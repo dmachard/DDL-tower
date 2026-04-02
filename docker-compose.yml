@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+      - ./config:/app/config
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    restart: always

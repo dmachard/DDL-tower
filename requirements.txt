@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiosqlite
+pydantic
+pydantic-settings
+aiohttp
+beautifulsoup4
+playwright
+apscheduler
+python-dotenv
+httpx
+jinja2
+parse-torrent-title
+PyYAML

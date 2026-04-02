@@ -1,0 +1,41 @@
+# DDLtower - Generic Configuration File
+
+# --- General System Settings ---
+app_name: "DDL Tower"
+debug: true
+
+# --- Database Configuration ---
+# Default to data folder inside the project
+database_url: "sqlite+aiosqlite:///./data/ddl.db"
+
+# --- AllDebrid API Settings ---
+# You can also use the ALLDEBRID_API_KEY environment variable
+alldebrid:
+  api_key: "YOUR_API_KEY_HERE"
+  agent: "ddl-tower-v2"
+
+# --- Scraper Global Settings ---
+# Frequency of the automated discovery scans (in minutes)
+scan_interval_minutes: 60
+
+# --- Direct & Global Extraction Patterns ---
+# Regular expressions used to identify download links on any page
+direct_scan_patterns:
+  - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+
+# --- Automated Discovery Sources (Scrapers) ---
+sources:
+  - name: "LinuxISO-Sample"
+    entry_url: "https://example.com/linux-isos"
+    entry_wait_for: ".content-loaded" # Optional selector to wait for (CSS/XPath)
+    crawls:
+      - pattern: 'https?://example\.com/subpage/[\w-]+' # Links to follow
+        wait_for: "a[href*='1fichier.com']" # Wait condition for subpages
+        scrape_once: true # Skip if already visited
+    target_patterns: # list of patterns to search for all sub pages
+      - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+
+  - name: "Manual-Paste-Example"
+    entry_url: "https://rentry.co/sample-links"
+    target_patterns:
+      - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'

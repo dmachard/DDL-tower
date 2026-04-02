@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDLtower | Ultra-Compact Dashboard</title>
+    <link rel="stylesheet" href="static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- Decorative background elements -->
+    <div class="bg-glow spot-1"></div>
+    <div class="bg-glow spot-2"></div>
+
+    <div class="app-shell">
+        <main class="main-content">
+            <header class="content-header">
+                <div class="logo">
+                    <h1>DDL<span>tower</span></h1>
+                </div>
+                <div class="header-search">
+                    <div class="search-wrapper scan-wrapper">
+                        <input type="text" id="direct-scan-input" placeholder="Scan a URL">
+                        <div id="scan-indicator" class="scan-indicator hidden"></div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <!-- Scan triggered via CLI/API only -->
+                </div>
+            </header>
+
+            <nav class="view-nav">
+                <button class="nav-item active" data-view="releases">
+                    Releases
+                    <span class="nav-count" id="count-releases">0</span>
+                </button>
+                <button class="nav-item" data-view="links">
+                    Explorer
+                    <span class="nav-count" id="count-links">0</span>
+                </button>
+                <button class="nav-item" data-view="scraped">
+                    Scans
+                    <span class="nav-count" id="count-scraped">0</span>
+                </button>
+                <button class="nav-item" data-view="stats">
+                    Statistics
+                </button>
+            </nav>
+
+            <div id="links-view" class="list-container view-section hidden">
+                <div class="view-toolbar">
+                    <div class="search-wrapper row-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="search-links" placeholder="Search in links...">
+                    </div>
+                    <div class="filter-group">
+                        <select id="filter-category" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="movie">Movies Only</option>
+                            <option value="series">Series Only</option>
+                        </select>
+                        <select id="filter-status" class="filter-select">
+                            <option value="">All Statuses</option>
+                            <option value="alive">Alive Only</option>
+                            <option value="dead">Dead Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="list-header">
+                    <div class="col-status">Status</div>
+                    <div class="col-content">Release</div>
+                    <div class="col-tech">Source</div>
+                    <div class="col-size">Size</div>
+                    <div class="col-date">Detected</div>
+                </div>
+                <div id="links-container" class="link-list">
+                    <!-- Links loop here -->
+                </div>
+                <!-- Pagination for Links -->
+                <div id="links-pagination" class="pagination-container">
+                    <button id="prev-links" class="btn-prev" disabled>Previous</button>
+                    <div id="links-page-numbers" class="page-numbers"></div>
+                    <button id="next-links" class="btn-next">Next</button>
+                </div>
+            </div>
+
+            <div id="releases-view" class="list-container view-section">
+                <div class="view-toolbar">
+                    <div class="search-wrapper row-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="search-releases" placeholder="Search in titles...">
+                    </div>
+                    <div class="filter-group">
+                        <select id="filter-category-releases" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="movie">Movies Only</option>
+                            <option value="series">Series Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="list-header release-grid-header">
+                    <div class="col-content">Title</div>
+                    <div class="col-releases">Available Versions</div>
+                </div>
+                <div id="releases-container" class="link-list">
+                    <!-- Grouped releases loop here -->
+                </div>
+                <!-- Pagination for Releases -->
+                <div id="releases-pagination" class="pagination-container">
+                    <button id="prev-releases" class="btn-prev" disabled>Previous</button>
+                    <div id="releases-page-numbers" class="page-numbers"></div>
+                    <button id="next-releases" class="btn-next">Next</button>
+                </div>
+            </div>
+
+            <div id="scraped-view" class="list-container view-section hidden">
+                <div class="view-toolbar">
+                    <div class="search-wrapper row-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="search-scraped" placeholder="Search in scans...">
+                    </div>
+                </div>
+                <div class="list-header scraped-grid">
+                    <div class="col-status">Status</div>
+                    <div class="col-content">Visited URL</div>
+                    <div class="col-tech">Scraper</div>
+                    <div class="col-frequency">Frequency</div>
+                    <div class="col-date">Last Scan</div>
+                </div>
+                <div id="scraped-container" class="link-list">
+                    <!-- Scraped history loop here -->
+                </div>
+                <!-- Pagination for Scans -->
+                <div id="scraped-pagination" class="pagination-container">
+                    <button id="prev-scraped" class="btn-prev" disabled>Previous</button>
+                    <div id="scraped-page-numbers" class="page-numbers"></div>
+                    <button id="next-scraped" class="btn-next">Next</button>
+                </div>
+            </div>
+
+            <div id="stats-view" class="view-section hidden">
+                <div class="stats-grid">
+                    <div class="stats-card">
+                        <div class="card-content">
+                            <span class="card-label">Unique Movies</span>
+                            <span class="card-value" id="stats-unique-movies">0</span>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="card-content">
+                            <span class="card-label">Movie Links</span>
+                            <span class="card-value" id="stats-links-movies">0</span>
+                        </div>
+                    </div>
+                    <div class="stats-card accent-blue">
+                        <div class="card-content">
+                            <span class="card-label">Total Volume</span>
+                            <span class="card-value" id="stats-size">0 GB</span>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="card-content">
+                            <span class="card-label">Unique Series</span>
+                            <span class="card-value" id="stats-unique-series">0</span>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="card-content">
+                            <span class="card-label">Series Links</span>
+                            <span class="card-value" id="stats-links-series">0</span>
+                        </div>
+                    </div>
+                    <div class="stats-card accent-red">
+                        <div class="card-content">
+                            <span class="card-label">Dead Links</span>
+                            <span class="card-value" id="stats-dead-links">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-detail-container">
+                    <div id="source-stats-container" class="source-grid">
+                        <!-- Source stats cards here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Templates -->
+    <template id="scraped-item-template">
+        <div class="link-row scraped-grid">
+            <div class="col-status">
+                <div class="status-dot"></div>
+            </div>
+            <div class="col-content">
+                <div class="row-url">
+                    <code class="link-url-code">...</code>
+                </div>
+            </div>
+            <div class="col-tech">
+                <span class="badge badge-hoster">...</span>
+            </div>
+            <div class="col-frequency">
+                <span class="badge badge-frequency">...</span>
+            </div>
+            <div class="col-date">...</div>
+        </div>
+    </template>
+
+    <template id="release-group-template">
+        <div class="release-group-row">
+            <div class="col-main">
+                <div class="group-title">...</div>
+                <div class="group-year">...</div>
+                <div class="group-last-updated">...</div>
+            </div>
+            <div class="col-releases">
+                <!-- Badges go here -->
+            </div>
+        </div>
+    </template>
+
+    <template id="link-item-template">
+        <div class="link-row">
+            <div class="col-status">
+                <div class="status-dot"></div>
+            </div>
+            <div class="col-content">
+                <div class="row-top">
+                    <span class="link-title">...</span>
+                    <span class="link-year"></span>
+                    <span class="link-season-ep hidden">...</span>
+                    <span class="link-resolution hidden">...</span>
+                    <span class="link-lang hidden">...</span>
+                </div>
+                <div class="row-bottom">
+                    <span class="link-filename">...</span>
+                </div>
+                <div class="row-url">
+                    <code class="link-url-code">...</code>
+                </div>
+            </div>
+            <div class="col-tech">
+                <span class="badge badge-hoster">...</span>
+            </div>
+            <div class="col-size">...</div>
+            <div class="col-date">...</div>
+        </div>
+    </template>
+
+    <script src="static/app.js?v=1.0.2"></script>
+</body>
+
+</html>
