@@ -1,6 +1,6 @@
 import re
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,9 +8,13 @@ from playwright.async_api import async_playwright
 from app.scrapers.base import BaseScraper
 from app.db.models import ScrapedURL
 
-class GenericScraper(BaseScraper):
+class CrawlScraper(BaseScraper):
+    """
+    Standard Scraper that crawls sublinks from an entry page
+    to find target download links.
+    """
     def __init__(self, config: dict):
-        self._name = config.get("name", "Generic")
+        self._name = config.get("name", "Crawl")
         self.entry_url = config.get("entry_url")
         self.entry_wait_for = config.get("entry_wait_for")
         self.crawls = config.get("crawls", [])
@@ -22,7 +26,6 @@ class GenericScraper(BaseScraper):
 
     async def run(self, session: Optional[AsyncSession] = None) -> AsyncGenerator[List[str], None]:
         async with async_playwright() as p:
-            # On utilise pas d'headless pour debugger si besoin ou selon config
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
             
@@ -123,12 +126,12 @@ class GenericScraper(BaseScraper):
                                 # Extract target links from subpage
                                 found_in_subpage = []
                                 for t_pattern in self.target_patterns:
-                                    found = re.findall(t_pattern, inner_html)
+                                    found = self._extract_links(inner_html, t_pattern)
                                     found_in_subpage.extend(found)
                                 
                                 if found_in_subpage:
                                     print(f"[{self.name}] Found {len(found_in_subpage)} target links on {url}")
-                                    yield list(dict.fromkeys(found_in_subpage))
+                                    yield {"links": list(dict.fromkeys(found_in_subpage)), "source_url": url}
                                 else:
                                     print(f"[{self.name}] No target links found on {url}")
                                 
@@ -138,12 +141,16 @@ class GenericScraper(BaseScraper):
                     # If no sub-steps, search directly on entry page
                     found_links = []
                     for pattern in self.target_patterns:
-                        found = re.findall(pattern, html)
+                        found = self._extract_links(html, pattern)
                         found_links.extend(found)
                     if found_links:
-                        yield list(dict.fromkeys(found_links))
+                        yield {"links": list(dict.fromkeys(found_links)), "source_url": self.entry_url}
 
             except Exception as e:
                 print(f"[{self.name}] ERROR: {e}")
             finally:
                 await browser.close()
+
+    def _extract_links(self, html: str, pattern: str) -> List[str]:
+        """Generic link extraction using current pattern."""
+        return re.findall(pattern, html)

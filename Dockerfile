@@ -30,5 +30,5 @@ COPY app /app/app
 # Expose port
 EXPOSE 8000
 
-# Start command with reload for development
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+# Start command with reload for development # , "--reload"
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"] 

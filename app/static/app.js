@@ -126,7 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (urlCode) urlCode.textContent = link.url;
 
             const hosterBadge = clone.querySelector('.badge-hoster');
-            if (hosterBadge) hosterBadge.textContent = link.source_name || "Manuel";
+            if (hosterBadge) {
+                if (link.source_url) {
+                    hosterBadge.innerHTML = `<a href="${link.source_url}" target="_blank" class="badge-source-link">${link.source_name || "Manuel"}</a>`;
+                } else {
+                    hosterBadge.textContent = link.source_name || "Manuel";
+                }
+            }
 
             const sizeCol = clone.querySelector('.col-size');
             if (sizeCol) sizeCol.textContent = link.size || 'N/A';
@@ -164,56 +170,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const releasesCol = clone.querySelector('.col-releases');
             
-            // Helper for sorting resolutions descending
+            const resolutions = group.resolutions || {};
             const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
-            const sortRes = (a, b) => (resOrder[b] || 0) - (resOrder[a] || 0);
+            const sortedRes = Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0));
 
-            const renderGroupedByRes = (items, container) => {
-                const resGroups = {};
-                items.forEach(rel => {
-                    const res = rel.resolution || 'HD';
-                    if (!resGroups[res]) resGroups[res] = [];
-                    resGroups[res].push(rel);
+            sortedRes.forEach(res => {
+                const resRow = document.createElement('div');
+                resRow.className = 'quality-row';
+                resRow.innerHTML = `<div class="quality-label">${res}</div>`;
+                
+                // Group by season
+                const seasonGroups = {};
+                resolutions[res].forEach(rel => {
+                    const s = rel.season || "Other";
+                    if (!seasonGroups[s]) seasonGroups[s] = [];
+                    seasonGroups[s].push(rel);
                 });
 
-                const sortedRes = Object.keys(resGroups).sort(sortRes);
-                sortedRes.forEach(res => {
-                    const subZone = document.createElement('div');
-                    subZone.className = 'quality-subzone';
-                    subZone.innerHTML = `<span class="quality-tag">${res}</span><div class="quality-badges"></div>`;
-                    const badgesContainer = subZone.querySelector('.quality-badges');
+                const sortedSeasons = Object.keys(seasonGroups).sort((a, b) => {
+                    if (a === "Other") return 1;
+                    if (b === "Other") return -1;
+                    return parseInt(a) - parseInt(b);
+                });
+
+                const seasonsContainer = document.createElement('div');
+                seasonsContainer.className = 'seasons-container';
+                resRow.appendChild(seasonsContainer);
+
+                sortedSeasons.forEach(s => {
+                    const seasonDiv = document.createElement('div');
+                    seasonDiv.className = 'season-group';
                     
-                    resGroups[res].forEach(rel => {
-                        const badge = createReleaseBadge(rel, group.last_updated);
-                        badgesContainer.appendChild(badge);
+                    if (group.category === 'series' && s !== "Other") {
+                        const sHeader = document.createElement('div');
+                        sHeader.className = 'season-header';
+                        sHeader.textContent = `Season ${s.toString().padStart(2, '0')}`;
+                        seasonDiv.appendChild(sHeader);
+                    }
+                    
+                    const grid = document.createElement('div');
+                    grid.className = 'quality-grid';
+                    seasonDiv.appendChild(grid);
+
+                    seasonGroups[s].forEach(rel => {
+                        const card = createReleaseCard(rel);
+                        grid.appendChild(card);
                     });
-                    container.appendChild(subZone);
-                });
-            };
-
-            if (group.category === 'series') {
-                const packs = group.releases.filter(rel => rel.season && !rel.episode);
-                const episodes = group.releases.filter(rel => rel.season && rel.episode);
-                const others = group.releases.filter(rel => !rel.season);
-
-                const renderCategoryZone = (items, label) => {
-                    if (items.length === 0) return;
-                    const zone = document.createElement('div');
-                    zone.className = `release-zone ${label.toLowerCase()}-zone`;
-                    zone.innerHTML = `<div class="zone-label">${label}</div><div class="zone-content"></div>`;
-                    const zoneContent = zone.querySelector('.zone-content');
                     
-                    renderGroupedByRes(items, zoneContent);
-                    releasesCol.appendChild(zone);
-                };
-
-                renderCategoryZone(packs, 'Packs');
-                renderCategoryZone(episodes, 'Episodes');
-                renderCategoryZone(others, 'Misc');
-            } else {
-                // Movies - just group by resolution
-                renderGroupedByRes(group.releases, releasesCol);
-            }
+                    seasonsContainer.appendChild(seasonDiv);
+                });
+                
+                releasesCol.appendChild(resRow);
+            });
 
             container.appendChild(clone);
         });
@@ -221,29 +229,60 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPagination('releases');
     };
 
-    const createReleaseBadge = (rel, last_updated) => {
-        const badge = document.createElement('a');
-        badge.className = 'release-badge';
-        badge.href = rel.url;
-        badge.target = '_blank';
+    const createReleaseCard = (rel) => {
+        const card = document.createElement('div');
+        card.className = 'release-card clickable';
         
-        const isNewest = rel.last_checked === last_updated;
-        if (isNewest) badge.classList.add('is-newest');
-        
+        const isNew = (lastChecked) => {
+            if (!lastChecked) return false;
+            const now = new Date();
+            const checked = new Date(lastChecked);
+            const diffHours = (now - checked) / (1000 * 60 * 60);
+            return diffHours < 48; // New if less than 48h old
+        };
+
         const seasonEp = formatSeasonEp(rel.season, rel.episode);
-        
-        badge.innerHTML = `
-            ${isNewest ? '<span class="new-label">NEW</span>' : ''}
-            <div class="rel-mid">
-                <span class="rel-size">${rel.size || 'N/A'}</span>
-                ${seasonEp ? `<span class="rel-se">${seasonEp}</span>` : ''}
+        const allUrls = rel.parts.map(p => p.url).join('\n');
+
+        card.innerHTML = `
+            <div class="rel-header">
+                <div class="rel-tags">
+                    ${seasonEp ? `<span class="rel-se">${seasonEp}</span>` : ''}
+                    ${rel.language && rel.language !== 'None' ? `<span class="rel-lang-tag">${rel.language}</span>` : ''}
+                </div>
+                <div class="rel-copy-tag">
+                    <i class="fas fa-copy"></i>
+                    ${isNew(rel.last_checked) ? '<i class="fas fa-star badge-star" title="New Release"></i>' : ''}
+                </div>
             </div>
-            <div class="rel-bottom">
-                ${rel.language && rel.language !== 'None' ? `<span class="rel-lang">${rel.language}</span>` : ''}
-                <span class="rel-source">${rel.source_name || 'Manuel'}</span>
+            <div class="rel-footer">
+                <span class="rel-parts-count">${rel.parts.length} file${rel.parts.length > 1 ? 's' : ''}</span>
+                <span class="rel-size">${rel.total_size}</span>
+            </div>
+            <div class="rel-source">
+                <i class="fas fa-server"></i> 
+                ${rel.source_url ? `<a href="${rel.source_url}" target="_blank" class="rel-source-link">${rel.source || 'Unknown'}</a>` : (rel.source || 'Unknown')}
             </div>
         `;
-        return badge;
+
+        const copyBtn = card.querySelector('.rel-copy-tag');
+        copyBtn.onclick = async (e) => {
+            e.stopPropagation();
+            try {
+                await navigator.clipboard.writeText(allUrls);
+                const icon = copyBtn.querySelector('i');
+                icon.className = 'fas fa-check';
+                copyBtn.classList.add('success');
+                setTimeout(() => {
+                    icon.className = 'fas fa-copy';
+                    copyBtn.classList.remove('success');
+                }, 1000);
+            } catch (err) {
+                console.error('Failed to copy!', err);
+            }
+        };
+
+        return card;
     };
 
     const renderScraped = (items) => {

@@ -13,3 +13,4 @@ httpx
 jinja2
 parse-torrent-title
 PyYAML
+feedparser

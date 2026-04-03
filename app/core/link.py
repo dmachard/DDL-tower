@@ -1,19 +1,22 @@
 import math
+import PTN # NEW: For cleaning override_title
 from datetime import datetime, timezone
 from typing import List
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import DownloadLink
-from app.services.alldebrid import AllDebridClient
+from app.core.hoster import Hoster
+from app.core.utils import format_size # Import generic utility
 
 class LinkManager:
     def __init__(self):
-        self.ad_client = AllDebridClient()
+        self.hoster = Hoster()
 
-    async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str):
+    async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str, override_filename: str = None) -> List[DownloadLink]:
         """
         Manages ONLY physical links: 
         AllDebrid verification AND database insertion.
+        If override_filename is provided, it's used as the base filename (useful for multi-part).
         """
         if not raw_links: return
 
@@ -30,30 +33,31 @@ class LinkManager:
             print(f"[LINK] No new links for {source_name}.")
             return
 
-        print(f"[LINK] Verifying {len(new_links)} new links via AllDebrid...")
-        ad_results = await self.ad_client.check_links(new_links)
-
-        for link, info in ad_results.items():
-            filename = info.get('filename')
+        print(f"[LINK] Verifying {len(new_links)} new links via hoster...")
+        hv_results = await self.hoster.check_links(new_links)
+        
+        added_links = []
+        
+        for link in new_links:
+            info = hv_results.get(link, {"status": "unknown"})
+            # Source of truth for filename: override_filename if present, else what hoster found
+            filename = override_filename if override_filename else info.get('filename')
             status = info.get('status', 'dead')
             
-            new_link = DownloadLink(
+            new_db_link = DownloadLink(
                 url=link,
                 hoster=info.get('host', 'unknown'),
                 status=status,
                 filename=filename,
-                size=self._format_size(info.get('size', 0)),
+                size=format_size(info.get('size', 0)),
+                size_bytes=info.get('size', 0),
                 last_checked=datetime.now(timezone.utc),
-                source_name=source_name
+                source_name=source_name,
+                source_url=source_url
             )
-            session.add(new_link)
-            print(f"[LINK] Added link to DB: {filename}")
+            session.add(new_db_link)
+            added_links.append(new_db_link)
+            print(f"[LINK] Added link: {filename or link}")
+        
+        return added_links
 
-    def _format_size(self, size_bytes: int) -> str:
-        if size_bytes == 0: return "0B"
-        import math
-        size_name = ("B", "KB", "MB", "GB", "TB")
-        i = int(math.floor(math.log(size_bytes, 1024)))
-        p = math.pow(1024, i)
-        s = round(size_bytes / p, 2)
-        return f"{s} {size_name[i]}"

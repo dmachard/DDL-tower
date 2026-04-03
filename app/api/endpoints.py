@@ -5,6 +5,7 @@ from sqlalchemy import func, or_
 from pydantic import BaseModel
 from typing import List
 import math
+import re
 
 from app.db.database import get_db
 from app.db.models import DownloadLink, ScrapedURL
@@ -104,10 +105,9 @@ async def get_releases(
     result = await db.execute(stmt)
     groups = result.all()
     
-    # For each group, fetch all its releases
+    # For each group, fetch and aggregate its releases
     items = []
     for g_title, g_year, g_cat, g_latest in groups:
-        # Avoid null titles in grouping results if any
         if not g_title: continue
         
         rel_stmt = select(DownloadLink).where(
@@ -120,12 +120,77 @@ async def get_releases(
         rel_result = await db.execute(rel_stmt)
         releases = rel_result.scalars().all()
         
+        # Secondary grouping by Release Card (Episode, Pack, or unique Movie release)
+        release_cards = {}
+        for r in releases:
+            # Create a "release signature" by removing part indicators from filename
+            sig = r.filename or ""
+            sig = re.sub(r'[._ ]part\s*\d+', '', sig, flags=re.I)
+            sig = re.sub(r'[._ ]pt\s*\d+', '', sig, flags=re.I)
+            sig = re.sub(r'\.(rar|zip|7z|html)$', '', sig, flags=re.I)
+            
+            # Group key: (Season, Episode, Resolution, Language, Source, Signature)
+            key = (r.season, r.episode, r.resolution, r.language, r.source_name, sig.lower())
+            
+            if key not in release_cards:
+                release_cards[key] = {
+                    "id": r.id,
+                    "season": r.season,
+                    "episode": r.episode,
+                    "resolution": r.resolution,
+                    "language": r.language,
+                    "source": r.source_name,
+                    "source_url": r.source_url,
+                    "total_bytes": 0,
+                    "last_checked": r.last_checked,
+                    "parts": []
+                }
+            
+            # Sum size and add part
+            b = r.size_bytes or parse_size(r.size)
+            release_cards[key]["total_bytes"] += b
+            
+            # Detect part number
+            part_match = re.search(r'Part\s*(\d+)', r.filename, re.I)
+            part_num = int(part_match.group(1)) if part_match else 1
+            
+            release_cards[key]["parts"].append({
+                "id": r.id,
+                "part": part_num,
+                "size": r.size,
+                "hoster": r.hoster,
+                "url": r.url
+            })
+            
+        # Final formatting for the title group
+        release_items = []
+        for card in release_cards.values():
+            card["parts"].sort(key=lambda x: x["part"])
+            card["total_size"] = format_size(card["total_bytes"])
+            release_items.append(card)
+
+        # Group cards by resolution
+        resolutions_map = {}
+        for card in release_cards.values():
+            res = card["resolution"] or "HD"
+            if res not in resolutions_map:
+                resolutions_map[res] = []
+            resolutions_map[res].append(card)
+        
+        # Sort each resolution list by season/episode (ensure we handle potential string/int mix)
+        for res in resolutions_map:
+            resolutions_map[res].sort(key=lambda x: (
+                int(x["season"]) if x["season"] is not None and str(x["season"]).isdigit() else 0,
+                int(x["episode"]) if x["episode"] is not None and str(x["episode"]).isdigit() else 0
+            ))
+
         items.append({
             "title": g_title,
             "year": g_year,
             "category": g_cat,
             "last_updated": g_latest,
-            "releases": releases
+            "resolutions": resolutions_map,
+            "count": len(release_cards)
         })
         
     return {

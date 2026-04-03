@@ -2,22 +2,23 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
-from app.scrapers.generic import GenericScraper
+from app.scrapers.crawl_scraper import CrawlScraper
+from app.scrapers.rss_scraper import RSSScraper # NEW
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
 
 scheduler = AsyncIOScheduler()
 
 async def run_scrapers():
-    """
-    Sequential Orchestrator: 
-    1. Discovery (Scraper) -> raw links
-    2. Verification & Storage (LinkManager) -> Fill DownloadLink
-    3. Enrichment (Categorizer) -> Metadata extraction (Title, Season, Resolution, Codec, Multi...)
-    """
     print(f"[SCHEDULER] [{datetime.now().strftime('%H:%M:%S')}] Starting sequence...")
     
-    scrapers = [GenericScraper(config) for config in settings.SCRAPER_SOURCES]
+    scrapers = []
+    for config in settings.SCRAPER_SOURCES:
+        if "rss_url" in config:
+            scrapers.append(RSSScraper(config))
+        else:
+            scrapers.append(CrawlScraper(config))
+
     link_manager = LinkManager()
     categorizer = Categorizer()
     
@@ -25,40 +26,53 @@ async def run_scrapers():
         # STEP A: DISCOVERY & LINK STORAGE (Per scraper)
         for scraper in scrapers:
             try:
+                print(f"[SCHEDULER] Running scraper: {scraper.name}")
                 # Iterate over the async generator to process links in real-time
-                async for links_batch in scraper.run(session):
-                    if not links_batch:
+                async for batch in scraper.run(session):
+                    if not batch:
+                        continue
+                    
+                    # Scrapers now return a dictionary with links and optional metadata
+                    if isinstance(batch, dict):
+                        links = batch.get("links")
+                        override_filename = batch.get("override_filename")
+                        batch_source_url = batch.get("source_url")
+                    else:
+                        links = batch
+                        override_filename = None
+                        batch_source_url = None
+                    
+                    if not links:
                         continue
 
-                    # The Link module handles its own table and AllDebrid
-                    await link_manager.check_links(
+                    # Determine source URL for tracking: prioritize the precise URL from the batch
+                    s_url = batch_source_url or getattr(scraper, "entry_url", None) or getattr(scraper, "rss_url", None)
+
+                    # check the status of links
+                    new_links = await link_manager.check_links(
                         session=session,
-                        raw_links=links_batch,
-                        source_url=scraper.entry_url,
-                        source_name=scraper.name
+                        raw_links=links,
+                        source_url=s_url,
+                        source_name=scraper.name,
+                        override_filename=override_filename 
                     )
                     
                     # Commit immediately for UI display
                     await session.commit()
-                    print(f"[SCHEDULER] Batch of {len(links_batch)} links from '{scraper.name}' stored (real-time).")
-
-                    # Immediate enrichment for badge display (WOW effect)
-                    try:
-                        await categorizer.enrich_links(session)
-                        await session.commit()
-                        print(f"[SCHEDULER] Real-time enrichment for '{scraper.name}' finished.")
-                    except Exception as e:
-                        print(f"[SCHEDULER] Real-time enrichment error: {e}")
+                    
+                    if new_links:
+                        print(f"[SCHEDULER] Batch of {len(new_links)} new links from '{scraper.name}' stored. Starting enrichment...")
+                        # Immediate enrichment for badge display (WOW effect)
+                        try:
+                            await categorizer.enrich_links(session, links=new_links)
+                            await session.commit()
+                            print(f"[SCHEDULER] Real-time enrichment for '{scraper.name}' finished.")
+                        except Exception as e:
+                            print(f"[SCHEDULER] Real-time enrichment error for '{scraper.name}': {e}")
+                    else:
+                        print(f"[SCHEDULER] No new links from '{scraper.name}' in this batch.")
                 
                 print(f"[SCHEDULER] Full scan for '{scraper.name}' finished.")
-
-                # STEP B: ENRICHMENT (Immediate for the current scraper)
-                try:
-                    await run_categorization()
-                    print(f"[SCHEDULER] Metadata enrichment for '{scraper.name}' finished.")
-                except Exception as e:
-                    print(f"[SCHEDULER] Error in enrichment phase for '{scraper.name}': {e}")
-
             except Exception as e:
                 print(f"[SCHEDULER] Error in cycle for '{scraper.name}': {e}")
                 await session.rollback()

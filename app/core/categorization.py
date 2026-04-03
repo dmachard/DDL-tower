@@ -1,27 +1,37 @@
-import PTN
+from typing import List
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import DownloadLink
 
+import PTN
+
 class Categorizer:
     @staticmethod
-    async def enrich_links(session: AsyncSession):
+    async def enrich_links(session: AsyncSession, links: List[DownloadLink] = None):
         """
-        Extracts metadata (Title, Season, Quality...) for all RAW links
-        (those that don't have a 'title' yet).
+        Extracts metadata (Title, Season, Quality...) for links.
+        If 'links' is provided, it processes only those.
+        Otherwise, it scans the database for links without a title (batch fallback).
         """
-        # 1. Look for links to process
-        stmt = select(DownloadLink).where(DownloadLink.title == None)
-        q = await session.execute(stmt)
-        links = q.scalars().all()
-        
-        if not links:
-            print("[CATEGORIZER] No raw links to enrich.")
+        if links is None:
+            # Batch mode: Look for links without a title in the DB BUT with a filename!
+            stmt = select(DownloadLink).where(DownloadLink.title == None, DownloadLink.filename != None)
+            q = await session.execute(stmt)
+            processed_links = q.scalars().all()
+        else:
+            processed_links = links
+            
+        if not processed_links:
+            if links is None: # Only log if it was a batch scan
+                print("[CATEGORIZER] No raw links for batch enrichment.")
             return
 
-        print(f"[CATEGORIZER] Enriching {len(links)} raw links...")
+        print(f"[CATEGORIZER] Enriching {len(processed_links)} links (Real-time Flow)...")
 
-        for link in links:
+        for link in processed_links:
+            if not link.filename:
+                continue
+                
             # Parse the filename
             p = PTN.parse(link.filename)
             

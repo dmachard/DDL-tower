@@ -20,3 +20,8 @@ Dashboard : http://localhost:8001
 ## Configuration
 
 Via config/config.yaml — scanning patterns, scheduler frequency, integrations.
+
+## cli
+
+# reset links
+docker compose exec app python3 app/scripts/reset_links.py ....

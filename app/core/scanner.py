@@ -17,10 +17,6 @@ class DirectScanner:
         self.categorizer = Categorizer()
         # Use explicit patterns from config
         self.target_patterns = settings.DIRECT_SCAN_PATTERNS
-        
-        # Fallback if config is empty
-        if not self.target_patterns:
-            self.target_patterns = [r"https?://(?:www\.)?1fichier\.com/\?[\w-]+"]
 
     async def scan_urls(self, urls: List[str]):
         """
@@ -55,7 +51,8 @@ class DirectScanner:
                             continue
                     
                     full_html = " ".join(all_html)
-                    
+                    print("[DIRECT-SCAN] Page loaded. Size: ", len(full_html))
+   
                     # 5. Extract target links only
                     found_links = set()
                     for pattern in self.target_patterns:
@@ -73,23 +70,32 @@ class DirectScanner:
                         )
                         await session.merge(scraped_entry)
                         
-                        if found_links:
-                            print(f"[DIRECT-SCAN] Found {len(found_links)} links on {url}")
-                            # Use LinkManager to check mortality and store in DownloadLink
-                            await self.link_manager.check_links(
-                                session=session,
+                        if not found_links:
+                            print(f"[DIRECT-SCAN] No links found on {url}")
+                            await session.commit()
+                            continue
+                        
+                        print(f"[DIRECT-SCAN] Found {len(found_links)} links on {url}")
+                        # Use LinkManager to check mortality and store in DownloadLink
+                        await self.link_manager.check_links(
+                            session=session,
                                 raw_links=list(found_links),
                                 source_url=url,
                                 source_name="Manuel"
                             )
                             
-                            # Commit so Categorizer can see them
-                            await session.commit()
-                            
-                            # Enrich metadata
-                            await self.categorizer.enrich_links(session)
-                        
+                        # Commit so Categorizer can see them
                         await session.commit()
+                        
+                        # Enrich metadata ONLY for found links, not the whole DB!
+                        if found_links:
+                            # We need to get the actual DownloadLink objects from the DB for Categorizer
+                            stmt = select(DownloadLink).where(DownloadLink.url.in_(list(found_links)))
+                            res = await session.execute(stmt)
+                            db_links = res.scalars().all()
+                            if db_links:
+                                await self.categorizer.enrich_links(session, links=db_links)
+                                await session.commit()
                         
                 except Exception as e:
                     print(f"[DIRECT-SCAN] Error scanning {url}: {e}")

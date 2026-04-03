@@ -39,3 +39,11 @@ sources:
     entry_url: "https://rentry.co/sample-links"
     target_patterns:
       - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+
+  - name: "RSS-Example"
+    rss_url: "https://example.com/rss"
+    required_keywords:
+      - "1fichier"
+    click_selector: ".content-loaded"
+    target_patterns:
+      - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
