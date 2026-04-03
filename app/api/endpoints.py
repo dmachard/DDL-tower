@@ -140,14 +140,16 @@ async def get_releases(
         # Secondary grouping by Release Card (Episode, Pack, or unique Movie release)
         release_cards = {}
         for r in releases:
-            # Create a "release signature" by removing part indicators from filename
+            # Create a "release signature" by removing part indicators and normalizing delimiters
             sig = r.filename or ""
             sig = re.sub(r'[._ ]part\s*\d+', '', sig, flags=re.I)
             sig = re.sub(r'[._ ]pt\s*\d+', '', sig, flags=re.I)
             sig = re.sub(r'\.(rar|zip|7z|html)$', '', sig, flags=re.I)
+            # Unify delimiters for better mirror resistance
+            sig = re.sub(r'[._\s-]+', '.', sig).lower()
             
-            # Group key: (Season, Episode, Resolution, Language, Source, Signature)
-            key = (r.season, r.episode, r.resolution, r.language, r.source_name, sig.lower())
+            # Group key: (Season, Episode, Resolution, Language, Source, Sig)
+            key = (r.season, r.episode, r.resolution, r.language, r.source_name, sig)
             
             if key not in release_cards:
                 is_new = False
@@ -156,7 +158,7 @@ async def get_releases(
                     if l_checked.tzinfo is None:
                         l_checked = l_checked.replace(tzinfo=timezone.utc)
                     is_new = l_checked >= threshold
-
+ 
                 release_cards[key] = {
                     "id": r.id,
                     "season": r.season,
@@ -166,31 +168,38 @@ async def get_releases(
                     "source": r.source_name,
                     "source_url": r.source_url,
                     "total_bytes": 0,
+                    "part_sizes": {}, 
                     "last_checked": r.last_checked,
                     "is_new": is_new,
                     "parts": []
                 }
             
-            # Sum size and add part
-            b = r.size_bytes or parse_size(r.size)
-            release_cards[key]["total_bytes"] += b
-            
-            # Detect part number
-            part_match = re.search(r'Part\s*(\d+)', r.filename, re.I)
-            part_num = int(part_match.group(1)) if part_match else 1
-            
-            release_cards[key]["parts"].append({
-                "id": r.id,
-                "part": part_num,
-                "size": r.size,
-                "size_bytes": r.size_bytes,
-                "hoster": r.hoster,
-                "url": r.url
-            })
+            card = release_cards[key]
+            if not any(p["url"] == r.url for p in card["parts"]):
+                # Detect part number
+                part_match = re.search(r'Part\s*(\d+)', r.filename or '', re.I)
+                part_num = int(part_match.group(1)) if part_match else 1
+                
+                # Update total bytes only for unique part numbers
+                # (Pick the largest part found among mirrors)
+                b = r.size_bytes or 0
+                if part_num not in card["part_sizes"] or b > card["part_sizes"][part_num]:
+                    card["part_sizes"][part_num] = b
+                
+                card["parts"].append({
+                    "id": r.id,
+                    "part": part_num,
+                    "size": r.size,
+                    "size_bytes": r.size_bytes,
+                    "hoster": r.hoster,
+                    "url": r.url
+                })
             
         # Final formatting for the title group
         release_items = []
         for card in release_cards.values():
+            # Calculate total_bytes from unique parts
+            card["total_bytes"] = sum(card["part_sizes"].values())
             card["parts"].sort(key=lambda x: x["part"])
             card["total_size"] = format_size(card["total_bytes"])
             release_items.append(card)

@@ -269,10 +269,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         card.innerHTML = `
             <div class="rel-meta-top">
-                ${rel.source_url ? 
-                    `<a href="${rel.source_url}" target="_blank" class="rel-source-link"><i class="fas fa-server"></i> ${rel.source || '...'}</a>` :
-                    `<span class="rel-source-label"><i class="fas fa-server"></i> ${rel.source || '...'}</span>`
-                }
+                ${rel.source_url ?
+                `<a href="${rel.source_url}" target="_blank" class="rel-source-link"><i class="fas fa-server"></i> ${rel.source || '...'}</a>` :
+                `<span class="rel-source-label"><i class="fas fa-server"></i> ${rel.source || '...'}</span>`
+            }
                 ${rel.is_new ? '<i class="fas fa-star badge-star" title="New Release"></i>' : ''}
             </div>
             <div class="rel-tags">
