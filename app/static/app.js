@@ -233,14 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.createElement('div');
         card.className = 'release-card clickable';
         
-        const isNew = (lastChecked) => {
-            if (!lastChecked) return false;
-            const now = new Date();
-            const checked = new Date(lastChecked);
-            const diffHours = (now - checked) / (1000 * 60 * 60);
-            return diffHours < 48; // New if less than 48h old
-        };
-
         const seasonEp = formatSeasonEp(rel.season, rel.episode);
         const allUrls = rel.parts.map(p => p.url).join('\n');
 
@@ -252,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="rel-copy-tag">
                     <i class="fas fa-copy"></i>
-                    ${isNew(rel.last_checked) ? '<i class="fas fa-star badge-star" title="New Release"></i>' : ''}
+                    ${rel.is_new ? '<i class="fas fa-star badge-star" title="New Release"></i>' : ''}
                 </div>
             </div>
             <div class="rel-footer">

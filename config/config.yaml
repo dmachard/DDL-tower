@@ -17,6 +17,8 @@ alldebrid:
 # --- Scraper Global Settings ---
 # Frequency of the automated discovery scans (in minutes)
 scan_interval_minutes: 60
+# Multiplier to determine novelty threshold (scan_interval * multiplier)
+scan_novelty_multiplier: 2
 
 # --- Direct & Global Extraction Patterns ---
 # Regular expressions used to identify download links on any page

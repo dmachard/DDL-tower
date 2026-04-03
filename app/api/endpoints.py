@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy import func, or_
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime, timezone, timedelta
 import math
 import re
 
@@ -13,10 +14,22 @@ from app.core.scheduler import run_scrapers
 from app.core.scanner import DirectScanner
 from app.core.utils import parse_size, format_size
 
+from app.core.config import settings
 router = APIRouter(prefix="/api")
 
 class ScanRequest(BaseModel):
     urls: List[str]
+
+async def get_latest_scan_time(db: AsyncSession):
+    """
+    Retrieve the most recent scan timestamp from ScrapedURL table.
+    """
+    stmt = select(func.max(ScrapedURL.last_scraped))
+    result = await db.execute(stmt)
+    res = result.scalar()
+    if res and res.tzinfo is None:
+        return res.replace(tzinfo=timezone.utc)
+    return res
 
 @router.get("/links")
 async def get_links(
@@ -105,6 +118,10 @@ async def get_releases(
     result = await db.execute(stmt)
     groups = result.all()
     
+    # Calculate novelty threshold (multiplier from config)
+    last_scan = await get_latest_scan_time(db)
+    threshold = last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER) if last_scan else None
+
     # For each group, fetch and aggregate its releases
     items = []
     for g_title, g_year, g_cat, g_latest in groups:
@@ -133,6 +150,13 @@ async def get_releases(
             key = (r.season, r.episode, r.resolution, r.language, r.source_name, sig.lower())
             
             if key not in release_cards:
+                is_new = False
+                if r.last_checked and threshold:
+                    l_checked = r.last_checked
+                    if l_checked.tzinfo is None:
+                        l_checked = l_checked.replace(tzinfo=timezone.utc)
+                    is_new = l_checked >= threshold
+
                 release_cards[key] = {
                     "id": r.id,
                     "season": r.season,
@@ -143,6 +167,7 @@ async def get_releases(
                     "source_url": r.source_url,
                     "total_bytes": 0,
                     "last_checked": r.last_checked,
+                    "is_new": is_new,
                     "parts": []
                 }
             
