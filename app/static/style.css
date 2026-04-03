@@ -1177,42 +1177,89 @@ body {
     width: 100%;
 }
 
+.rel-meta-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.rel-source-label, 
+.rel-source-link {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.7;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.rel-source-link:hover {
+    color: var(--accent);
+    opacity: 1;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.rel-source-label i,
+.rel-source-link i {
+    font-size: 10px;
+}
+
 .rel-tags {
     display: flex;
     gap: 6px;
     align-items: center;
     flex-wrap: wrap;
+    margin-bottom: 4px;
 }
 
-.rel-se {
-    font-size: 10px;
-    font-weight: 900;
-    text-transform: uppercase;
-    color: white;
-    background: var(--accent-gradient);
-    padding: 2px 8px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-    box-shadow: 0 2px 10px var(--accent-glow);
-}
-
-.rel-lang-tag {
+.rel-tag {
     font-size: 9px;
-    font-weight: 800;
-    color: var(--text-dim);
-    background: rgba(255, 255, 255, 0.05);
-    padding: 2px 8px;
+    font-weight: 900;
+    padding: 2px 7px;
     border-radius: 4px;
     text-transform: uppercase;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    letter-spacing: 0.5px;
     display: flex;
     align-items: center;
+    height: 18px;
 }
 
-.rel-lang-tag i {
-    margin-right: 4px !important;
-    font-size: 10px !important;
-    color: var(--accent) !important;
+.rel-tag-se {
+    color: white;
+    background: var(--accent-gradient);
+    box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.rel-tag-lang {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.rel-tag-res {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.rel-hoster-badge {
+    font-size: 9px;
+    font-weight: 900;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .rel-copy-tag {
@@ -1235,25 +1282,70 @@ body {
     transform: scale(1.1);
 }
 
-.rel-footer {
+.rel-providers {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    margin-top: 0;
+}
+
+.rel-provider-row {
+    display: flex;
     align-items: center;
-    margin-top: auto;
+    gap: 12px;
+    padding: 3px 0;
+    transition: var(--transition);
 }
 
-.rel-parts-count {
-    font-size: 9px;
+.rel-provider-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.rel-p-name {
+    font-size: 11px;
     font-weight: 800;
-    color: var(--text-dim);
+    color: var(--text-primary);
     text-transform: uppercase;
-    opacity: 0.6;
+    letter-spacing: 0.5px;
+    flex: 1;
 }
 
-.rel-size {
-    font-size: 12px;
+.rel-p-count {
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--text-dim);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.rel-p-size {
+    font-size: 11px;
     font-weight: 700;
     color: var(--text-secondary);
+}
+
+.rel-p-copy {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 6px;
+    font-size: 14px;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.rel-p-copy:hover {
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.rel-p-copy.success {
+    color: var(--success);
 }
 
 /* Success Feedback */
@@ -1294,14 +1386,14 @@ body {
 /* Grid Layout V9 - 4 Columns Max & Wider Cards */
 .col-releases {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 15px !important;
     width: 100% !important;
 }
 
 .release-card {
-    min-width: 220px !important;
-    max-width: 100% / 4;
+    min-width: 280px !important;
+    max-width: 100%;
 }
 
 /* Adjustments for smaller screens */
@@ -1367,7 +1459,7 @@ body {
 
 .quality-grid {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 12px !important;
     flex: 1;
 }
@@ -1441,7 +1533,7 @@ body {
 
 .quality-grid {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 15px !important;
     width: 100%;
 }
@@ -1489,14 +1581,15 @@ body {
 
 .quality-grid {
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
     gap: 15px !important;
     width: 100% !important;
 }
 
 /* Card refinement */
 .release-card {
-    min-width: 200px !important;
+    min-width: 280px !important;
+    max-width: 100%;
 }
 
 /* Absolute Alignment Fix (V15) */
@@ -1548,25 +1641,18 @@ body {
 .quality-grid {
     flex: 1 !important;
     display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 15px !important;
 }
 
 /* NEW Badge Style (V17) */
-.badge-new {
+.rel-new-corner {
     position: absolute;
-    top: 0;
-    left: 0;
-    background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
-    color: white;
-    font-size: 8px;
-    font-weight: 900;
-    padding: 2px 6px;
-    border-bottom-right-radius: 8px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
-    z-index: 10;
+    top: 8px;
+    right: 10px;
+    color: #f59e0b;
+    font-size: 11px;
+    filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.5));
 }
 
 /* Add some padding to card header if badge exists */
@@ -1579,12 +1665,10 @@ body {
     border-radius: 4px !important;
 }
 
-.rel-se,
-.rel-lang-tag,
+.rel-tag,
 .quality-label,
 .badge-new {
     border-radius: 2px !important;
-    /* Sharper tags too */
 }
 
 /* NEW Badge Spacing Fix (V19) */
@@ -1655,12 +1739,8 @@ body {
 }
 
 /* Source Position Adjustment (V22) */
-.rel-source {
-    margin-top: 5px !important;
-    margin-bottom: 0 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.03);
-    /* Subtle separator */
-    padding-top: 5px !important;
+.rel-footer {
+    display: none !important;
 }
 
 .rel-footer {

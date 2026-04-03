@@ -47,11 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
             dateStr += 'Z';
         }
         const d = new Date(dateStr);
-        return d.toLocaleDateString('en-US', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            hour: '2-digit', 
-            minute: '2-digit' 
+        return d.toLocaleDateString('en-US', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
         });
     };
 
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         links.forEach((link, index) => {
             const clone = linkTemplate.content.cloneNode(true);
             const row = clone.querySelector('.link-row');
-            
+
             row.style.animationDelay = `${index * 0.01}s`;
             if (link.category) row.classList.add(`cat-${link.category}`);
 
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const titleEl = clone.querySelector('.link-title');
             if (titleEl) titleEl.textContent = link.title || link.filename || link.url;
-            
+
             if (link.year) {
                 const yearSpan = clone.querySelector('.link-year');
                 if (yearSpan) yearSpan.textContent = `(${link.year})`;
@@ -121,28 +121,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const filenameEl = clone.querySelector('.link-filename');
             if (filenameEl) filenameEl.textContent = link.filename || "...";
-            
+
             const urlCode = clone.querySelector('.link-url-code');
             if (urlCode) urlCode.textContent = link.url;
 
             const hosterBadge = clone.querySelector('.badge-hoster');
             if (hosterBadge) {
                 if (link.source_url) {
-                    hosterBadge.innerHTML = `<a href="${link.source_url}" target="_blank" class="badge-source-link">${link.source_name || "Manuel"}</a>`;
+                    hosterBadge.innerHTML = `<a href="${link.source_url}" target="_blank" class="badge-source-link">${link.source_name || "Direct-Scan"}</a>`;
                 } else {
-                    hosterBadge.textContent = link.source_name || "Manuel";
+                    hosterBadge.textContent = link.source_name || "Direct-Scan";
                 }
             }
 
             const sizeCol = clone.querySelector('.col-size');
             if (sizeCol) sizeCol.textContent = link.size || 'N/A';
-            
+
             const dateCol = clone.querySelector('.col-date');
             if (dateCol) dateCol.textContent = formatDate(link.last_checked);
 
             linksContainer.appendChild(clone);
         });
-        
+
         renderPagination('links');
     };
 
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('releases-container');
         const template = document.getElementById('release-group-template');
         if (!container || !template) return;
-        
+
         container.innerHTML = '';
         if (!groups || groups.length === 0) {
             container.innerHTML = '<div class="empty-state">No releases found</div>';
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const clone = template.content.cloneNode(true);
             const row = clone.querySelector('.release-group-row');
             row.style.animationDelay = `${index * 0.05}s`;
-            
+
             if (group.category) row.classList.add(`cat-${group.category}`);
 
             clone.querySelector('.group-title').textContent = group.title;
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clone.querySelector('.group-last-updated').textContent = `Latest update: ${formatDate(group.last_updated)}`;
 
             const releasesCol = clone.querySelector('.col-releases');
-            
+
             const resolutions = group.resolutions || {};
             const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
             const sortedRes = Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0));
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const resRow = document.createElement('div');
                 resRow.className = 'quality-row';
                 resRow.innerHTML = `<div class="quality-label">${res}</div>`;
-                
+
                 // Group by season
                 const seasonGroups = {};
                 resolutions[res].forEach(rel => {
@@ -200,14 +200,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortedSeasons.forEach(s => {
                     const seasonDiv = document.createElement('div');
                     seasonDiv.className = 'season-group';
-                    
+
                     if (group.category === 'series' && s !== "Other") {
                         const sHeader = document.createElement('div');
                         sHeader.className = 'season-header';
                         sHeader.textContent = `Season ${s.toString().padStart(2, '0')}`;
                         seasonDiv.appendChild(sHeader);
                     }
-                    
+
                     const grid = document.createElement('div');
                     grid.className = 'quality-grid';
                     seasonDiv.appendChild(grid);
@@ -216,10 +216,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         const card = createReleaseCard(rel);
                         grid.appendChild(card);
                     });
-                    
+
                     seasonsContainer.appendChild(seasonDiv);
                 });
-                
+
                 releasesCol.appendChild(resRow);
             });
 
@@ -229,50 +229,81 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPagination('releases');
     };
 
+    const formatBytes = (bytes, decimals = 2) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    };
+
     const createReleaseCard = (rel) => {
         const card = document.createElement('div');
-        card.className = 'release-card clickable';
-        
+        card.className = 'release-card';
+
         const seasonEp = formatSeasonEp(rel.season, rel.episode);
-        const allUrls = rel.parts.map(p => p.url).join('\n');
+
+        // Group by Hoster
+        const providers = {};
+        rel.parts.forEach(p => {
+            const h = p.hoster || 'Unknown';
+            if (!providers[h]) {
+                providers[h] = { name: h, partsCount: 0, totalBytes: 0, urls: [] };
+            }
+            providers[h].partsCount++;
+            providers[h].totalBytes += (p.size_bytes || 0);
+            providers[h].urls.push(p.url);
+        });
+
+        const providerRows = Object.values(providers).map(p => `
+            <div class="rel-provider-row">
+                <span class="rel-p-name">${p.name}</span>
+                <span class="rel-p-count">${p.partsCount}F</span>
+                <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
+                <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="Copy links">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+        `).join('');
 
         card.innerHTML = `
-            <div class="rel-header">
-                <div class="rel-tags">
-                    ${seasonEp ? `<span class="rel-se">${seasonEp}</span>` : ''}
-                    ${rel.language && rel.language !== 'None' ? `<span class="rel-lang-tag">${rel.language}</span>` : ''}
-                </div>
-                <div class="rel-copy-tag">
-                    <i class="fas fa-copy"></i>
-                    ${rel.is_new ? '<i class="fas fa-star badge-star" title="New Release"></i>' : ''}
-                </div>
+            <div class="rel-meta-top">
+                ${rel.source_url ? 
+                    `<a href="${rel.source_url}" target="_blank" class="rel-source-link"><i class="fas fa-server"></i> ${rel.source || '...'}</a>` :
+                    `<span class="rel-source-label"><i class="fas fa-server"></i> ${rel.source || '...'}</span>`
+                }
+                ${rel.is_new ? '<i class="fas fa-star badge-star" title="New Release"></i>' : ''}
             </div>
-            <div class="rel-footer">
-                <span class="rel-parts-count">${rel.parts.length} file${rel.parts.length > 1 ? 's' : ''}</span>
-                <span class="rel-size">${rel.total_size}</span>
+            <div class="rel-tags">
+                ${seasonEp ? `<span class="rel-tag rel-tag-se">${seasonEp}</span>` : ''}
+                ${rel.language && rel.language !== 'None' ? `<span class="rel-tag rel-tag-lang">${rel.language}</span>` : ''}
             </div>
-            <div class="rel-source">
-                <i class="fas fa-server"></i> 
-                ${rel.source_url ? `<a href="${rel.source_url}" target="_blank" class="rel-source-link">${rel.source || 'Unknown'}</a>` : (rel.source || 'Unknown')}
+            <div class="rel-providers">
+                ${providerRows}
             </div>
         `;
 
-        const copyBtn = card.querySelector('.rel-copy-tag');
-        copyBtn.onclick = async (e) => {
-            e.stopPropagation();
-            try {
-                await navigator.clipboard.writeText(allUrls);
-                const icon = copyBtn.querySelector('i');
-                icon.className = 'fas fa-check';
-                copyBtn.classList.add('success');
-                setTimeout(() => {
-                    icon.className = 'fas fa-copy';
-                    copyBtn.classList.remove('success');
-                }, 1000);
-            } catch (err) {
-                console.error('Failed to copy!', err);
-            }
-        };
+        // Add copy event listeners
+        card.querySelectorAll('.rel-p-copy').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const urls = btn.getAttribute('data-urls');
+                try {
+                    await navigator.clipboard.writeText(urls);
+                    const icon = btn.querySelector('i');
+                    const originalClass = icon.className;
+                    icon.className = 'fas fa-check';
+                    btn.classList.add('success');
+                    setTimeout(() => {
+                        icon.className = originalClass;
+                        btn.classList.remove('success');
+                    }, 1000);
+                } catch (err) {
+                    console.error('Failed to copy!', err);
+                }
+            };
+        });
 
         return card;
     };
@@ -332,10 +363,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (pageNumbers) {
             pageNumbers.innerHTML = '';
-            
+
             // Show first, last, current, and neighbors
             const pagesToShow = new Set([1, viewState.pages, viewState.page, viewState.page - 1, viewState.page + 1]);
-            const sortedPages = Array.from(pagesToShow).filter(p => p > 0 && p <= viewState.pages).sort((a,b) => a - b);
+            const sortedPages = Array.from(pagesToShow).filter(p => p > 0 && p <= viewState.pages).sort((a, b) => a - b);
 
             let lastP = 0;
             sortedPages.forEach(p => {
@@ -345,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     dot.textContent = '...';
                     pageNumbers.appendChild(dot);
                 }
-                
+
                 const btn = document.createElement('button');
                 btn.className = `page-number ${p === viewState.page ? 'active' : ''}`;
                 btn.textContent = p;
@@ -373,14 +404,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const res = await fetch(url);
             const data = await res.json();
-            
+
             state.links.items = data.items;
             state.links.total = data.total;
             state.links.pages = data.pages;
 
             const countEl = document.getElementById('count-links');
             if (countEl) countEl.textContent = data.total;
-            
+
             if (state.currentView === 'links') {
                 renderLinks(data.items);
             }
@@ -399,14 +430,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const res = await fetch(url);
             const data = await res.json();
-            
+
             state.releases.items = data.items;
             state.releases.total = data.total;
             state.releases.pages = data.pages;
 
             const countEl = document.getElementById('count-releases');
             if (countEl) countEl.textContent = data.total;
-            
+
             if (state.currentView === 'releases') {
                 renderReleases(data.items);
             }
@@ -431,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const countEl = document.getElementById('count-scraped');
             if (countEl) countEl.textContent = data.total;
-            
+
             if (state.currentView === 'scraped') {
                 renderScraped(data.items);
             }
@@ -463,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uniqueSeriesEl) uniqueSeriesEl.textContent = stats.unique_series;
         if (linksSeriesEl) linksSeriesEl.textContent = stats.links_series;
         if (sizeEl) sizeEl.textContent = stats.total_size;
-        
+
         const deadLinksEl = document.getElementById('stats-dead-links');
         if (deadLinksEl) deadLinksEl.textContent = stats.dead_links;
 
@@ -471,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceContainer.innerHTML = '';
             const sortedSources = Object.keys(stats.size_by_source).sort();
             const totalBytes = stats.total_size_bytes || 1;
-            
+
             sortedSources.forEach(source => {
                 const sizeFmt = stats.size_by_source[source];
                 const sizeRaw = stats.size_by_source_raw[source] || 0;
@@ -571,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             state.currentView = view;
-            
+
             if (view === 'links') fetchLinks();
             else if (view === 'releases') fetchReleases();
             else if (view === 'scraped') fetchScraped();
@@ -594,14 +625,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 directScanInput.disabled = true;
                 const originalPlaceholder = directScanInput.placeholder;
                 directScanInput.placeholder = 'Scanning started...';
-                
+
                 try {
                     const res = await fetch('/api/scan/direct', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ urls: [url] })
                     });
-                    
+
                     if (res.ok) {
                         directScanInput.value = '';
                         // Refresh links after a delay to show new findings
@@ -654,9 +685,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.currentView === 'releases') fetchReleases();
         else if (state.currentView === 'links') fetchLinks();
         else if (state.currentView === 'scraped') fetchScraped();
-        
+
         // Always refresh counts for other tabs
-        if (state.currentView !== 'links') fetchLinks(); 
+        if (state.currentView !== 'links') fetchLinks();
         if (state.currentView !== 'releases') fetchReleases();
         if (state.currentView !== 'scraped') fetchScraped();
     }, 10000); // 10s is enough for background refresh

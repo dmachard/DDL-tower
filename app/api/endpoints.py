@@ -183,6 +183,7 @@ async def get_releases(
                 "id": r.id,
                 "part": part_num,
                 "size": r.size,
+                "size_bytes": r.size_bytes,
                 "hoster": r.hoster,
                 "url": r.url
             })

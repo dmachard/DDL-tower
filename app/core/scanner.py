@@ -3,11 +3,12 @@ import asyncio
 from datetime import datetime, timezone
 from typing import List, Set
 from playwright.async_api import async_playwright
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
-from app.db.models import ScrapedURL
+from app.db.models import ScrapedURL, DownloadLink
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
 
@@ -63,7 +64,7 @@ class DirectScanner:
                         # Record visit
                         scraped_entry = ScrapedURL(
                             url=url,
-                            source_name="Manuel",
+                            source_name="Direct-Scan",
                             status="success" if found_links else "no_links",
                             scrape_once=True,
                             last_scraped=datetime.now(timezone.utc)
@@ -81,7 +82,7 @@ class DirectScanner:
                             session=session,
                                 raw_links=list(found_links),
                                 source_url=url,
-                                source_name="Manuel"
+                                source_name="Direct-Scan"
                             )
                             
                         # Commit so Categorizer can see them
@@ -102,7 +103,7 @@ class DirectScanner:
                     async with AsyncSessionLocal() as session:
                         scraped_entry = ScrapedURL(
                             url=url,
-                            source_name="Manuel",
+                            source_name="Direct-Scan",
                             status="failed",
                             scrape_once=True,
                             last_scraped=datetime.now(timezone.utc)
