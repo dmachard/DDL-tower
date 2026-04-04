@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             header_visited_url: "Visited URL",
             header_scraper: "Scraper",
             header_frequency: "Frequency",
+            header_duration: "Duration",
             header_last_scan: "Last Scan",
             stat_unique_movies: "Unique Movies",
             stat_movie_links: "Movie Links",
@@ -91,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
             header_visited_url: "URL Visitée",
             header_scraper: "Scraper",
             header_frequency: "Fréquence",
+            header_duration: "Durée",
             header_last_scan: "Dernier Scan",
             stat_unique_movies: "Films Uniques",
             stat_movie_links: "Liens Films",
@@ -143,6 +145,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const season = s ? `S${s.toString().padStart(2, '0')}` : '';
         const episode = e ? `E${e.toString().padStart(2, '0')}` : '';
         return `${season}${episode}`;
+    };
+
+    const formatDuration = (ms) => {
+        if (ms === null || ms === undefined) return '-';
+        if (ms < 1000) return `${ms}ms`;
+        return `${(ms / 1000).toFixed(1)}s`;
     };
 
     const debounce = (func, wait) => {
@@ -412,6 +420,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (freqBadge) {
                 freqBadge.textContent = item.scrape_once ? TRANSLATIONS[state.language].badge_unique : TRANSLATIONS[state.language].badge_recurring;
             }
+
+            const durationCol = clone.querySelector('.col-duration');
+            if (durationCol) durationCol.textContent = formatDuration(item.duration_ms);
 
             const dateCol = clone.querySelector('.col-date');
             if (dateCol) dateCol.textContent = formatDate(item.last_scraped);

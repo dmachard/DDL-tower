@@ -35,3 +35,4 @@ class ScrapedURL(Base):
     last_scraped = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     status = Column(String, default="success") # 'success' or 'failed'
     scrape_once = Column(Boolean, default=False)
+    duration_ms = Column(Integer, nullable=True)

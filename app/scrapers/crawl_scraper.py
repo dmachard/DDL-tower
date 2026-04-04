@@ -32,6 +32,7 @@ class CrawlScraper(BaseScraper):
             try:
                 # 1. Load entry URL
                 print(f"[{self.name}] Load entry URL: {self.entry_url}")
+                start_time = datetime.now(timezone.utc)
                 await page.goto(self.entry_url, wait_until="networkidle", timeout=30000)
                 
                 # Get page content
@@ -48,6 +49,8 @@ class CrawlScraper(BaseScraper):
                         entry_status = "failed"
                         print(f"[{self.name}] ERROR: entry wait condition not found: {self.entry_wait_for}")
                 
+                duration = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+
                 # Record visit of the entry URL in database (with final status)
                 if session:
                     scraped_entry = ScrapedURL(
@@ -55,7 +58,8 @@ class CrawlScraper(BaseScraper):
                         source_name=self.name, 
                         status=entry_status,
                         scrape_once=False,
-                        last_scraped=datetime.now(timezone.utc)
+                        last_scraped=datetime.now(timezone.utc),
+                        duration_ms=duration
                     )
                     await session.merge(scraped_entry)
                     await session.commit()
@@ -95,6 +99,7 @@ class CrawlScraper(BaseScraper):
                         for idx, url in enumerate(sublinks, 1):
                             try:
                                 print(f"[{self.name}] Load sublink {idx}/{len(sublinks)}: {url}")
+                                sub_start_time = datetime.now(timezone.utc)
                                 await page.goto(url, wait_until="networkidle", timeout=30000)
                                 
                                 wait_condition_failed = False
@@ -106,6 +111,8 @@ class CrawlScraper(BaseScraper):
                                         print(f"[{self.name}] crawl failed: wait condition not found for '{wait_condition}' on {url}")
                                         wait_condition_failed = True
 
+                                sub_duration = int((datetime.now(timezone.utc) - sub_start_time).total_seconds() * 1000)
+
                                 # Record visit in database (Always tracked now)
                                 if session:
                                     scraped_entry = ScrapedURL(
@@ -113,7 +120,8 @@ class CrawlScraper(BaseScraper):
                                         source_name=self.name, 
                                         status="success" if not wait_condition_failed else "failed",
                                         scrape_once=scrape_once,
-                                        last_scraped=datetime.now(timezone.utc)
+                                        last_scraped=datetime.now(timezone.utc),
+                                        duration_ms=sub_duration
                                     )
                                     await session.merge(scraped_entry)
                                     await session.commit()

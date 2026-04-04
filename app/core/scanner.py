@@ -35,6 +35,7 @@ class DirectScanner:
                 
                 print(f"[DIRECT-SCAN] Processing URL: {url}")
                 page = await context.new_page()
+                start_time = datetime.now(timezone.utc)
                 try:
                     # 1. Visit the URL
                     await page.goto(url, wait_until="domcontentloaded", timeout=45000)
@@ -59,6 +60,8 @@ class DirectScanner:
                     for pattern in self.target_patterns:
                         found_links.update(re.findall(pattern, full_html))
                     
+                    duration = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+
                     # 6. Store and process results
                     async with AsyncSessionLocal() as session:
                         # Record visit
@@ -67,7 +70,8 @@ class DirectScanner:
                             source_name="Direct-Scan",
                             status="success" if found_links else "no_links",
                             scrape_once=True,
-                            last_scraped=datetime.now(timezone.utc)
+                            last_scraped=datetime.now(timezone.utc),
+                            duration_ms=duration
                         )
                         await session.merge(scraped_entry)
                         
@@ -96,13 +100,15 @@ class DirectScanner:
                         
                 except Exception as e:
                     print(f"[DIRECT-SCAN] Error scanning {url}: {e}")
+                    duration = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
                     async with AsyncSessionLocal() as session:
                         scraped_entry = ScrapedURL(
                             url=url,
                             source_name="Direct-Scan",
                             status="failed",
                             scrape_once=True,
-                            last_scraped=datetime.now(timezone.utc)
+                            last_scraped=datetime.now(timezone.utc),
+                            duration_ms=duration
                         )
                         await session.merge(scraped_entry)
                         await session.commit()

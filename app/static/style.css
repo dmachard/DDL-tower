@@ -256,7 +256,13 @@ body {
 
 /* Grids */
 .scraped-grid {
-    grid-template-columns: 80px 1fr 140px 120px 150px !important;
+    grid-template-columns: 80px 1fr 140px 120px 100px 150px !important;
+}
+
+.col-duration {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
 }
 
 .badge-frequency {

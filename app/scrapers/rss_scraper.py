@@ -69,8 +69,11 @@ class RSSScraper(BaseScraper):
 
                 try:
                     print(f"[RSS_SCRAPER] [{self.name}] Visiting: {url}")
+                    start_time = datetime.now(timezone.utc)
                     await page.goto(url, wait_until="networkidle", timeout=45000)
                     
+                    duration = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+
                     # Record visit in DB
                     if session:
                         scraped_entry = ScrapedURL(
@@ -78,7 +81,8 @@ class RSSScraper(BaseScraper):
                             source_name=self.name, 
                             status="success",
                             scrape_once=should_scrape_once,
-                            last_scraped=datetime.now(timezone.utc)
+                            last_scraped=datetime.now(timezone.utc),
+                            duration_ms=duration
                         )
                         await session.merge(scraped_entry)
                         await session.commit()

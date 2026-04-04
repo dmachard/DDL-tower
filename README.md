@@ -14,14 +14,18 @@ DDLtower is a tool to automate link extraction, categorization and management fr
 git clone https://github.com/dmachard/ddltower.git
 cd ddltower
 docker compose up -d
+```
 
 Dashboard : http://localhost:8001
 
 ## Configuration
 
-Via config/config.yaml — scanning patterns, scheduler frequency, integrations.
+Via `config/config.yaml`
 
 ## cli
 
-# reset links
+### Reset links
+
+```bash
 docker compose exec app python3 app/scripts/reset_links.py ....
+```
