@@ -8,54 +8,133 @@ document.addEventListener('DOMContentLoaded', () => {
     const navItems = document.querySelectorAll('.nav-item');
     const viewSections = document.querySelectorAll('.view-section');
 
-    // State
+    // State Configuration
+    const CONFIG = {
+        views: {
+            links: { limit: 50, recent: true, hours: 12 },
+            releases: { limit: 20, recent: true, hours: 12 },
+            scraped: { limit: 50 }
+        },
+        filters: {
+            links: [
+                { type: 'recent', value: 'true', i18n: 'filter_recent', icon: 'fas fa-star tag-star' },
+                { type: 'hours', value: '12', label: '12h' },
+                { type: 'hours', value: '24', label: '24h' },
+                { type: 'hours', value: '48', label: '48h' },
+                { type: 'category', value: 'movie', i18n: 'filter_movies', icon: 'fas fa-film' },
+                { type: 'category', value: 'series', i18n: 'filter_series', icon: 'fas fa-tv' },
+                { type: 'status', value: 'alive', i18n: 'filter_alive', icon: 'fas fa-check-circle' },
+                { type: 'status', value: 'dead', i18n: 'filter_dead', icon: 'fas fa-times-circle' },
+            ],
+            releases: [
+                { type: 'recent', value: 'true', i18n: 'filter_recent', icon: 'fas fa-star tag-star' },
+                { type: 'hours', value: '12', label: '12h' },
+                { type: 'hours', value: '24', label: '24h' },
+                { type: 'hours', value: '48', label: '48h' },
+                { type: 'category', value: 'movie', i18n: 'filter_movies', icon: 'fas fa-film' },
+                { type: 'category', value: 'series', i18n: 'filter_series', icon: 'fas fa-tv' },
+            ]
+        }
+    };
+
+    const TRANSLATIONS = {
+        en: {
+            nav_releases: "Releases",
+            nav_explorer: "Explorer",
+            nav_scans: "Scans",
+            nav_stats: "Statistics",
+            header_status: "Status",
+            header_release: "Release",
+            header_source: "Source",
+            header_size: "Size",
+            header_detected: "Added",
+            header_title: "Title",
+            header_versions: "Available Versions",
+            header_visited_url: "Visited URL",
+            header_scraper: "Scraper",
+            header_frequency: "Frequency",
+            header_last_scan: "Last Scan",
+            stat_unique_movies: "Unique Movies",
+            stat_movie_links: "Movie Links",
+            stat_total_volume: "Total Volume",
+            stat_unique_series: "Unique Series",
+            stat_series_links: "Series Links",
+            stat_dead_links: "Dead Links",
+            filter_recent: "Recent",
+            filter_movies: "Movies",
+            filter_series: "Series",
+            filter_alive: "Alive",
+            filter_dead: "Dead",
+            placeholder_scan: "Scan a URL",
+            placeholder_search_links: "Search in links...",
+            placeholder_search_titles: "Search in titles...",
+            placeholder_search_scans: "Search in scans...",
+            msg_no_results: "No results found",
+            msg_no_history: "No scan history",
+            msg_latest_update: "Added",
+            badge_unique: "Unique",
+            badge_recurring: "Recurring",
+            copy_links: "Copy links"
+        },
+        fr: {
+            nav_releases: "Nouveautés",
+            nav_explorer: "Explorer",
+            nav_scans: "Scans",
+            nav_stats: "Statistiques",
+            header_status: "Statut",
+            header_release: "Fichier",
+            header_source: "Source",
+            header_size: "Taille",
+            header_detected: "Ajouté",
+            header_title: "Titre",
+            header_versions: "Versions Disponibles",
+            header_visited_url: "URL Visitée",
+            header_scraper: "Scraper",
+            header_frequency: "Fréquence",
+            header_last_scan: "Dernier Scan",
+            stat_unique_movies: "Films Uniques",
+            stat_movie_links: "Liens Films",
+            stat_total_volume: "Volume Total",
+            stat_unique_series: "Séries Uniques",
+            stat_series_links: "Liens Séries",
+            stat_dead_links: "Liens Morts",
+            filter_recent: "Récent",
+            filter_movies: "Films",
+            filter_series: "Séries",
+            filter_alive: "Vivant",
+            filter_dead: "Mort",
+            placeholder_scan: "Scanner une URL",
+            placeholder_search_links: "Chercher dans les liens...",
+            placeholder_search_titles: "Chercher dans les titres...",
+            placeholder_search_scans: "Chercher dans l'historique...",
+            msg_no_results: "Aucun résultat trouvé",
+            msg_no_history: "Aucun historique de scan",
+            msg_latest_update: "Ajouté",
+            badge_unique: "Unique",
+            badge_recurring: "Récurrent",
+            copy_links: "Copier les liens"
+        }
+    };
+
     const state = {
-        links: {
-            items: [],
-            page: 1,
-            limit: 50,
-            pages: 0,
-            total: 0,
-            query: '',
-            category: '',
-            status: '',
-            recent: true,
-            hours: 12
-        },
-        releases: {
-            items: [],
-            page: 1,
-            limit: 20,
-            pages: 0,
-            total: 0,
-            query: '',
-            category: '',
-            recent: true,
-            hours: 12
-        },
-        scraped: {
-            items: [],
-            page: 1,
-            limit: 50,
-            pages: 0,
-            total: 0,
-            query: ''
-        },
-        currentView: 'releases'
+        currentView: 'releases',
+        language: 'fr',
+        links: { items: [], page: 1, limit: 50, total: 0, pages: 0, query: '', category: '', status: '', recent: true, hours: 12 },
+        releases: { items: [], page: 1, limit: 20, total: 0, pages: 0, query: '', category: '', recent: true, hours: 12 },
+        scraped: { items: [], page: 1, limit: 50, total: 0, pages: 0, query: '' }
     };
 
     // Helpers
     const formatDate = (dateStr) => {
         if (!dateStr) return 'N/A';
-        if (!dateStr.includes('Z') && !dateStr.includes('+')) {
-            dateStr += 'Z';
-        }
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('en-US', {
+        const d = new Date(dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z');
+        const locale = state.language === 'fr' ? 'fr-FR' : 'en-US';
+        return d.toLocaleString(locale, {
             day: '2-digit',
             month: '2-digit',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            hour12: state.language !== 'fr'
         });
     };
 
@@ -68,13 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const debounce = (func, wait) => {
         let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
+        return (...args) => {
             clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
+            timeout = setTimeout(() => func(...args), wait);
         };
     };
 
@@ -83,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!linksContainer) return;
         linksContainer.innerHTML = '';
         if (!links || links.length === 0) {
-            linksContainer.innerHTML = '<div class="empty-state">No results found</div>';
+            linksContainer.innerHTML = `<div class="empty-state">${TRANSLATIONS[state.language].msg_no_results}</div>`;
             return;
         }
         links.forEach((link, index) => {
@@ -157,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.innerHTML = '';
         if (!groups || groups.length === 0) {
-            container.innerHTML = '<div class="empty-state">No releases found</div>';
+            container.innerHTML = `<div class="empty-state">${TRANSLATIONS[state.language].msg_no_results}</div>`;
             return;
         }
 
@@ -170,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             clone.querySelector('.group-title').textContent = group.title;
             clone.querySelector('.group-year').textContent = group.year ? `(${group.year})` : '';
-            clone.querySelector('.group-last-updated').textContent = `Latest update: ${formatDate(group.last_updated)}`;
+            clone.querySelector('.group-last-updated').textContent = `${TRANSLATIONS[state.language].msg_latest_update}: ${formatDate(group.last_updated)}`;
 
             const releasesCol = clone.querySelector('.col-releases');
 
@@ -265,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="rel-p-name">${p.name}</span>
                 <span class="rel-p-count">${p.partsCount}F</span>
                 <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
-                <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="Copy links">
+                <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].copy_links}">
                     <i class="fas fa-copy"></i>
                 </button>
             </div>
@@ -316,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!scrapedContainer) return;
         scrapedContainer.innerHTML = '';
         if (!items || items.length === 0) {
-            scrapedContainer.innerHTML = '<div class="empty-state">No scan history</div>';
+            scrapedContainer.innerHTML = `<div class="empty-state">${TRANSLATIONS[state.language].msg_no_history}</div>`;
             return;
         }
         items.forEach((item, index) => {
@@ -335,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const freqBadge = clone.querySelector('.badge-frequency');
             if (freqBadge) {
-                freqBadge.textContent = item.scrape_once ? "Unique" : "Recurring";
+                freqBadge.textContent = item.scrape_once ? TRANSLATIONS[state.language].badge_unique : TRANSLATIONS[state.language].badge_recurring;
             }
 
             const dateCol = clone.querySelector('.col-date');
@@ -386,9 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.textContent = p;
                 btn.onclick = () => {
                     viewState.page = p;
-                    if (type === 'links') fetchLinks();
-                    else if (type === 'releases') fetchReleases();
-                    else fetchScraped();
+                    fetchData(type);
                 };
                 pageNumbers.appendChild(btn);
                 lastP = p;
@@ -396,86 +469,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Fetching
-    const fetchLinks = async () => {
+    const fetchData = async (view) => {
+        const viewState = state[view];
+        if (!viewState) return;
+
         try {
-            const url = new URL('/api/links', window.location.origin);
-            url.searchParams.append('page', state.links.page);
-            url.searchParams.append('limit', state.links.limit);
-            if (state.links.query) url.searchParams.append('q', state.links.query);
-            if (state.links.category) url.searchParams.append('category', state.links.category);
-            if (state.links.status) url.searchParams.append('status', state.links.status);
-            if (state.links.recent) url.searchParams.append('recent', true);
-            if (state.links.hours) url.searchParams.append('hours', state.links.hours);
+            const url = new URL(`/api/${view}`, window.location.origin);
+            url.searchParams.append('page', viewState.page);
+            url.searchParams.append('limit', viewState.limit);
+            if (viewState.query) url.searchParams.append('q', viewState.query);
+            if (viewState.category) url.searchParams.append('category', viewState.category);
+            if (view === 'links' && viewState.status) url.searchParams.append('status', viewState.status);
+            if (viewState.recent) url.searchParams.append('recent', 'true');
+            if (viewState.hours) url.searchParams.append('hours', viewState.hours);
 
             const res = await fetch(url);
             const data = await res.json();
 
-            state.links.items = data.items;
-            state.links.total = data.total;
-            state.links.pages = data.pages;
+            viewState.items = data.items;
+            viewState.total = data.total;
+            viewState.pages = data.pages;
 
-            const countEl = document.getElementById('count-links');
+            const countEl = document.getElementById(`count-${view}`);
             if (countEl) countEl.textContent = data.total;
 
-            if (state.currentView === 'links') {
-                renderLinks(data.items);
+            if (state.currentView === view) {
+                if (view === 'links') renderLinks(data.items);
+                else if (view === 'releases') renderReleases(data.items);
+                else if (view === 'scraped') renderScraped(data.items);
             }
         } catch (err) {
-            console.error('Error fetching links:', err);
-        }
-    };
-
-    const fetchReleases = async () => {
-        try {
-            const url = new URL('/api/releases', window.location.origin);
-            url.searchParams.append('page', state.releases.page);
-            url.searchParams.append('limit', state.releases.limit);
-            if (state.releases.query) url.searchParams.append('q', state.releases.query);
-            if (state.releases.category) url.searchParams.append('category', state.releases.category);
-            if (state.releases.recent) url.searchParams.append('recent', true);
-            if (state.releases.hours) url.searchParams.append('hours', state.releases.hours);
-
-            const res = await fetch(url);
-            const data = await res.json();
-
-            state.releases.items = data.items;
-            state.releases.total = data.total;
-            state.releases.pages = data.pages;
-
-            const countEl = document.getElementById('count-releases');
-            if (countEl) countEl.textContent = data.total;
-
-            if (state.currentView === 'releases') {
-                renderReleases(data.items);
-            }
-        } catch (err) {
-            console.error('Error fetching releases:', err);
-        }
-    };
-
-    const fetchScraped = async () => {
-        try {
-            const url = new URL('/api/scraped', window.location.origin);
-            url.searchParams.append('page', state.scraped.page);
-            url.searchParams.append('limit', state.scraped.limit);
-            if (state.scraped.query) url.searchParams.append('q', state.scraped.query);
-
-            const res = await fetch(url);
-            const data = await res.json();
-
-            state.scraped.items = data.items;
-            state.scraped.total = data.total;
-            state.scraped.pages = data.pages;
-
-            const countEl = document.getElementById('count-scraped');
-            if (countEl) countEl.textContent = data.total;
-
-            if (state.currentView === 'scraped') {
-                renderScraped(data.items);
-            }
-        } catch (err) {
-            console.error('Error fetching scraped history:', err);
+            console.error(`Error fetching ${view}:`, err);
         }
     };
 
@@ -576,18 +600,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Search Logic (Debounced server-side)
     const handleSearch = debounce((e) => {
         const query = e.target.value.toLowerCase();
-        if (e.target.id === 'search-scraped') {
-            state.scraped.query = query;
-            state.scraped.page = 1;
-            fetchScraped();
-        } else if (e.target.id === 'search-releases') {
-            state.releases.query = query;
-            state.releases.page = 1;
-            fetchReleases();
-        } else {
-            state.links.query = query;
-            state.links.page = 1;
-            fetchLinks();
+        const view = e.target.id.replace('search-', '');
+        if (state[view]) {
+            state[view].query = query;
+            state[view].page = 1;
+            fetchData(view);
         }
     }, 400);
 
@@ -610,11 +627,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             state.currentView = view;
-
-            if (view === 'links') fetchLinks();
-            else if (view === 'releases') fetchReleases();
-            else if (view === 'scraped') fetchScraped();
-            else if (view === 'stats') fetchStats();
+            if (view === 'stats') fetchStats();
+            else fetchData(view);
         });
     });
 
@@ -645,8 +659,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         directScanInput.value = '';
                         // Refresh links after a delay to show new findings
                         setTimeout(() => {
-                            fetchLinks();
-                            fetchScraped();
+                            fetchData('links');
+                            fetchData('scraped');
                         }, 5000);
                     }
                 } catch (err) {
@@ -662,7 +676,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Filter logic using Tags
     const updateTagsUI = (containerId, viewState) => {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -677,11 +690,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 isActive = (String(viewState[type]) === String(val));
             }
 
-            if (isActive) {
-                tag.classList.add('active');
-            } else {
-                tag.classList.remove('active');
-            }
+            if (isActive) tag.classList.add('active');
+            else tag.classList.remove('active');
         });
     };
 
@@ -695,53 +705,131 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (type === 'recent') {
             viewState.recent = !viewState.recent;
-            if (!viewState.recent) viewState.hours = null; // Clear hours if disabling recent
+            if (!viewState.recent) viewState.hours = null;
         } else if (type === 'hours') {
             const h = parseInt(value);
-            if (viewState.hours === h) {
-                viewState.hours = null; // Toggle off
-            } else {
-                viewState.hours = h;
-                viewState.recent = true; // Selecting a period automatically enables Recent mode
-            }
+            if (viewState.hours === h) viewState.hours = null;
+            else { viewState.hours = h; viewState.recent = true; }
         } else {
-            // Toggle logic: if already selected, deselect (empty string)
             viewState[type] = viewState[type] === value ? '' : value;
         }
 
         viewState.page = 1;
         updateTagsUI(view === 'links' ? 'filter-tags-links' : 'filter-tags-releases', viewState);
+        fetchData(view);
+    };
 
-        if (view === 'links') fetchLinks();
-        else fetchReleases();
+    const setLanguage = (lang) => {
+        state.language = lang;
+        localStorage.setItem('ddlt_lang', lang);
+
+        // Update All UI Strings
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            const text = TRANSLATIONS[lang][key];
+            if (text) el.textContent = text;
+        });
+
+        // Update Placeholders
+        if (directScanInput) directScanInput.placeholder = TRANSLATIONS[lang].placeholder_scan;
+        if (searchLinks) searchLinks.placeholder = TRANSLATIONS[lang].placeholder_search_links;
+        const searchRel = document.getElementById('search-releases');
+        if (searchRel) searchRel.placeholder = TRANSLATIONS[lang].placeholder_search_titles;
+        const searchScr = document.getElementById('search-scraped');
+        if (searchScr) searchScr.placeholder = TRANSLATIONS[lang].placeholder_search_scans;
+
+        // Update Custom Selector
+        const currentLangLabel = document.getElementById('current-lang');
+        if (currentLangLabel) currentLangLabel.textContent = lang.toUpperCase();
+
+        // Re-render conditional parts
+        ['links', 'releases'].forEach(v => {
+            loadFilters(v);
+            updateTagsUI(`filter-tags-${v}`, state[v]);
+        });
+
+        if (state.currentView === 'releases') renderReleases(state.releases.items);
+        else if (state.currentView === 'links') renderLinks(state.links.items);
+        else if (state.currentView === 'scraped') renderScraped(state.scraped.items);
+        else if (state.currentView === 'stats') fetchStats();
+    };
+
+    const loadFilters = (view) => {
+        const container = document.getElementById(`filter-tags-${view}`);
+        if (!container || !CONFIG.filters[view]) return;
+
+        container.innerHTML = CONFIG.filters[view].map(f => {
+            const cls = f.type === 'recent' ? 'filter-tag tag-recent' : 'filter-tag';
+            const iconHtml = f.icon ? `<i class="${f.icon}"></i> ` : '';
+            const label = f.i18n ? TRANSLATIONS[state.language][f.i18n] : f.label;
+            return `<div class="${cls}" data-type="${f.type}" data-value="${f.value}">${iconHtml}${label}</div>`;
+        }).join('');
+    };
+
+    const initCustomSelect = () => {
+        const select = document.getElementById('lang-custom-select');
+        if (!select) return;
+
+        const trigger = select.querySelector('.select-trigger');
+        const options = select.querySelectorAll('.option');
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            select.classList.toggle('active');
+        });
+
+        options.forEach(opt => {
+            opt.addEventListener('click', () => {
+                const val = opt.getAttribute('data-value');
+                setLanguage(val);
+                select.classList.remove('active');
+            });
+        });
+
+        // Click outside to close
+        document.addEventListener('click', () => {
+            select.classList.remove('active');
+        });
+    };
+
+    initCustomSelect();
+
+    // Custom fetch for config
+    const initApp = async () => {
+        try {
+            const res = await fetch('/api/config');
+            const cfg = await res.json();
+
+            // Priority: LocalStorage > Backend Config > Default 'fr'
+            const savedLang = localStorage.getItem('ddlt_lang');
+            const initialLang = savedLang || cfg.default_language || 'fr';
+
+            setLanguage(initialLang);
+        } catch (err) {
+            console.error('Failed to load init config:', err);
+            setLanguage('fr');
+        }
     };
 
     document.getElementById('filter-tags-links')?.addEventListener('click', (e) => handleTagClick(e, 'links'));
     document.getElementById('filter-tags-releases')?.addEventListener('click', (e) => handleTagClick(e, 'releases'));
 
-    // Initial tags UI state
-    updateTagsUI('filter-tags-links', state.links);
-    updateTagsUI('filter-tags-releases', state.releases);
-
     // Initial Load
-    fetchLinks();
-    fetchReleases();
-    fetchScraped();
+    ['links', 'releases'].forEach(v => {
+        loadFilters(v);
+        updateTagsUI(`filter-tags-${v}`, state[v]);
+    });
+
+    ['links', 'releases', 'scraped'].forEach(fetchData);
+    initApp(); // Loads language and kicks off remaining UI
     fetchStats();
 
-    // Targeted Refresh (only counts and stats frequently, current page less frequently)
+    // Targeted Refresh
     setInterval(() => {
-        // We only refresh the current view's data
-        if (state.currentView === 'releases') fetchReleases();
-        else if (state.currentView === 'links') fetchLinks();
-        else if (state.currentView === 'scraped') fetchScraped();
-
-        // Always refresh counts for other tabs
-        if (state.currentView !== 'links') fetchLinks();
-        if (state.currentView !== 'releases') fetchReleases();
-        if (state.currentView !== 'scraped') fetchScraped();
-    }, 10000); // 10s is enough for background refresh
+        ['links', 'releases', 'scraped'].forEach(v => {
+            fetchData(v);
+        });
+    }, 10000);
 
     setInterval(fetchStats, 60000);
 });
-

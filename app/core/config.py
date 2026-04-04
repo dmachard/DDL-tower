@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # App General Settings
     APP_NAME: str = _yaml_config.get("app_name", "DDL Tower")
     DEBUG: bool = _yaml_config.get("debug", True)
+    DEFAULT_LANGUAGE: str = _yaml_config.get("default_language", "fr")
     
     # Database Settings
     DATABASE_URL: str = _yaml_config.get("database_url", "sqlite+aiosqlite:///./data/ddl.db")

@@ -14,6 +14,9 @@ alldebrid:
   api_key: "YOUR_API_KEY_HERE"
   agent: "ddl-tower-v2"
 
+# Default language (fr or en)
+default_language: fr
+
 # --- Scraper Global Settings ---
 # Frequency of the automated discovery scans (in minutes)
 scan_interval_minutes: 60

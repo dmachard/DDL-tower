@@ -20,6 +20,16 @@ router = APIRouter(prefix="/api")
 class ScanRequest(BaseModel):
     urls: List[str]
 
+@router.get("/config")
+async def get_config():
+    """
+    Returns app configuration for the frontend.
+    """
+    return {
+        "default_language": settings.DEFAULT_LANGUAGE,
+        "app_name": settings.APP_NAME
+    }
+
 async def get_latest_scan_time(db: AsyncSession):
     """
     Retrieve the most recent scan timestamp from ScrapedURL table.
@@ -30,6 +40,20 @@ async def get_latest_scan_time(db: AsyncSession):
     if res and res.tzinfo is None:
         return res.replace(tzinfo=timezone.utc)
     return res
+
+async def get_threshold(db: AsyncSession, recent: bool, hours: int = None):
+    """
+    Unified threshold calculation for novelty window.
+    """
+    if not recent:
+        return None
+    if hours:
+        return datetime.now(timezone.utc) - timedelta(hours=hours)
+    
+    last_scan = await get_latest_scan_time(db)
+    if not last_scan:
+        return None
+    return last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER)
 
 @router.get("/links")
 async def get_links(
@@ -62,12 +86,7 @@ async def get_links(
         stmt = stmt.where(DownloadLink.status == status)
 
     if recent:
-        if hours:
-            threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
-        else:
-            last_scan = await get_latest_scan_time(db)
-            threshold = last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER) if last_scan else None
-        
+        threshold = await get_threshold(db, recent, hours)
         if threshold:
             stmt = stmt.where(DownloadLink.last_checked >= threshold)
     
@@ -105,11 +124,7 @@ async def get_releases(
     Returns grouped download links (releases) for movies and series.
     """
     # Calculate novelty threshold (multiplier from config or custom hours)
-    if recent and hours:
-        threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
-    else:
-        last_scan = await get_latest_scan_time(db)
-        threshold = last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER) if last_scan else None
+    threshold = await get_threshold(db, recent, hours)
 
     # Base statement for groups
     stmt = select(

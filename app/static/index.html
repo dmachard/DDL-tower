@@ -31,25 +31,36 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <!-- Scan triggered via CLI/API only -->
+                    <div class="language-switcher">
+                        <div class="custom-select" id="lang-custom-select">
+                            <div class="select-trigger">
+                                <span id="current-lang">FR</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="select-options">
+                                <div class="option" data-value="fr">FR</div>
+                                <div class="option" data-value="en">EN</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </header>
 
             <nav class="view-nav">
                 <button class="nav-item active" data-view="releases">
-                    Releases
+                    <span data-i18n="nav_releases">Releases</span>
                     <span class="nav-count" id="count-releases">0</span>
                 </button>
                 <button class="nav-item" data-view="links">
-                    Explorer
+                    <span data-i18n="nav_explorer">Explorer</span>
                     <span class="nav-count" id="count-links">0</span>
                 </button>
                 <button class="nav-item" data-view="scraped">
-                    Scans
+                    <span data-i18n="nav_scans">Scans</span>
                     <span class="nav-count" id="count-scraped">0</span>
                 </button>
                 <button class="nav-item" data-view="stats">
-                    Statistics
+                    <span data-i18n="nav_stats">Statistics</span>
                 </button>
             </nav>
 
@@ -60,34 +71,15 @@
                         <input type="text" id="search-links" placeholder="Search in links...">
                     </div>
                     <div class="filter-group">
-                        <div id="filter-tags-links" class="filter-tags">
-                            <div class="filter-tag tag-recent" data-type="recent" data-value="true">
-                                <i class="fas fa-star tag-star"></i> Recent
-                            </div>
-                            <div class="filter-tag" data-type="hours" data-value="12">12h</div>
-                            <div class="filter-tag" data-type="hours" data-value="24">24h</div>
-                            <div class="filter-tag" data-type="hours" data-value="48">48h</div>
-                            <div class="filter-tag" data-type="category" data-value="movie">
-                                <i class="fas fa-film"></i> Movies
-                            </div>
-                            <div class="filter-tag" data-type="category" data-value="series">
-                                <i class="fas fa-tv"></i> Series
-                            </div>
-                            <div class="filter-tag" data-type="status" data-value="alive">
-                                <i class="fas fa-check-circle"></i> Alive
-                            </div>
-                            <div class="filter-tag" data-type="status" data-value="dead">
-                                <i class="fas fa-times-circle"></i> Dead
-                            </div>
-                        </div>
+                        <div id="filter-tags-links" class="filter-tags"></div>
                     </div>
                 </div>
                 <div class="list-header">
-                    <div class="col-status">Status</div>
-                    <div class="col-content">Release</div>
-                    <div class="col-tech">Source</div>
-                    <div class="col-size">Size</div>
-                    <div class="col-date">Detected</div>
+                    <div class="col-status" data-i18n="header_status">Status</div>
+                    <div class="col-content" data-i18n="header_release">Release</div>
+                    <div class="col-tech" data-i18n="header_source">Source</div>
+                    <div class="col-size" data-i18n="header_size">Size</div>
+                    <div class="col-date" data-i18n="header_detected">Detected</div>
                 </div>
                 <div id="links-container" class="link-list">
                     <!-- Links loop here -->
@@ -107,25 +99,12 @@
                         <input type="text" id="search-releases" placeholder="Search in titles...">
                     </div>
                     <div class="filter-group">
-                        <div id="filter-tags-releases" class="filter-tags">
-                            <div class="filter-tag tag-recent" data-type="recent" data-value="true">
-                                <i class="fas fa-star tag-star"></i> Recent
-                            </div>
-                            <div class="filter-tag" data-type="hours" data-value="12">12h</div>
-                            <div class="filter-tag" data-type="hours" data-value="24">24h</div>
-                            <div class="filter-tag" data-type="hours" data-value="48">48h</div>
-                            <div class="filter-tag" data-type="category" data-value="movie">
-                                <i class="fas fa-film"></i> Movies
-                            </div>
-                            <div class="filter-tag" data-type="category" data-value="series">
-                                <i class="fas fa-tv"></i> Series
-                            </div>
-                        </div>
+                        <div id="filter-tags-releases" class="filter-tags"></div>
                     </div>
                 </div>
                 <div class="list-header release-grid-header">
-                    <div class="col-content">Title</div>
-                    <div class="col-releases">Available Versions</div>
+                    <div class="col-content" data-i18n="header_title">Title</div>
+                    <div class="col-releases" data-i18n="header_versions">Available Versions</div>
                 </div>
                 <div id="releases-container" class="link-list">
                     <!-- Grouped releases loop here -->
@@ -146,11 +125,11 @@
                     </div>
                 </div>
                 <div class="list-header scraped-grid">
-                    <div class="col-status">Status</div>
-                    <div class="col-content">Visited URL</div>
-                    <div class="col-tech">Scraper</div>
-                    <div class="col-frequency">Frequency</div>
-                    <div class="col-date">Last Scan</div>
+                    <div class="col-status" data-i18n="header_status">Status</div>
+                    <div class="col-content" data-i18n="header_visited_url">Visited URL</div>
+                    <div class="col-tech" data-i18n="header_scraper">Scraper</div>
+                    <div class="col-frequency" data-i18n="header_frequency">Frequency</div>
+                    <div class="col-date" data-i18n="header_last_scan">Last Scan</div>
                 </div>
                 <div id="scraped-container" class="link-list">
                     <!-- Scraped history loop here -->
@@ -167,37 +146,37 @@
                 <div class="stats-grid">
                     <div class="stats-card">
                         <div class="card-content">
-                            <span class="card-label">Unique Movies</span>
+                            <span class="card-label" data-i18n="stat_unique_movies">Unique Movies</span>
                             <span class="card-value" id="stats-unique-movies">0</span>
                         </div>
                     </div>
                     <div class="stats-card">
                         <div class="card-content">
-                            <span class="card-label">Movie Links</span>
+                            <span class="card-label" data-i18n="stat_movie_links">Movie Links</span>
                             <span class="card-value" id="stats-links-movies">0</span>
                         </div>
                     </div>
                     <div class="stats-card accent-blue">
                         <div class="card-content">
-                            <span class="card-label">Total Volume</span>
+                            <span class="card-label" data-i18n="stat_total_volume">Total Volume</span>
                             <span class="card-value" id="stats-size">0 GB</span>
                         </div>
                     </div>
                     <div class="stats-card">
                         <div class="card-content">
-                            <span class="card-label">Unique Series</span>
+                            <span class="card-label" data-i18n="stat_unique_series">Unique Series</span>
                             <span class="card-value" id="stats-unique-series">0</span>
                         </div>
                     </div>
                     <div class="stats-card">
                         <div class="card-content">
-                            <span class="card-label">Series Links</span>
+                            <span class="card-label" data-i18n="stat_series_links">Series Links</span>
                             <span class="card-value" id="stats-links-series">0</span>
                         </div>
                     </div>
                     <div class="stats-card accent-red">
                         <div class="card-content">
-                            <span class="card-label">Dead Links</span>
+                            <span class="card-label" data-i18n="stat_dead_links">Dead Links</span>
                             <span class="card-value" id="stats-dead-links">0</span>
                         </div>
                     </div>

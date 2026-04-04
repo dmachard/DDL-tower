@@ -1915,3 +1915,91 @@ body {
 .filter-tag.active .tag-star {
     color: white;
 }
+
+/* Language Switcher */
+.language-switcher {
+    display: flex;
+    gap: 8px;
+    margin-left: 20px;
+}
+
+.custom-select {
+    position: relative;
+    user-select: none;
+    cursor: pointer;
+    min-width: 60px;
+}
+
+.select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+}
+
+.custom-select:hover .select-trigger {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.custom-select.active .select-trigger {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.select-trigger i {
+    font-size: 10px;
+    transition: transform 0.3s ease;
+    color: var(--text-dim);
+}
+
+.custom-select.active .select-trigger i {
+    transform: rotate(180deg);
+}
+
+.select-options {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 25, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    display: none;
+    z-index: 1000;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    animation: selectFadeIn 0.2s ease;
+}
+
+.custom-select.active .select-options {
+    display: block;
+}
+
+.option {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: all 0.2s ease;
+}
+
+.option:hover {
+    background: var(--accent-gradient);
+    color: white;
+}
+
+@keyframes selectFadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
