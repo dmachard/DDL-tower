@@ -67,7 +67,7 @@ class Categorizer:
             
             # Manual MULTI detection
             fn_up = link.filename.upper()
-            is_multi = p.get('multi') or ".MULTI." in fn_up or "_MULTI_" in fn_up or "-MULTI-" in fn_up
+            is_multi = p.get('multi') or ".MULTI." in fn_up or " MULTI " in fn_up
             
             if is_multi and "MULTI" not in [l.upper() for l in langs]:
                 langs.append("MULTI")

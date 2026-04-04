@@ -78,25 +78,21 @@ class DirectScanner:
                         
                         print(f"[DIRECT-SCAN] Found {len(found_links)} links on {url}")
                         # Use LinkManager to check mortality and store in DownloadLink
-                        await self.link_manager.check_links(
+                        # It returns only the NEW links added to the database
+                        new_links = await self.link_manager.check_links(
                             session=session,
-                                raw_links=list(found_links),
-                                source_url=url,
-                                source_name="Direct-Scan"
-                            )
+                            raw_links=list(found_links),
+                            source_url=url,
+                            source_name="Direct-Scan"
+                        )
                             
                         # Commit so Categorizer can see them
                         await session.commit()
                         
-                        # Enrich metadata ONLY for found links, not the whole DB!
-                        if found_links:
-                            # We need to get the actual DownloadLink objects from the DB for Categorizer
-                            stmt = select(DownloadLink).where(DownloadLink.url.in_(list(found_links)))
-                            res = await session.execute(stmt)
-                            db_links = res.scalars().all()
-                            if db_links:
-                                await self.categorizer.enrich_links(session, links=db_links)
-                                await session.commit()
+                        # Enrich metadata ONLY for the newly added links!
+                        if new_links:
+                            await self.categorizer.enrich_links(session, links=new_links)
+                            await session.commit()
                         
                 except Exception as e:
                     print(f"[DIRECT-SCAN] Error scanning {url}: {e}")
