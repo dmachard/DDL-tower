@@ -18,7 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
             total: 0,
             query: '',
             category: '',
-            status: ''
+            status: '',
+            recent: true,
+            hours: 12
         },
         releases: {
             items: [],
@@ -27,7 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
             pages: 0,
             total: 0,
             query: '',
-            category: ''
+            category: '',
+            recent: true,
+            hours: 12
         },
         scraped: {
             items: [],
@@ -401,6 +405,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.links.query) url.searchParams.append('q', state.links.query);
             if (state.links.category) url.searchParams.append('category', state.links.category);
             if (state.links.status) url.searchParams.append('status', state.links.status);
+            if (state.links.recent) url.searchParams.append('recent', true);
+            if (state.links.hours) url.searchParams.append('hours', state.links.hours);
 
             const res = await fetch(url);
             const data = await res.json();
@@ -427,6 +433,8 @@ document.addEventListener('DOMContentLoaded', () => {
             url.searchParams.append('limit', state.releases.limit);
             if (state.releases.query) url.searchParams.append('q', state.releases.query);
             if (state.releases.category) url.searchParams.append('category', state.releases.category);
+            if (state.releases.recent) url.searchParams.append('recent', true);
+            if (state.releases.hours) url.searchParams.append('hours', state.releases.hours);
 
             const res = await fetch(url);
             const data = await res.json();
@@ -654,24 +662,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Filter event listeners
-    document.getElementById('filter-category')?.addEventListener('change', (e) => {
-        state.links.category = e.target.value;
-        state.links.page = 1;
-        fetchLinks();
-    });
+    // Filter logic using Tags
+    const updateTagsUI = (containerId, viewState) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.querySelectorAll('.filter-tag').forEach(tag => {
+            const type = tag.getAttribute('data-type');
+            const val = tag.getAttribute('data-value');
 
-    document.getElementById('filter-status')?.addEventListener('change', (e) => {
-        state.links.status = e.target.value;
-        state.links.page = 1;
-        fetchLinks();
-    });
+            let isActive = false;
+            if (type === 'recent') {
+                isActive = (viewState.recent && val === 'true');
+            } else {
+                isActive = (String(viewState[type]) === String(val));
+            }
 
-    document.getElementById('filter-category-releases')?.addEventListener('change', (e) => {
-        state.releases.category = e.target.value;
-        state.releases.page = 1;
-        fetchReleases();
-    });
+            if (isActive) {
+                tag.classList.add('active');
+            } else {
+                tag.classList.remove('active');
+            }
+        });
+    };
+
+    const handleTagClick = (e, view) => {
+        const tag = e.target.closest('.filter-tag');
+        if (!tag) return;
+
+        const type = tag.getAttribute('data-type');
+        const value = tag.getAttribute('data-value');
+        const viewState = state[view];
+
+        if (type === 'recent') {
+            viewState.recent = !viewState.recent;
+            if (!viewState.recent) viewState.hours = null; // Clear hours if disabling recent
+        } else if (type === 'hours') {
+            const h = parseInt(value);
+            if (viewState.hours === h) {
+                viewState.hours = null; // Toggle off
+            } else {
+                viewState.hours = h;
+                viewState.recent = true; // Selecting a period automatically enables Recent mode
+            }
+        } else {
+            // Toggle logic: if already selected, deselect (empty string)
+            viewState[type] = viewState[type] === value ? '' : value;
+        }
+
+        viewState.page = 1;
+        updateTagsUI(view === 'links' ? 'filter-tags-links' : 'filter-tags-releases', viewState);
+
+        if (view === 'links') fetchLinks();
+        else fetchReleases();
+    };
+
+    document.getElementById('filter-tags-links')?.addEventListener('click', (e) => handleTagClick(e, 'links'));
+    document.getElementById('filter-tags-releases')?.addEventListener('click', (e) => handleTagClick(e, 'releases'));
+
+    // Initial tags UI state
+    updateTagsUI('filter-tags-links', state.links);
+    updateTagsUI('filter-tags-releases', state.releases);
 
     // Initial Load
     fetchLinks();

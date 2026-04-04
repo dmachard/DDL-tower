@@ -38,7 +38,9 @@ async def get_links(
     limit: int = Query(50, ge=1, le=500),
     q: str = Query(None),
     category: str = Query(None),
-    status: str = Query(None)
+    status: str = Query(None),
+    recent: bool = Query(False),
+    hours: int = Query(None)
 ):
     """
     Returns download links with pagination and search.
@@ -58,6 +60,16 @@ async def get_links(
     
     if status:
         stmt = stmt.where(DownloadLink.status == status)
+
+    if recent:
+        if hours:
+            threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
+        else:
+            last_scan = await get_latest_scan_time(db)
+            threshold = last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER) if last_scan else None
+        
+        if threshold:
+            stmt = stmt.where(DownloadLink.last_checked >= threshold)
     
     # Get total count for pagination
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -85,11 +97,20 @@ async def get_releases(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     q: str = Query(None),
-    category: str = Query(None)
+    category: str = Query(None),
+    recent: bool = Query(False),
+    hours: int = Query(None)
 ):
     """
     Returns grouped download links (releases) for movies and series.
     """
+    # Calculate novelty threshold (multiplier from config or custom hours)
+    if recent and hours:
+        threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
+    else:
+        last_scan = await get_latest_scan_time(db)
+        threshold = last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER) if last_scan else None
+
     # Base statement for groups
     stmt = select(
         DownloadLink.title,
@@ -103,6 +124,9 @@ async def get_releases(
     
     if category:
         stmt = stmt.where(DownloadLink.category == category)
+
+    if recent and threshold:
+        stmt = stmt.where(DownloadLink.last_checked >= threshold)
         
     stmt = stmt.group_by(DownloadLink.title, DownloadLink.year, DownloadLink.category)
     
@@ -118,10 +142,6 @@ async def get_releases(
     result = await db.execute(stmt)
     groups = result.all()
     
-    # Calculate novelty threshold (multiplier from config)
-    last_scan = await get_latest_scan_time(db)
-    threshold = last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER) if last_scan else None
-
     # For each group, fetch and aggregate its releases
     items = []
     for g_title, g_year, g_cat, g_latest in groups:
@@ -132,7 +152,12 @@ async def get_releases(
             DownloadLink.year == g_year,
             DownloadLink.category == g_cat,
             DownloadLink.status == "alive"
-        ).order_by(DownloadLink.last_checked.desc())
+        )
+
+        if recent and threshold:
+            rel_stmt = rel_stmt.where(DownloadLink.last_checked >= threshold)
+
+        rel_stmt = rel_stmt.order_by(DownloadLink.last_checked.desc())
         
         rel_result = await db.execute(rel_stmt)
         releases = rel_result.scalars().all()

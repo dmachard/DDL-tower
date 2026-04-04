@@ -60,16 +60,26 @@
                         <input type="text" id="search-links" placeholder="Search in links...">
                     </div>
                     <div class="filter-group">
-                        <select id="filter-category" class="filter-select">
-                            <option value="">All Categories</option>
-                            <option value="movie">Movies Only</option>
-                            <option value="series">Series Only</option>
-                        </select>
-                        <select id="filter-status" class="filter-select">
-                            <option value="">All Statuses</option>
-                            <option value="alive">Alive Only</option>
-                            <option value="dead">Dead Only</option>
-                        </select>
+                        <div id="filter-tags-links" class="filter-tags">
+                            <div class="filter-tag tag-recent" data-type="recent" data-value="true">
+                                <i class="fas fa-star tag-star"></i> Recent
+                            </div>
+                            <div class="filter-tag" data-type="hours" data-value="12">12h</div>
+                            <div class="filter-tag" data-type="hours" data-value="24">24h</div>
+                            <div class="filter-tag" data-type="hours" data-value="48">48h</div>
+                            <div class="filter-tag" data-type="category" data-value="movie">
+                                <i class="fas fa-film"></i> Movies
+                            </div>
+                            <div class="filter-tag" data-type="category" data-value="series">
+                                <i class="fas fa-tv"></i> Series
+                            </div>
+                            <div class="filter-tag" data-type="status" data-value="alive">
+                                <i class="fas fa-check-circle"></i> Alive
+                            </div>
+                            <div class="filter-tag" data-type="status" data-value="dead">
+                                <i class="fas fa-times-circle"></i> Dead
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="list-header">
@@ -97,11 +107,20 @@
                         <input type="text" id="search-releases" placeholder="Search in titles...">
                     </div>
                     <div class="filter-group">
-                        <select id="filter-category-releases" class="filter-select">
-                            <option value="">All Categories</option>
-                            <option value="movie">Movies Only</option>
-                            <option value="series">Series Only</option>
-                        </select>
+                        <div id="filter-tags-releases" class="filter-tags">
+                            <div class="filter-tag tag-recent" data-type="recent" data-value="true">
+                                <i class="fas fa-star tag-star"></i> Recent
+                            </div>
+                            <div class="filter-tag" data-type="hours" data-value="12">12h</div>
+                            <div class="filter-tag" data-type="hours" data-value="24">24h</div>
+                            <div class="filter-tag" data-type="hours" data-value="48">48h</div>
+                            <div class="filter-tag" data-type="category" data-value="movie">
+                                <i class="fas fa-film"></i> Movies
+                            </div>
+                            <div class="filter-tag" data-type="category" data-value="series">
+                                <i class="fas fa-tv"></i> Series
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="list-header release-grid-header">
