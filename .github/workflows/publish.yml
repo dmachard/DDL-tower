@@ -1,0 +1,29 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  dockerhub:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Build the Docker image
+      run: |
+        docker build . --file Dockerfile -t ddl-tower
+
+    - name: Tag image
+      run: |
+        docker tag ddl-tower dmachard/ddl-tower:${{ github.event.release.tag_name }}
+        docker tag ddl-tower dmachard/ddl-tower:latest
+
+    - name: Upload to DockerHub
+      run: |
+        echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_LOGIN }}" --password-stdin
+        docker push dmachard/ddl-tower:latest
+        docker push dmachard/ddl-tower:${{ github.event.release.tag_name }}

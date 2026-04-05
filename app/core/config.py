@@ -36,6 +36,16 @@ class Settings(BaseSettings):
     SCAN_INTERVAL_MINUTES: int = _yaml_config.get("scan_interval_minutes", 15)
     SCAN_NOVELTY_MULTIPLIER: int = _yaml_config.get("scan_novelty_multiplier", 2)
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
+    _yaml_omdb = _yaml_config.get("omdb", {})
+    OMDB_API_KEY: str = os.getenv("OMDB_API_KEY", _yaml_omdb.get("api_key", ""))
+    OMDB_LANGUAGE: str = _yaml_omdb.get("language", "en")
+    
+    _yaml_tmdb = _yaml_config.get("tmdb", {})
+    TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", _yaml_tmdb.get("api_key", ""))
+    
+    # Translation Settings
+    _yaml_trans = _yaml_config.get("translation", {})
+    MYMEMORY_EMAIL: str = _yaml_trans.get("mymemory_email", "dmachard@gmail.com")
     
     @property
     def SCRAPER_SOURCES(self) -> List[dict]:

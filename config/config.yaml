@@ -12,10 +12,22 @@ database_url: "sqlite+aiosqlite:///./data/ddl.db"
 # You can also use the ALLDEBRID_API_KEY environment variable
 alldebrid:
   api_key: "YOUR_API_KEY_HERE"
-  agent: "ddl-tower-v2"
+
+# OMDb API Settings
+omdb:
+  api_key: "YOUR_API_KEY_HERE"
+  language: "en"
+
+# TMDB API Settings
+tmdb:
+  api_key: "ea9574c5bb8156b7082d08b6fd8cffbd"
+
+# Translation Settings (MyMemory API)
+translation:
+  mymemory_email: "dmachard@gmail.com"
 
 # Default language (fr or en)
-default_language: fr
+default_language: en
 
 # --- Scraper Global Settings ---
 # Frequency of the automated discovery scans (in minutes)
@@ -27,6 +39,8 @@ scan_novelty_multiplier: 2
 # Regular expressions used to identify download links on any page
 direct_scan_patterns:
   - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+  - 'https?://(?:www\.)?rapidgator\.net/file/[\w-]+/[\w.-]+'
+  - 'https?://(?:www\.)?nitroflare\.com/view/[\w-]+/[\w.-]+'
 
 # --- Automated Discovery Sources (Scrapers) ---
 sources:

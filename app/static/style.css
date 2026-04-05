@@ -64,9 +64,9 @@ body {
 
 /* App Shell */
 .app-shell {
-    padding: 40px;
-    max-width: 1400px;
-    margin: 0 auto;
+    padding: 20px 40px;
+    width: 100%;
+    margin: 0;
 }
 
 .content-header {
@@ -885,7 +885,8 @@ body {
 /* Grouped Releases View */
 .release-group-row {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 1fr 3fr;
+    gap: 30px;
     min-height: 100px;
     padding: 20px 24px;
     border-top: 1px solid var(--glass-border);
@@ -908,12 +909,11 @@ body {
     transform: translateX(4px);
 }
 
-.col-main {
+.group-header {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 4px;
-    padding-right: 20px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
 }
 
 .group-title {
@@ -923,18 +923,67 @@ body {
     line-height: 1.2;
 }
 
+.group-category {
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+}
+
+.group-category.cat-movie {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.group-category.cat-series {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
 .group-year {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-dim);
 }
 
+.group-meta-content {
+    display: flex;
+    gap: 15px;
+    margin-top: 8px;
+    align-items: flex-start;
+}
+
+.group-plot {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    overflow: visible;
+    max-width: 100%;
+}
+
 .group-last-updated {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-dim);
     margin-top: 8px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    opacity: 0.7;
+}
+
+.group-poster {
+    width: 140px;
+    height: 210px;
+    border-radius: var(--radius-sm);
+    background: var(--glass-highlight);
+    background-size: cover;
+    background-position: center;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    flex-shrink: 0;
 }
 
 .col-releases {

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, Boolean
+from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, Boolean, ForeignKey
 from datetime import datetime, timezone
 from app.db.database import Base
 
@@ -26,6 +27,22 @@ class DownloadLink(Base):
     quality = Column(String, nullable=True)
     codec = Column(String, nullable=True)
     language = Column(String, nullable=True)
+
+    # Reference to centralized metadata
+    imdb_id = Column(String, ForeignKey("media_metadata.imdb_id"), nullable=True)
+    metadata_rel = relationship("MediaMetadata", back_populates="links")
+
+class MediaMetadata(Base):
+    __tablename__ = "media_metadata"
+
+    imdb_id = Column(String, primary_key=True) # Unique identifier from OMDb
+    official_title = Column(String, nullable=True)
+    year = Column(Integer, nullable=True)
+    poster_path = Column(String, nullable=True)
+    plot_en = Column(String, nullable=True)
+    plot_fr = Column(String, nullable=True)
+
+    links = relationship("DownloadLink", back_populates="metadata_rel")
 
 class ScrapedURL(Base):
     __tablename__ = "scraped_urls"

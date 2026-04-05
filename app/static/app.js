@@ -129,7 +129,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helpers
     const formatDate = (dateStr) => {
         if (!dateStr) return 'N/A';
-        const d = new Date(dateStr.endsWith('Z') || dateStr.includes('+') ? dateStr : dateStr + 'Z');
+        // Handle common SQLite formats (space instead of T)
+        let formatted = dateStr.replace(' ', 'T');
+        const d = new Date(formatted.endsWith('Z') || formatted.includes('+') ? formatted : formatted + 'Z');
         const locale = state.language === 'fr' ? 'fr-FR' : 'en-US';
         return d.toLocaleString(locale, {
             day: '2-digit',
@@ -251,8 +253,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (group.category) row.classList.add(`cat-${group.category}`);
 
-            clone.querySelector('.group-title').textContent = group.title;
+            clone.querySelector('.group-title').textContent = group.official_title || group.title;
+            
+            const catTag = clone.querySelector('.group-category');
+            if (group.category) {
+                catTag.textContent = group.category === 'movie' ? 
+                    TRANSLATIONS[state.language].filter_movies : 
+                    TRANSLATIONS[state.language].filter_series;
+                catTag.classList.add(`cat-${group.category}`);
+            } else {
+                catTag.classList.add('hidden');
+            }
+
             clone.querySelector('.group-year').textContent = group.year ? `(${group.year})` : '';
+            
+            // Poster (Local Path)
+            const posterEl = clone.querySelector('.group-poster');
+            if (group.poster_path) {
+                // If the path doesn't start with static/, it might be relative
+                const pPath = group.poster_path.startsWith('static/') ? group.poster_path : `static/posters/${group.poster_path}`;
+                posterEl.style.backgroundImage = `url(${pPath})`;
+                posterEl.classList.add('has-poster');
+            }
+
+            // Plot (Bilingual)
+            const plotEl = clone.querySelector('.group-plot');
+            const plot = state.language === 'fr' ? (group.plot_fr || group.plot_en) : (group.plot_en || group.plot_fr);
+            if (plot && plot !== 'N/A') {
+                plotEl.textContent = plot;
+            }
+
             clone.querySelector('.group-last-updated').textContent = `${TRANSLATIONS[state.language].msg_latest_update}: ${formatDate(group.last_updated)}`;
 
             const releasesCol = clone.querySelector('.col-releases');

@@ -9,7 +9,7 @@ import math
 import re
 
 from app.db.database import get_db
-from app.db.models import DownloadLink, ScrapedURL
+from app.db.models import DownloadLink, ScrapedURL, MediaMetadata
 from app.core.scheduler import run_scrapers
 from app.core.scanner import DirectScanner
 from app.core.utils import parse_size, format_size
@@ -131,8 +131,16 @@ async def get_releases(
         DownloadLink.title,
         DownloadLink.year,
         DownloadLink.category,
-        func.max(DownloadLink.last_checked).label("latest")
+        func.max(DownloadLink.last_checked).label("latest"),
+        MediaMetadata.poster_path,
+        MediaMetadata.plot_en,
+        MediaMetadata.plot_fr,
+        MediaMetadata.official_title,
+        MediaMetadata.year.label("official_year")
     ).where(DownloadLink.status == "alive")
+    
+    # Outer join with MediaMetadata
+    stmt = stmt.outerjoin(MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id)
     
     if q:
         stmt = stmt.where(DownloadLink.title.ilike(f"%{q}%"))
@@ -143,7 +151,16 @@ async def get_releases(
     if recent and threshold:
         stmt = stmt.where(DownloadLink.last_checked >= threshold)
         
-    stmt = stmt.group_by(DownloadLink.title, DownloadLink.year, DownloadLink.category)
+    stmt = stmt.group_by(
+        DownloadLink.title, 
+        DownloadLink.year, 
+        DownloadLink.category, 
+        MediaMetadata.poster_path, 
+        MediaMetadata.plot_en, 
+        MediaMetadata.plot_fr, 
+        MediaMetadata.official_title,
+        MediaMetadata.year
+    )
     
     # Get total count of groups
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -159,7 +176,7 @@ async def get_releases(
     
     # For each group, fetch and aggregate its releases
     items = []
-    for g_title, g_year, g_cat, g_latest in groups:
+    for g_title, g_year, g_cat, g_latest, g_poster, g_plot_en, g_plot_fr, g_official, g_off_year in groups:
         if not g_title: continue
         
         rel_stmt = select(DownloadLink).where(
@@ -259,11 +276,17 @@ async def get_releases(
                 int(x["episode"]) if x["episode"] is not None and str(x["episode"]).isdigit() else 0
             ))
 
+        group_latest = releases[0].last_checked if releases else None
+        
         items.append({
             "title": g_title,
-            "year": g_year,
+            "official_title": g_official,
+            "year": g_off_year or g_year,
             "category": g_cat,
-            "last_updated": g_latest,
+            "poster_path": g_poster,
+            "plot_en": g_plot_en,
+            "plot_fr": g_plot_fr,
+            "last_updated": group_latest.isoformat() if hasattr(group_latest, "isoformat") else group_latest,
             "resolutions": resolutions_map,
             "count": len(release_cards)
         })
