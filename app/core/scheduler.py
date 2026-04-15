@@ -3,7 +3,8 @@ from datetime import datetime
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.scrapers.crawl_scraper import CrawlScraper
-from app.scrapers.rss_scraper import RSSScraper # NEW
+from app.scrapers.rss_scraper import RSSScraper
+from app.scrapers.webtop_scraper import WebtopScraper
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
 
@@ -16,6 +17,8 @@ async def run_scrapers():
     for config in settings.SCRAPER_SOURCES:
         if "rss_url" in config:
             scrapers.append(RSSScraper(config))
+        elif "js_items" in config or config.get("use_webtop"):
+            scrapers.append(WebtopScraper(config))
         else:
             scrapers.append(CrawlScraper(config))
 

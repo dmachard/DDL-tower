@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from playwright.async_api import async_playwright
 from app.scrapers.base import BaseScraper
 from app.db.models import ScrapedURL
+from app.core.config import settings
 
 class CrawlScraper(BaseScraper):
     """

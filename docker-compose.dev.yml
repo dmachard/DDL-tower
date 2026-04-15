@@ -2,11 +2,34 @@ services:
   ddltower:
     build: .
     user: "${UID:-1000}:${GID:-1000}"
+    group_add:
+      - ${DOCKER_GID:-983}
     volumes:
       - ./app:/app/app
       - ./data:/app/data
       - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8001:8001"
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]
     restart: always
+
+  webtop:
+    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    container_name: webtop
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+      - SUBFOLDER=/ #optional
+      - TITLE=Webtop Chromium
+      - INSTALL_PACKAGES=socat
+    volumes:
+      - ./webtop_data:/config
+      - /var/run/docker.sock:/var/run/docker.sock #optional
+    ports:
+      - 3000:3000
+    shm_size: "1gb"
+    restart: unless-stopped

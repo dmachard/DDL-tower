@@ -25,7 +25,7 @@ class TMDbService:
         Fetch movie/series metadata (Title, Plot, IMDB ID, Poster Path) from TMDb.
         Attempts to get both English and French plots.
         """
-        if not self.api_key:
+        if not self.api_key or "[YOUR_KEY]" in self.api_key or "TMDB_API_KEY" in self.api_key:
             return None
 
         search_lang = language or settings.DEFAULT_LANGUAGE

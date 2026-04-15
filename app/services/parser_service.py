@@ -73,6 +73,11 @@ class ParserService:
         raw_title = p.get('title', filename)
         title = html.unescape(raw_title) if raw_title else raw_title
         
+        # Aggressive title cleaning if tags leaked into it
+        if title:
+            title = re.split(r'[\.\[\s\-](?:MULTI|FRENCH|TRUEFRENCH|1080P|720P|2160P|BLURAY|UHD|VOSTFR|VFF|VFI|VFQ|DV|HDR|REPACK|PROPER|FINAL)\b', title, flags=re.I)[0]
+            title = title.replace('.', ' ').strip()
+        
         # Category detection
         category = "series" if p.get('season') is not None else "movie"
         
@@ -87,15 +92,21 @@ class ParserService:
         if not res and ("4KLIGHT" in filename.upper()):
             res = "4KLIGHT"
 
-        # Language handling
+        # Language & French Tags handling
         langs = p.get('language', [])
         if isinstance(langs, str): langs = [langs]
         
-        fn_up = filename.upper()
-        if (p.get('multi') or ".MULTI." in fn_up or " MULTI " in fn_up) and "MULTI" not in [l.upper() for l in langs]:
-            langs.append("MULTI")
-        if (".VOSTFR." in fn_up or " VOSTFR " in fn_up or " VOSTFR" in fn_up) and "VOST" not in [l.upper() for l in langs]:
-            langs.append("VOST")
+        fn_up = filename.upper().replace('[', '.').replace(']', '.').replace('_', '.')
+        
+        # Manual detection for common FR scene tags
+        if "TRUEFRENCH" in fn_up or "VFF" in fn_up:
+            if "FRENCH" not in [l.upper() for l in langs]: langs.append("FRENCH")
+        if "MULTI" in fn_up or p.get('multi'):
+            if "MULTI" not in [l.upper() for l in langs]: langs.append("MULTI")
+        if "VOSTFR" in fn_up or "VOST" in fn_up:
+            if "VOSTFR" not in [l.upper() for l in langs]: langs.append("VOSTFR")
+        if "VFI" in fn_up or "VFQ" in fn_up:
+            if "VF" not in [l.upper() for l in langs]: langs.append("VF")
 
         return {
             "title": title,

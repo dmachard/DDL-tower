@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # Scraper Settings
     SCAN_INTERVAL_MINUTES: int = _yaml_config.get("scan_interval_minutes", 15)
     SCAN_NOVELTY_MULTIPLIER: int = _yaml_config.get("scan_novelty_multiplier", 2)
+    BROWSER_URL: Optional[str] = _yaml_config.get("browser_url", None)
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
     _yaml_tmdb = _yaml_config.get("tmdb", {})
     TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", _yaml_tmdb.get("api_key", ""))

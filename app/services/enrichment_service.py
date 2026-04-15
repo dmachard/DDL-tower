@@ -18,7 +18,7 @@ class EnrichmentService:
         """
         Enriches a single link by fetching metadata from TMDb.
         """
-        if not link.title or link.imdb_id == "N/A":
+        if not link.title:
             return
             
         # 1. Check for existing metadata in DB
@@ -97,7 +97,9 @@ class EnrichmentService:
             if existing_meta.official_title: link.title = existing_meta.official_title
             if existing_meta.year: link.year = existing_meta.year
         else:
-            link.imdb_id = "N/A"
+            # Generate a local ID based on title to avoid grouping everything under "N/A"
+            clean_t = re.sub(r'[^a-zA-Z0-9\s]', '', link.title or "unknown").lower().strip()
+            link.imdb_id = f"local_{clean_t.replace(' ', '_')}"[:40]
 
     @staticmethod
     async def process_batch(session: AsyncSession, links: List[DownloadLink], force_year: int = None, force_type: str = None, force_imdb_id: str = None):

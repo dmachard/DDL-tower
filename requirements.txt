@@ -16,3 +16,4 @@ PyYAML
 feedparser
 pytest
 pytest-asyncio
+docker

@@ -18,6 +18,8 @@ DDLtower is a automation tool for web link extraction, tagging and management.
 git clone https://github.com/dmachard/ddltower.git
 cd ddl-tower
 mkdir data/
+# Create .env file with your IDs
+echo "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: -f3)" > .env
 docker compose up -d
 ```
 
@@ -30,7 +32,20 @@ To launch the development environment:
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-## Configuration
+### Environment Variables (.env)
+
+The `.env` file is used to manage permissions for the non-root user and allow access to the Docker socket:
+
+- `UID`: Your local user ID (default: 1000)
+- `GID`: Your local group ID (default: 1000)
+- `DOCKER_GID`: The GID of the `docker` group on your host (needed for Link Unlocking).
+
+You can generate it automatically with:
+```bash
+echo "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: -f3)" > .env
+```
+
+### Application Settings
 
 Settings are managed in `config/config.yaml`.
 
@@ -102,5 +117,8 @@ sudo docker compose exec ddltower python3 -m app.cli.main scan
 
 ```bash
 sudo docker compose exec ddltower sqlite3 /app/data/ddl.db "SELECT official_title, poster_path, year FROM media_metadata WHERE imdb_id='tt32430579';"
+
+sudo docker compose exec ddltower sqlite3 ./data/ddl.db "DELETE FROM download_links; DELETE FROM scraped_urls;"
+
 ```
 
