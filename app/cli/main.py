@@ -1,7 +1,10 @@
 import argparse
 import asyncio
 import sys
-from app.cli.commands import DBCommands, TagCommands, LinkCommands, ScanCommands
+from app.cli.db import DBCommands
+from app.cli.tags import TagCommands
+from app.cli.links import LinkCommands
+from app.cli.scan import ScanCommands
 
 async def run_cli():
     from app.db.database import init_db

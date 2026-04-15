@@ -1,5 +1,5 @@
 services:
-  app:
+  ddltower:
     build: .
     user: "${UID:-1000}:${GID:-1000}"
     volumes:

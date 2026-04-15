@@ -1,0 +1,149 @@
+import re
+import os
+import html
+from typing import List, Optional, Tuple, Dict
+from pathlib import Path
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import DownloadLink, MediaMetadata
+from app.services.tmdb import tmdb_service
+from app.services.translation import translation_service
+from app.services.parser_service import parser_service
+from app.core.config import settings
+
+class EnrichmentService:
+    @staticmethod
+    async def enrich_link_metadata(session: AsyncSession, link: DownloadLink, force_year: int = None, force_type: str = None, force_imdb_id: str = None):
+        """
+        Enriches a single link by fetching metadata from TMDb.
+        """
+        if not link.title or link.imdb_id == "N/A":
+            return
+            
+        # 1. Check for existing metadata in DB
+        stmt = select(MediaMetadata).where(MediaMetadata.official_title == link.title)
+        if link.year:
+            stmt = stmt.where(MediaMetadata.year == link.year)
+        
+        existing_meta = (await session.execute(stmt.limit(1))).scalar()
+        
+        # 2. Re-fetch if poster is missing from disk
+        if existing_meta and existing_meta.poster_path:
+            p_filename = os.path.basename(existing_meta.poster_path)
+            p_disk_path = Path(settings.POSTER_DIR) / p_filename
+            if not p_disk_path.exists():
+                existing_meta = None
+
+        if not existing_meta:
+            search_title = parser_service.clean_search_title(link.title)
+            res_data = None
+            
+            if force_imdb_id:
+                res_data = await tmdb_service.fetch_metadata_by_imdb_id(force_imdb_id, link.title, link.year)
+            
+            if not res_data:
+                res_data = await tmdb_service.fetch_metadata(search_title, link.year, link.category)
+            
+            if res_data:
+                imdb_id = res_data.get("imdb_id")
+                if not imdb_id:
+                    clean_t = re.sub(r'[^a-zA-Z0-9\s]', '', link.title).lower()
+                    imdb_id = f"local_{clean_t.replace(' ', '_')}"[:40]
+                
+                # Check for existing meta with this ID
+                stmt_id = select(MediaMetadata).where(MediaMetadata.imdb_id == imdb_id).limit(1)
+                existing_meta = (await session.execute(stmt_id)).scalar()
+
+                # Prep plots
+                plot_en = res_data.get("plot_en") or res_data.get("plot")
+                plot_fr = res_data.get("plot_fr")
+                if plot_en and not plot_fr:
+                    plot_fr = await translation_service.translate(plot_en)
+                elif not plot_en and plot_fr:
+                    plot_en = plot_fr
+
+                if not existing_meta:
+                    p_url = res_data.get("poster_url")
+                    local_path = None
+                    if p_url and p_url != "N/A":
+                        local_path = await tmdb_service.download_poster(imdb_id, p_url)
+                    
+                    existing_meta = MediaMetadata(
+                        imdb_id=imdb_id,
+                        official_title=res_data.get("official_title"),
+                        title_fr=res_data.get("title_fr"),
+                        year=res_data.get("year"),
+                        poster_path=local_path,
+                        plot_en=plot_en,
+                        plot_fr=plot_fr,
+                        rating=res_data.get("rating")
+                    )
+                    session.add(existing_meta)
+                    await session.flush()
+                else:
+                    # Update existing
+                    if res_data.get("poster_url") and not existing_meta.poster_path:
+                         existing_meta.poster_path = await tmdb_service.download_poster(existing_meta.imdb_id, res_data.get("poster_url"))
+                    if res_data.get("official_title"): existing_meta.official_title = html.unescape(res_data.get("official_title"))
+                    if res_data.get("title_fr"): existing_meta.title_fr = html.unescape(res_data.get("title_fr"))
+                    if not existing_meta.plot_fr and plot_fr: existing_meta.plot_fr = plot_fr
+                    if not existing_meta.plot_en and plot_en: existing_meta.plot_en = plot_en
+                    if not existing_meta.year: existing_meta.year = res_data.get("year")
+                    if not existing_meta.rating: existing_meta.rating = res_data.get("rating")
+        
+        if existing_meta:
+            link.imdb_id = existing_meta.imdb_id
+            if existing_meta.official_title: link.title = existing_meta.official_title
+            if existing_meta.year: link.year = existing_meta.year
+        else:
+            link.imdb_id = "N/A"
+
+    @staticmethod
+    async def process_batch(session: AsyncSession, links: List[DownloadLink], force_year: int = None, force_type: str = None, force_imdb_id: str = None):
+        """
+        Processes a batch of links for enrichment.
+        """
+        # First, ensure all links have technical parsing done
+        for link in links:
+            p = parser_service.parse_filename(link.filename)
+            if p:
+                link.title = p["title"]
+                if force_type: link.category = force_type
+                else: link.category = p["category"]
+                
+                link.year = force_year if force_year is not None else p["year"]
+                link.season = p["season"]
+                link.episode = p["episode"]
+                link.resolution = p["resolution"]
+                link.quality = p["quality"]
+                link.codec = p["codec"]
+                link.network = p["network"]
+                link.v_quality = p["v_quality"]
+                
+                # Language merge
+                langs = p["languages"]
+                if link.language:
+                    existing = [t.strip() for t in link.language.split(",") if t.strip()]
+                    for et in existing:
+                        if et.upper() not in [l.upper() for l in langs]: langs.append(et)
+                link.language = ", ".join(langs) if langs else None
+
+        # Group by (title, year, category) to optimize TMDb calls
+        needed = {}
+        for link in links:
+            if link.title and (not link.imdb_id or link.imdb_id == "N/A"):
+                key = (link.title, link.year, link.category)
+                if key not in needed: needed[key] = []
+                needed[key].append(link)
+        
+        for (title, year, cat), group in needed.items():
+            # We just need to enrich ONE link and then copy to others
+            base_link = group[0]
+            await EnrichmentService.enrich_link_metadata(session, base_link, force_year, force_type, force_imdb_id)
+            for other in group[1:]:
+                other.imdb_id = base_link.imdb_id
+                other.title = base_link.title
+                other.year = base_link.year
+
+enrichment_service = EnrichmentService()
