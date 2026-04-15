@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetSearch = document.getElementById('target-search');
     const handleSearch = debounce((e) => {
         const query = e.target.value.toLowerCase();
-        const view = e.target.id.replace('search-', '');
+        const view = e.target.id === 'target-search' ? 'releases' : e.target.id.replace('search-', '');
         if (state[view]) {
             state[view].query = query;
             state[view].page = 1;
