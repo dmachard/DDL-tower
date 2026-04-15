@@ -61,4 +61,4 @@ def test_parse_filename_multi_vostfr():
     res = parser_service.parse_filename(filename)
     langs = [l.upper() for l in res["languages"]]
     assert "MULTI" in langs
-    assert "VOST" in langs
+    assert "VOSTFR" in langs
