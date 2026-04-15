@@ -1,0 +1,11 @@
+services:
+  ddltower:
+    image: dmachard/ddl-tower:latest
+    build: .
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    ports:
+      - "8001:8001"
+    restart: always

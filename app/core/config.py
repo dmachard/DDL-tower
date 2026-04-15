@@ -1,0 +1,60 @@
+import os
+import yaml
+from pathlib import Path
+from typing import List, Optional
+from pydantic_settings import BaseSettings
+from pydantic import BaseModel, ConfigDict
+
+# Configuration directory path
+CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
+CONFIG_FILE = CONFIG_DIR / "config.yaml"
+
+# Initial loading
+_yaml_config = {}
+if CONFIG_FILE.exists():
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            _yaml_config = yaml.safe_load(f) or {}
+    except Exception as e:
+        print(f"Error loading config.yaml: {e}")
+
+class Settings(BaseSettings):
+    # App General Settings
+    APP_NAME: str = _yaml_config.get("app_name", "DDL Tower")
+    DEBUG: bool = _yaml_config.get("debug", True)
+    DEFAULT_LANGUAGE: str = _yaml_config.get("default_language", "fr")
+    
+    # Database Settings
+    DATABASE_URL: str = _yaml_config.get("database_url", "sqlite+aiosqlite:///./data/ddl.db")
+    
+    # AllDebrid API Settings (Environment variable takes priority)
+    _yaml_alldebrid = _yaml_config.get("alldebrid", {})
+    ALLDEBRID_API_KEY: str = os.getenv("ALLDEBRID_API_KEY", _yaml_alldebrid.get("api_key", ""))
+    ALLDEBRID_AGENT: str = _yaml_alldebrid.get("agent", "ddl-tower")
+    
+    # Download Settings
+    DOWNLOAD_DIR: str = os.getenv("DOWNLOAD_DIR", _yaml_config.get("download_dir", "/app/data/download"))
+    POSTER_DIR: str = os.getenv("POSTER_DIR", _yaml_config.get("poster_dir", "/app/data/posters"))
+    EXTRACT_RAR: bool = _yaml_config.get("extract_rar", True)
+    DELETE_RAR_AFTER_EXTRACTION: bool = _yaml_config.get("delete_rar_after_extraction", True)
+    KEEP_ONLY_VIDEO_FILES: bool = _yaml_config.get("keep_only_video_files", True)
+    
+    # Scraper Settings
+    SCAN_INTERVAL_MINUTES: int = _yaml_config.get("scan_interval_minutes", 15)
+    SCAN_NOVELTY_MULTIPLIER: int = _yaml_config.get("scan_novelty_multiplier", 2)
+    DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
+    _yaml_tmdb = _yaml_config.get("tmdb", {})
+    TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", _yaml_tmdb.get("api_key", ""))
+    
+    # Translation Settings (MyMemory)
+    _yaml_mymemory = _yaml_config.get("mymemory", {})
+    MYMEMORY_EMAIL: str = _yaml_mymemory.get("email", "dmachard@gmail.com")
+    
+    @property
+    def SCRAPER_SOURCES(self) -> List[dict]:
+        # Directly read the 'sources' block from the main YAML
+        return _yaml_config.get("sources", [])
+
+    model_config = ConfigDict(env_file=".env", extra="ignore")
+
+settings = Settings()

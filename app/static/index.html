@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDL Tower</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="static/style.css?v=1.0.3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+    <!-- Decorative background elements -->
+    <div class="bg-glow spot-1"></div>
+    <div class="bg-glow spot-2"></div>
+
+    <div class="app-shell">
+        <main class="main-content">
+            <header class="content-header">
+                <div class="logo">
+                    <img src="static/favicon.svg" alt="DDL Tower Logo" class="logo-icon">
+                    <h1>DDL<span>tower</span></h1>
+                </div>
+                <div class="header-search">
+                    <div class="search-wrapper scan-wrapper">
+                        <input type="text" id="direct-scan-input" placeholder="Scan a URL">
+                        <div id="scan-indicator" class="scan-indicator hidden"></div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="language-switcher">
+                        <div class="custom-select" id="lang-custom-select">
+                            <div class="select-trigger">
+                                <span id="current-lang">FR</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="select-options">
+                                <div class="option" data-value="fr">FR</div>
+                                <div class="option" data-value="en">EN</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <nav class="view-nav">
+                <button class="nav-item active" data-view="releases">
+                    <i class="fas fa-compass"></i>
+                    <span data-i18n="nav_releases">Explorer</span>
+                    <span class="nav-count" id="count-releases">0</span>
+                </button>
+
+                <button class="nav-item" data-view="downloads">
+                    <i class="fas fa-cloud-download-alt"></i>
+                    <span data-i18n="nav_downloads">Downloads</span>
+                    <span class="nav-count" id="count-downloads">0</span>
+                </button>
+
+                <button class="nav-item" data-view="sources">
+                    <i class="fas fa-satellite-dish"></i>
+                    <span data-i18n="nav_sources">Sources</span>
+                </button>
+
+                <!-- Global Search Bar in Nav -->
+                <div class="search-wrapper global-search">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="target-search" placeholder="Chercher..." data-i18n="search_placeholder">
+                </div>
+
+                <div id="live-toggle" class="live-status">
+                    <div class="live-indicator"></div>
+                    <span class="live-label">LIVE</span>
+                </div>
+            </nav>
+
+            <!-- Releases View -->
+            <div id="releases-view" class="view-section">
+                <div class="sticky-controls">
+                    <div class="view-toolbar">
+                        <div class="filter-group">
+                            <!-- JS will inject filters here into these containers -->
+                            <div class="filter-tags" id="filter-common-releases"></div>
+                            <div id="filter-tags-releases" class="filter-tags"></div>
+                            <div id="filter-select-releases" class="filter-select-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="list-container">
+                    <div id="releases-container" class="release-grid"></div>
+                    <div id="releases-pagination" class="pagination-bottom pagination-container"></div>
+                </div>
+            </div>
+
+
+
+            <!-- Downloads View -->
+            <div id="downloads-view" class="view-section hidden">
+                <div class="list-container">
+                    <div id="downloads-container" class="link-list"></div>
+                </div>
+            </div>
+
+            <!-- Sources View -->
+            <div id="sources-view" class="view-section hidden">
+                <div class="stats-grid">
+                    <div class="stats-card">
+                        <div class="card-content">
+                            <span class="card-label" data-i18n="stat_unique_movies">Unique Movies</span>
+                            <span class="card-value" id="stats-unique-movies">0</span>
+                        </div>
+                    </div>
+                    <div class="stats-card accent-blue">
+                        <div class="card-content">
+                            <span class="card-label" data-i18n="stat_total_volume">Total Volume</span>
+                            <span class="card-value" id="stats-size">0 GB</span>
+                        </div>
+                    </div>
+                    <div class="stats-card accent-red">
+                        <div class="card-content">
+                            <span class="card-label" data-i18n="stat_dead_links">Dead Links</span>
+                            <span class="card-value" id="stats-dead-links">0</span>
+                        </div>
+                    </div>
+                    <div class="stats-card accent-green">
+                        <div class="card-content">
+                            <span class="card-label" data-i18n="stat_total_links">Total Links</span>
+                            <span class="card-value" id="stats-total-links">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="sources-dashboard-grid" id="sources-dashboard-container"></div>
+            </div>
+        </main>
+    </div>
+
+
+    <template id="release-group-template">
+        <div class="release-group-row">
+            <div class="col-main">
+                <div class="group-header">
+                    <span class="group-category"></span>
+                    <div class="group-title">...</div>
+                </div>
+                <div class="group-year-rating">
+                    <span class="group-year">...</span>
+                </div>
+                <div class="group-meta-content">
+                    <div class="group-poster-col">
+                        <div class="group-poster"></div>
+                        <div class="group-actions">
+                            <!-- Action buttons here -->
+                        </div>
+                    </div>
+                    <div class="group-info">
+                        <div class="group-rating"></div>
+                        <div class="group-plot"></div>
+                    </div>
+                </div>
+                <div class="group-last-updated">...</div>
+            </div>
+            <div class="col-releases">
+                <!-- Badges go here -->
+            </div>
+        </div>
+    </template>
+
+
+
+
+    <template id="download-item-template">
+        <div class="link-row downloads-grid">
+            <div class="col-status">
+                <i class="fas fa-file-alt file-icon"></i>
+            </div>
+            <div class="col-content">
+                <span class="download-name">...</span>
+                <div class="download-progress-container hidden">
+                    <div class="download-progress-bar"></div>
+                    <span class="download-progress-text">0%</span>
+                </div>
+            </div>
+            <div class="col-size">...</div>
+            <div class="col-date">...</div>
+            <div class="col-actions">
+                <a href="#" class="btn-action-round btn-download-local" title="Download to PC" download>
+                    <i class="fas fa-download"></i>
+                </a>
+                <button class="btn-delete-download" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal Identification -->
+    <div id="identify-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="modal_identify_title">Identify Release</h3>
+                <span class="modal-close" id="close-identify-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="search-box">
+                    <input type="text" id="identify-search-input" placeholder="Search title...">
+                    <select id="identify-category-select" class="modal-select">
+                        <option value="movie" data-i18n="filter_movies">Movies</option>
+                        <option value="series" data-i18n="filter_series">Series</option>
+                    </select>
+                    <button id="btn-do-identify-search" class="btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div id="identify-results" class="search-results">
+                    <!-- Search results here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content modal-content-sm">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirmation</h3>
+                <span class="modal-close" id="close-confirm-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" class="confirm-text"></p>
+                <div class="confirm-actions">
+                    <button id="btn-confirm-cancel" class="btn-secondary" data-i18n="btn_cancel">Cancel</button>
+                    <button id="btn-confirm-ok" class="btn-primary" data-i18n="btn_confirm">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="static/app.js?v=6"></script>
+</body>
+
+</html>

@@ -1,0 +1,94 @@
+:root {
+    --bg-deep: #0f111a;
+    --bg-main: #121421;
+    --glass-bg: rgba(26, 32, 44, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-highlight: rgba(255, 255, 255, 0.03);
+
+    --accent: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.3);
+    --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+
+    --text-pure: #ffffff;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-dim: #475569;
+
+    --success: #10b981;
+    --error: #ef4444;
+    --warning: #f59e0b;
+    --live: #00ff88;
+    --rating: #fbbf24;
+
+    /* Semantic UI Colors */
+    --color-movie: #38bdf8;
+    --color-series: #a78bfa;
+    --color-hd: #10b981;
+    --color-sd: #94a3b8;
+    --color-network: #a5b4fc;
+    --color-quality: #f472b6;
+
+    /* Z-Index Scale */
+    --z-base: 1;
+    --z-nav: 100;
+    --z-sticky: 200;
+    --z-overlay: 500;
+    --z-modal: 1000;
+    --z-toast: 2000;
+
+    --radius-md: 12px;
+    --radius-sm: 6px;
+
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --header-h: 70px;
+    --nav-h: 70px;
+
+    --bg-stealth: #0d1117;
+    --glass-heavy: rgba(13, 17, 23, 0.95);
+    --glass-light: rgba(255, 255, 255, 0.05);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Scrollbar Style */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

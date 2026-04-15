@@ -1,0 +1,187 @@
+/* Downloads View */
+.downloads-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.link-row.downloads-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr 120px 160px 100px !important;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 10px 20px;
+    transition: var(--transition);
+}
+
+.link-row.downloads-grid:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.download-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-pure);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.file-icon {
+    font-size: 20px;
+    color: var(--text-secondary);
+}
+
+.folder-icon { color: var(--warning); }
+.error-icon { color: var(--error); }
+
+.download-progress-container {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    margin-top: 10px;
+    position: relative;
+    overflow: visible;
+}
+
+.download-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success) 0%, var(--live) 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.download-progress-text {
+    position: absolute;
+    right: 0;
+    top: -20px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--success);
+}
+
+.active-download {
+    background: rgba(16, 185, 129, 0.04) !important;
+    border-left: 4px solid var(--success) !important;
+}
+
+.error-download {
+    background: rgba(239, 68, 68, 0.05) !important;
+    border-left: 4px solid var(--error) !important;
+}
+
+.col-size, .col-date {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.col-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-delete-download {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    color: var(--error);
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-delete-download:hover:not(:disabled) {
+    background: var(--error);
+    color: white;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.btn-delete-download:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
+.download-parts-detail {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    font-size: 11px;
+}
+
+.part-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    color: var(--text-dim);
+}
+
+.part-progress { color: var(--success); font-weight: 700; }
+
+/* Mobile Card Layout */
+@media (max-width: 900px) {
+    .downloads-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 15px !important;
+        gap: 8px !important;
+        position: relative;
+    }
+
+    .col-status {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+    }
+
+    .col-content {
+        margin-right: 30px;
+    }
+
+    .download-name {
+        font-size: 16px;
+        white-space: normal;
+        word-break: break-all;
+    }
+
+    .download-progress-container {
+        margin-bottom: 25px; /* Space for text */
+    }
+
+    .col-size, .col-date, .col-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .col-size::before, 
+    .col-date::before, 
+    .col-actions::before {
+        content: attr(data-label);
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--text-dim);
+    }
+
+    .col-actions {
+        margin-top: 5px;
+        padding-top: 10px;
+    }
+}

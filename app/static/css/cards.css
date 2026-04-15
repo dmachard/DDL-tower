@@ -1,0 +1,170 @@
+/* Stats Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.stats-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 30px;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+
+
+.card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.card-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.card-value {
+    font-size: 42px;
+    font-weight: 900;
+    color: var(--text-pure);
+    line-height: 1;
+}
+
+.accent-blue .card-value {
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.accent-red .card-value {
+    color: var(--error);
+    text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+.accent-green .card-value {
+    color: var(--success);
+    text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+/* Release Cards & Badges */
+.release-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px !important;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px !important;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(8px);
+    position: relative;
+    overflow: hidden;
+    min-width: 250px !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+.release-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(16, 185, 129, 0.1);
+}
+
+.release-badge {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 120px;
+    transition: var(--transition);
+    text-decoration: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.rel-tag {
+    font-size: 9px;
+    font-weight: 900;
+    padding: 2px 7px;
+    border-radius: 2px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    height: 18px;
+}
+
+.rel-tag-se { color: white; background: var(--accent-gradient); box-shadow: 0 2px 8px var(--accent-glow); }
+.rel-tag-lang { color: var(--color-movie); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); }
+.rel-tag-res { color: var(--color-hd); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); }
+.rel-tag-quality { color: var(--color-series); background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); }
+.rel-tag-codec { color: var(--color-sd); background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); }
+.rel-tag-network { color: var(--color-network) !important; background: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
+.rel-tag-vquality { color: var(--rating) !important; background: rgba(251, 191, 36, 0.1) !important; border: 1px solid rgba(251, 191, 36, 0.4) !important; }
+
+/* Seasons Grouping */
+.season-group { margin-bottom: 15px; }
+.season-header {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin: 12px 0 8px 2px;
+    opacity: 0.8;
+}
+
+/* Star Badge */
+.badge-star {
+    color: var(--rating) !important;
+    font-size: 10px !important;
+    margin-left: 6px !important;
+    filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.4));
+    animation: star-pulsate 2s infinite ease-in-out;
+}
+
+/* Seasons layout fix */
+.seasons-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+/* IMDb Links */
+.imdb-link {
+    color: inherit;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.imdb-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    opacity: 0.8;
+}
+
+/* Star Badge pulsate */
+@keyframes star-pulsate {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+
+@media (max-width: 900px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .card-value { font-size: 32px; }
+}
