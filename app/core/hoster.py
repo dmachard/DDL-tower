@@ -3,9 +3,9 @@ import aiohttp
 from typing import List, Dict, Any
 from urllib.parse import urlparse
 
-from app.services.one_fichier import OneFichierService
-from app.services.nitroflare import NitroflareService
-from app.services.rapidgator import RapidgatorService
+from app.hosters.one_fichier import OneFichierService
+from app.hosters.nitroflare import NitroflareService
+from app.hosters.rapidgator import RapidgatorService
 from app.services.alldebrid import AllDebridClient
 
 class Hoster:
