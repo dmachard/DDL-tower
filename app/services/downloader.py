@@ -148,7 +148,7 @@ class DownloaderService:
                     # If we reach here, either it's not a RAR or extraction wasn't triggered
                     if group["status"] != "error":
                         # If it's a movie or series and it wasn't a RAR, organize it now
-                        if category in ["movie", "series"] and not self.is_rar(str(file_path)):
+                        if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
                              from app.services.library_service import library_service
                              library_service.organize_file(str(file_path), category, title=title, year=year)
 
