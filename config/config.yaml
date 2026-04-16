@@ -9,6 +9,8 @@ debug: true
 database_url: "sqlite+aiosqlite:///./data/ddl.db"
 
 # Download Settings
+download_dir: "/app/data/download"
+library_movies_dir: "/app/data/films"
 delete_rar_after_extraction: true
 keep_only_video_files: true
 

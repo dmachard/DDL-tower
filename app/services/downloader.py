@@ -49,7 +49,7 @@ class DownloaderService:
                     "status": "waiting"
                 }
 
-    async def download_file(self, url: str, filename: str = None) -> str:
+    async def download_file(self, url: str, filename: str = None, category: str = None) -> str:
         """
         Downloads a file from a URL to the download directory.
         Returns the path to the downloaded file.
@@ -133,7 +133,8 @@ class DownloaderService:
                             group["status"] = "extracting"
                             group["progress"] = 100
                             
-                            success = extraction_service.extract_rar(str(file_path), self.active_downloads)
+                            # Call extraction with category
+                            success = extraction_service.extract_rar(str(file_path), self.active_downloads, category=category)
                             if not success:
                                 group["status"] = "error"
                                 group["error"] = "Extraction failed (Check logs/archives)"
@@ -146,6 +147,11 @@ class DownloaderService:
                     
                     # If we reach here, either it's not a RAR or extraction wasn't triggered
                     if group["status"] != "error":
+                        # If it's a movie and it wasn't a RAR, organize it now
+                        if category == "movie" and not self.is_rar(str(file_path)):
+                             from app.services.library_service import library_service
+                             library_service.organize_file(str(file_path), category)
+
                         group["files"].pop(filename, None)
                         if not group["files"]:
                              self.active_downloads.pop(group_name, None)

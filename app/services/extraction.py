@@ -68,11 +68,14 @@ class ExtractionService:
         parts.sort()
         return parts[0]
 
-    def extract_rar(self, file_path: str, active_downloads: dict = None) -> bool:
+    def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None) -> bool:
         """
         Extracts a RAR archive using the system unrar command.
         Ensures extraction starts from the first volume.
         """
+        # We need to import library_service here to avoid circular imports if any
+        from app.services.library_service import library_service
+        
         if not self.should_extract(file_path, active_downloads):
             return False
 
@@ -147,6 +150,10 @@ class ExtractionService:
                             if not new_path.exists():
                                 shutil.move(str(video_p), str(new_path))
                                 print(f"[EXTRACTION] Promoted {video_p.name} to {path.parent}")
+                                
+                                # Library Organization (for Movies)
+                                if category == "movie":
+                                    library_service.organize_file(str(new_path), category)
                             else:
                                 print(f"[EXTRACTION] {video_p.name} already exists in destination, skipping move.")
                         except Exception as e:

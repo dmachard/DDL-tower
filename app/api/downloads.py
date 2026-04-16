@@ -121,12 +121,33 @@ async def run_download_task(urls: List[str]):
     # 3. Start downloads concurrently
     sem = asyncio.Semaphore(5)
 
-    async def sem_download(link, filename):
+    async def sem_download(link, filename, category):
         async with sem:
-            await downloader_service.download_file(link, filename)
+            await downloader_service.download_file(link, filename, category=category)
+
+    # 4. Fetch categories from DB for these URLs
+    url_to_category = {}
+    async with AsyncSessionLocal() as session:
+        from app.db.models import DownloadLink
+        from sqlalchemy import select
+        stmt = select(DownloadLink.url, DownloadLink.category).where(DownloadLink.url.in_(urls))
+        result = await session.execute(stmt)
+        for url, category in result.all():
+            url_to_category[url] = category
 
     print(f"[API] Starting {len(valid_downloads)} downloads concurrently...")
-    download_tasks = [sem_download(link, filename) for link, filename in valid_downloads]
+    
+    # We find the original URL for each valid_download to get its category
+    # (Since valid_downloads contains the UNLOCKED link, we need to match it back)
+    # Actually, run_download_task receives the ORIGINAL urls.
+    # The order in 'results' matches 'urls'.
+    
+    download_tasks = []
+    for idx, (link, filename) in enumerate(valid_downloads):
+        orig_url = urls[idx] if idx < len(urls) else None
+        cat = url_to_category.get(orig_url)
+        download_tasks.append(sem_download(link, filename, cat))
+
     await asyncio.gather(*download_tasks)
 
 @router.post("/download")
