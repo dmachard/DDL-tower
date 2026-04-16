@@ -27,12 +27,14 @@ async def get_links(
     stmt = select(DownloadLink)
     
     if q:
-        search_filter = or_(
-            DownloadLink.filename.ilike(f"%{q}%"),
-            DownloadLink.title.ilike(f"%{q}%"),
-            DownloadLink.url.ilike(f"%{q}%")
-        )
-        stmt = stmt.where(search_filter)
+        keywords = q.split()
+        for kw in keywords:
+            search_filter = or_(
+                DownloadLink.filename.ilike(f"%{kw}%"),
+                DownloadLink.title.ilike(f"%{kw}%"),
+                DownloadLink.url.ilike(f"%{kw}%")
+            )
+            stmt = stmt.where(search_filter)
     
     if category:
         stmt = stmt.where(DownloadLink.category == category)

@@ -71,7 +71,14 @@ class ReleaseService:
         stmt = stmt.outerjoin(MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id)
         
         if q:
-            stmt = stmt.where(DownloadLink.title.ilike(f"%{q}%"))
+            keywords = q.split()
+            for kw in keywords:
+                stmt = stmt.where(or_(
+                    DownloadLink.title.ilike(f"%{kw}%"),
+                    DownloadLink.filename.ilike(f"%{kw}%"),
+                    MediaMetadata.official_title.ilike(f"%{kw}%"),
+                    MediaMetadata.title_fr.ilike(f"%{kw}%")
+                ))
         if category:
             stmt = stmt.where(DownloadLink.category == category)
         if source:

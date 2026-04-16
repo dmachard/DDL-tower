@@ -13,9 +13,9 @@ services:
       - "8001:8001"
     restart: always
 
-  webtop:
+  ddltower-browser:
     image: lscr.io/linuxserver/webtop:ubuntu-xfce
-    container_name: webtop
+    container_name: ddltower-browser
     security_opt:
       - seccomp:unconfined
     environment:

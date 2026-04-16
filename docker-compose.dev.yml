@@ -14,14 +14,17 @@ services:
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]
     restart: always
 
-  webtop:
+  ddltower-browser:
     image: lscr.io/linuxserver/webtop:ubuntu-xfce
-    container_name: webtop
+    container_name: ddltower-browser
     security_opt:
       - seccomp:unconfined
+      - apparmor=unconfined
+    cap_add:
+      - SYS_ADMIN
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${UID:-1000}
+      - PGID=${GID:-1000}
       - TZ=Europe/Paris
       - SUBFOLDER=/ #optional
       - TITLE=Webtop Chromium

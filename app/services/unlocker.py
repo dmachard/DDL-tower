@@ -12,8 +12,8 @@ class LinkUnlocker:
     Advanced Link Unlocker that uses the Webtop container via Docker SDK
     to bypass Cloudflare/Turnstile.
     """
-    def __init__(self, container_name="webtop", cdp_port=9222, local_cdp_port=9223):
-        self.container_name = container_name
+    def __init__(self, container_name=None, cdp_port=9222, local_cdp_port=9223):
+        self.container_name = container_name or settings.WEBTOP_CONTAINER_NAME
         self.cdp_port = cdp_port
         self.local_cdp_port = local_cdp_port
         try:
@@ -31,28 +31,38 @@ class LinkUnlocker:
     def setup_container_env(self, url):
         """Prepares the Webtop container for extraction."""
         if not self.client:
+            print("[UNLOCKER] ERROR: No Docker client available.")
             return None
             
         try:
             container = self.client.containers.get(self.container_name)
         except Exception as e:
-            print(f"[UNLOCKER] Container '{self.container_name}' not found or unreachable: {e}")
+            print(f"[UNLOCKER] ERROR: Container '{self.container_name}' not found or unreachable: {e}")
             return None
 
-        # 1. Ensure socat is present (it should be if INSTALL_PACKAGES=socat was used)
-        res = container.exec_run("which socat")
-        if res.exit_code != 0:
-            print("[UNLOCKER] Installing socat in Webtop...")
-            container.exec_run("apt-get update", user="root")
-            container.exec_run("apt-get install -y socat", user="root")
+        # 1. Ensure socat is present
+        # Check if socat is already installed (fast)
+        try:
+            res = container.exec_run("which socat")
+            if res.exit_code != 0:
+                print(f"[UNLOCKER] socat not found in {self.container_name}. Attempting quick install...")
+                # Try install without update first (faster if cache exists)
+                res_inst = container.exec_run("apt-get install -y socat", user="root")
+                if res_inst.exit_code != 0:
+                    print("[UNLOCKER] Quick install failed. Running apt-get update (may be slow)...")
+                    container.exec_run("apt-get update", user="root")
+                    container.exec_run("apt-get install -y socat", user="root")
+            else:
+                print(f"[UNLOCKER] socat is ready in {self.container_name}")
+        except Exception as e:
+            print(f"[UNLOCKER] Warning: Failed to verify/install socat: {e}")
 
         # 2. Cleanup previous runs
         container.exec_run("pkill chromium", user="root")
         container.exec_run("pkill socat", user="root")
 
         # 3. Launch Browser inside Webtop container
-        # We use a temporary profile to avoid locks
-        print(f"[UNLOCKER] Launching Chromium in Webtop for {url}")
+        print(f"[UNLOCKER] Launching Chromium in {self.container_name} for {url}")
         container.exec_run(
             cmd=f"env DISPLAY=:1 chromium --no-sandbox --remote-debugging-port={self.local_cdp_port} --remote-allow-origins=* --user-data-dir=/tmp/automation-profile '{url}'",
             detach=True,

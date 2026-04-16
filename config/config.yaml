@@ -35,7 +35,8 @@ scan_interval_minutes: 60
 scan_novelty_multiplier: 2
 
 # Browser connection for Webtop/Cloudflare bypass (uncomment to use)
-browser_url: "http://webtop:9222"
+browser_url: "http://ddltower-browser:9222"
+webtop_container_name: "ddltower-browser"
 
 # --- Direct & Global Extraction Patterns ---
 # Regular expressions used to identify download links on any page

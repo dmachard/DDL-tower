@@ -19,7 +19,7 @@ git clone https://github.com/dmachard/ddltower.git
 cd ddl-tower
 mkdir data/
 # Create .env file with your IDs
-echo "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: -f3)" > .env
+echo -e "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: -f3)" > .env
 docker compose up -d
 ```
 
@@ -42,7 +42,7 @@ The `.env` file is used to manage permissions for the non-root user and allow ac
 
 You can generate it automatically with:
 ```bash
-echo "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: -f3)" > .env
+echo -e "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: -f3)" > .env
 ```
 
 ### Application Settings
