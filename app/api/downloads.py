@@ -102,22 +102,23 @@ async def run_download_task(urls: List[str]):
     unlock_tasks = [client.unlock_link(url) for url in urls]
     results = await asyncio.gather(*unlock_tasks)
     
-    valid_downloads = []
-    for res in results:
+    valid_downloads = [] # List of (orig_url, unlocked_link, filename)
+    for idx, res in enumerate(results):
+        orig_url = urls[idx]
         if res.get("status") == "success":
             data = res.get("data", {})
             link = data.get("link")
             filename = data.get("filename")
             if link:
-                valid_downloads.append((link, filename))
+                valid_downloads.append((orig_url, link, filename))
         else:
-            print(f"[API] Failed to unlock a link: {res.get('error')}")
+            print(f"[API] Failed to unlock {orig_url}: {res.get('error')}")
 
     if not valid_downloads:
         return
 
-    # 2. Register all files
-    downloader_service.pre_register_files(valid_downloads)
+    # 2. Register all files (expects list of (link, filename))
+    downloader_service.pre_register_files([(d[1], d[2]) for d in valid_downloads])
 
     # 3. Start downloads concurrently
     sem = asyncio.Semaphore(5)
@@ -131,36 +132,56 @@ async def run_download_task(urls: List[str]):
     async with AsyncSessionLocal() as session:
         from app.db.models import DownloadLink, MediaMetadata
         from sqlalchemy import select, func
+
         # Determine title priority based on default language
         if settings.DEFAULT_LANGUAGE == "fr":
-            title_priority = [MediaMetadata.title_fr, MediaMetadata.official_title, DownloadLink.title]
+            title_priority = [MediaMetadata.title_fr, MediaMetadata.official_title, DownloadLink.title, DownloadLink.filename]
         else:
-            title_priority = [MediaMetadata.official_title, MediaMetadata.title_fr, DownloadLink.title]
+            title_priority = [MediaMetadata.official_title, MediaMetadata.title_fr, DownloadLink.title, DownloadLink.filename]
         
         # Use a join to get the metadata if enriched
         stmt = select(
             DownloadLink.url, 
             DownloadLink.category, 
-            func.coalesce(*title_priority).label("final_title"),
-            func.coalesce(MediaMetadata.year, DownloadLink.year).label("final_year")
+            MediaMetadata.title_fr,
+            MediaMetadata.official_title,
+            DownloadLink.title,
+            DownloadLink.filename,
+            MediaMetadata.year,
+            DownloadLink.year
         ).outerjoin(
             MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id
         ).where(DownloadLink.url.in_(urls))
         
         result = await session.execute(stmt)
-        for url, category, title, year in result.all():
-            url_to_meta[url] = {"category": category, "title": title, "year": year}
+        for row in result:
+            # Robust title fallback in Python (handles None AND empty strings)
+            # order: fr -> official -> ptn_title -> filename
+            if settings.DEFAULT_LANGUAGE == "fr":
+                title_candidates = [row.title_fr, row.official_title, row.title, row.filename]
+            else:
+                title_candidates = [row.official_title, row.title_fr, row.title, row.filename]
+            
+            final_title = next((t for t in title_candidates if t), "Unknown-Series")
+            final_year = row.year or row.year_1 # SQLAlchemy suffix for double 'year' column
+            
+            url_to_meta[row.url.strip()] = {
+                "category": row.category or "movie",
+                "title": final_title,
+                "year": final_year
+            }
 
     print(f"[API] Starting {len(valid_downloads)} downloads concurrently...")
     
     download_tasks = []
-    for idx, (link, filename) in enumerate(valid_downloads):
-        orig_url = urls[idx] if idx < len(urls) else None
-        meta = url_to_meta.get(orig_url, {})
+    # Use the explicit (orig_url, unlocked_link, filename) mapping
+    for orig_url, link, filename in valid_downloads:
+        meta = url_to_meta.get(orig_url.strip(), {})
+        
         download_tasks.append(sem_download(
             link, 
             filename, 
-            meta.get("category"), 
+            meta.get("category", "movie"),
             meta.get("title"), 
             meta.get("year")
         ))
