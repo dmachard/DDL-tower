@@ -40,7 +40,7 @@ class LibraryService:
                 target_base_dir = self.movies_dir
             else: # series
                 s_title = self._sanitize_path(title or "Unknown Series")
-                folder_name = f"({year} - {s_title})" if year else s_title
+                folder_name = f"{year} - {s_title}" if year else s_title
                 target_base_dir = self.series_dir / folder_name
             
             # Ensure destination directory exists

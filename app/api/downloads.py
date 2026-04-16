@@ -131,12 +131,17 @@ async def run_download_task(urls: List[str]):
     async with AsyncSessionLocal() as session:
         from app.db.models import DownloadLink, MediaMetadata
         from sqlalchemy import select, func
+        # Determine title priority based on default language
+        if settings.DEFAULT_LANGUAGE == "fr":
+            title_priority = [MediaMetadata.title_fr, MediaMetadata.official_title, DownloadLink.title]
+        else:
+            title_priority = [MediaMetadata.official_title, MediaMetadata.title_fr, DownloadLink.title]
         
-        # Use a join to get the official title/year if enriched
+        # Use a join to get the metadata if enriched
         stmt = select(
             DownloadLink.url, 
             DownloadLink.category, 
-            func.coalesce(MediaMetadata.official_title, DownloadLink.title).label("final_title"),
+            func.coalesce(*title_priority).label("final_title"),
             func.coalesce(MediaMetadata.year, DownloadLink.year).label("final_year")
         ).outerjoin(
             MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id
