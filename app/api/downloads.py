@@ -121,32 +121,43 @@ async def run_download_task(urls: List[str]):
     # 3. Start downloads concurrently
     sem = asyncio.Semaphore(5)
 
-    async def sem_download(link, filename, category):
+    async def sem_download(link, filename, category, title, year):
         async with sem:
-            await downloader_service.download_file(link, filename, category=category)
+            await downloader_service.download_file(link, filename, category=category, title=title, year=year)
 
-    # 4. Fetch categories from DB for these URLs
-    url_to_category = {}
+    # 4. Fetch metadata from DB for these URLs - Prioritize Official Metadata
+    url_to_meta = {}
     async with AsyncSessionLocal() as session:
-        from app.db.models import DownloadLink
-        from sqlalchemy import select
-        stmt = select(DownloadLink.url, DownloadLink.category).where(DownloadLink.url.in_(urls))
+        from app.db.models import DownloadLink, MediaMetadata
+        from sqlalchemy import select, func
+        
+        # Use a join to get the official title/year if enriched
+        stmt = select(
+            DownloadLink.url, 
+            DownloadLink.category, 
+            func.coalesce(MediaMetadata.official_title, DownloadLink.title).label("final_title"),
+            func.coalesce(MediaMetadata.year, DownloadLink.year).label("final_year")
+        ).outerjoin(
+            MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id
+        ).where(DownloadLink.url.in_(urls))
+        
         result = await session.execute(stmt)
-        for url, category in result.all():
-            url_to_category[url] = category
+        for url, category, title, year in result.all():
+            url_to_meta[url] = {"category": category, "title": title, "year": year}
 
     print(f"[API] Starting {len(valid_downloads)} downloads concurrently...")
-    
-    # We find the original URL for each valid_download to get its category
-    # (Since valid_downloads contains the UNLOCKED link, we need to match it back)
-    # Actually, run_download_task receives the ORIGINAL urls.
-    # The order in 'results' matches 'urls'.
     
     download_tasks = []
     for idx, (link, filename) in enumerate(valid_downloads):
         orig_url = urls[idx] if idx < len(urls) else None
-        cat = url_to_category.get(orig_url)
-        download_tasks.append(sem_download(link, filename, cat))
+        meta = url_to_meta.get(orig_url, {})
+        download_tasks.append(sem_download(
+            link, 
+            filename, 
+            meta.get("category"), 
+            meta.get("title"), 
+            meta.get("year")
+        ))
 
     await asyncio.gather(*download_tasks)
 

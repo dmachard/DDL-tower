@@ -11,6 +11,7 @@ database_url: "sqlite+aiosqlite:///./data/ddl.db"
 # Download Settings
 download_dir: "/app/data/download"
 library_movies_dir: "/app/data/films"
+library_series_dir: "/app/data/series"
 delete_rar_after_extraction: true
 keep_only_video_files: true
 
