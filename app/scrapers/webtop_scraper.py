@@ -6,7 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from playwright.async_api import async_playwright
 from app.scrapers.base import BaseScraper
-from app.db.models import ScrapedURL
+from app.db.models import ScrapedURL, DownloadLink
 from app.core.config import settings
 from app.services.unlocker import LinkUnlocker
 
@@ -130,7 +130,15 @@ class WebtopScraper(BaseScraper):
                         for link_obj in links_data:
                             href = link_obj.get("href")
                             provider = link_obj.get("provider")
+                            episode_label = link_obj.get("episode_label")
                             if not href: continue
+                            
+                            # 2.1 Deduplication: Skip if this specific protected link was already unlocked
+                            if session:
+                                stmt_dup = select(ScrapedURL).where(ScrapedURL.url == href)
+                                if (await session.execute(stmt_dup)).scalar():
+                                    print(f"[{self.name}] Skipping already processed link: {href}")
+                                    continue
                             
                             # Match against unlock_patterns (Provider + Regex)
                             match_config = None
@@ -151,31 +159,34 @@ class WebtopScraper(BaseScraper):
                                     # Use the specialized LinkUnlocker (internal Docker/Webtop flow)
                                     unlocked_urls = await self.unlocker.unlock(href)
                                     if unlocked_urls:
-                                        all_final_urls.extend(unlocked_urls)
+                                        # Record that this protected link is successfully handled
+                                        if session:
+                                            await session.merge(ScrapedURL(
+                                                url=href, source_name=f"{self.name}-link", status="success",
+                                                scrape_once=True, last_scraped=datetime.now(timezone.utc)
+                                            ))
+                                            await session.commit()
+                                        
+                                        # Determine individual link filename override (Purely based on scraper metadata)
+                                        current_filename = f"{item.get('title')} {episode_label or ''}".strip()
+                                        current_filename = current_filename.replace(" ", ".").replace("..", ".")
+                                        
+                                        # Yield EACH link group immediately to allow real-time progress
+                                        yield {
+                                            "links": unlocked_urls,
+                                            "source_url": item_url,
+                                            "override_filename": current_filename
+                                        }
                                 except Exception as e:
                                     print(f"[{self.name}] Specialized unlock failed for {href}: {e}")
 
-                        if all_final_urls:
-                            # Record visit
-                            if session:
-                                await session.merge(ScrapedURL(
-                                    url=item_url, source_name=self.name, status="success",
-                                    scrape_once=True, last_scraped=datetime.now(timezone.utc)
-                                ))
-                                await session.commit()
-                            
-                            # Yield to scheduler
-                            # Simulate a standard release filename (dots instead of spaces)
-                            title_part = item.get("title", "").replace(" ", ".")
-                            release_part = item.get("release", "").replace(" ", ".")
-                            ov_filename = f"{title_part}.{release_part}" if title_part and release_part else (title_part or release_part)
-                            ov_filename = ov_filename.replace("..", ".").replace("(", ".").replace(")", ".").replace(" ", ".")
-
-                            yield {
-                                "links": list(dict.fromkeys(all_final_urls)),
-                                "source_url": item_url,
-                                "override_filename": ov_filename
-                            }
+                        # Record visit of the main detail page
+                        if session:
+                            await session.merge(ScrapedURL(
+                                url=item_url, source_name=self.name, status="success",
+                                scrape_once=True, last_scraped=datetime.now(timezone.utc)
+                            ))
+                            await session.commit()
 
                     except Exception as e:
                         print(f"[{self.name}] Error processing details of {item_url}: {e}")
