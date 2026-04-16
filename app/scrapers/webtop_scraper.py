@@ -27,6 +27,9 @@ class WebtopScraper(BaseScraper):
         # Link unlocking patterns (e.g., dl-protect.link)
         self.unlock_patterns = config.get("unlock_patterns", [])
         
+        # Deduplication behavior
+        self.scrape_once = config.get("scrape_once", True)
+        
         # Specialized unlocker
         self.unlocker = LinkUnlocker()
         
@@ -88,13 +91,14 @@ class WebtopScraper(BaseScraper):
                     print(f"[{self.name}] No items found.")
                     return
 
-                # Deduplicate and filter already scraped
-                if session:
+                # Deduplicate and filter already scraped (Only if scrape_once is True)
+                if session and self.scrape_once:
                     urls = [it.get("href") or it.get("url") for it in items_to_process]
                     stmt = select(ScrapedURL.url).where(ScrapedURL.url.in_(urls))
                     result = await session.execute(stmt)
                     scraped_urls = set(r[0] for r in result.all())
-                    # Only process items not in DB (or if they are not scrape_once)
+                    
+                    # Only process items not in DB
                     items_to_process = [it for it in items_to_process if (it.get("href") or it.get("url")) not in scraped_urls]
 
                 print(f"[{self.name}] Found {len(items_to_process)} new items to process.")
@@ -163,7 +167,7 @@ class WebtopScraper(BaseScraper):
                                         if session:
                                             await session.merge(ScrapedURL(
                                                 url=href, source_name=f"{self.name}-link", status="success",
-                                                scrape_once=True, last_scraped=datetime.now(timezone.utc)
+                                                scrape_once=self.scrape_once, last_scraped=datetime.now(timezone.utc)
                                             ))
                                             await session.commit()
                                         
@@ -184,7 +188,7 @@ class WebtopScraper(BaseScraper):
                         if session:
                             await session.merge(ScrapedURL(
                                 url=item_url, source_name=self.name, status="success",
-                                scrape_once=True, last_scraped=datetime.now(timezone.utc)
+                                scrape_once=self.scrape_once, last_scraped=datetime.now(timezone.utc)
                             ))
                             await session.commit()
 
