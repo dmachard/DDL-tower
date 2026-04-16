@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.utils import format_size
 from app.services.downloader import downloader_service
 from app.services.alldebrid import AllDebridClient
+from app.db.database import AsyncSessionLocal
 from pydantic import BaseModel
 
 router = APIRouter()
