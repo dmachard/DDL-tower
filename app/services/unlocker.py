@@ -41,21 +41,14 @@ class LinkUnlocker:
             return None
 
         # 1. Ensure socat is present
-        # Check if socat is already installed (fast)
         try:
             res = container.exec_run("which socat")
             if res.exit_code != 0:
-                print(f"[UNLOCKER] socat not found in {self.container_name}. Attempting quick install...")
-                # Try install without update first (faster if cache exists)
-                res_inst = container.exec_run("apt-get install -y socat", user="root")
-                if res_inst.exit_code != 0:
-                    print("[UNLOCKER] Quick install failed. Running apt-get update (may be slow)...")
-                    container.exec_run("apt-get update", user="root")
-                    container.exec_run("apt-get install -y socat", user="root")
-            else:
-                print(f"[UNLOCKER] socat is ready in {self.container_name}")
+                print(f"[UNLOCKER] ERROR: socat not found in {self.container_name}.")
+                return None
+            print(f"[UNLOCKER] socat is ready in {self.container_name}")
         except Exception as e:
-            print(f"[UNLOCKER] Warning: Failed to verify/install socat: {e}")
+            print(f"[UNLOCKER] Warning: Failed to verify socat: {e}")
 
         # 2. Cleanup previous runs
         container.exec_run("pkill chromium", user="root")
@@ -122,44 +115,47 @@ class LinkUnlocker:
                     print("[UNLOCKER] Waiting for Turnstile validation...")
                     await btn.wait_for(state="visible", timeout=60000)
 
-                    # --- Improved: Check for interactive Turnstile checkbox ---
-                    print("[UNLOCKER] Monitoring Turnstile interaction...")
-                    start_time = time.time()
-                    max_wait = 45 
-                    
-                    while time.time() - start_time < max_wait:
-                        try:
+                    # --- Multi-attempt strategy: Wait -> Reload -> Fallback Click ---
+                    solved = False
+                    for attempt in range(1, 3):
+                        print(f"[UNLOCKER] Turnstile attempt {attempt}/2...")
+                        attempt_start = time.time()
+                        attempt_timeout = 25 # seconds per attempt
+                        
+                        while time.time() - attempt_start < attempt_timeout:
                             # 1. Detect the Turnstile Frame
                             cf_frame = page.frame_locator('iframe[src*="challenges.cloudflare.com"], iframe[title*="Cloudflare"]').first
                             
-                            # 2. Check if already solved (Success checkmark)
-                            if await cf_frame.locator('#success').is_visible():
-                                print("[UNLOCKER] Turnstile Success detected.")
+                            # 2. Check if already solved (Success checkmark or button enabled)
+                            is_success = await cf_frame.locator('#success:not([style*="display: none"])').is_visible()
+                            if is_success or await btn.is_enabled():
+                                print(f"[UNLOCKER] Turnstile solved on attempt {attempt}!")
+                                solved = True
                                 break
-
-                            # 3. Try to find and click the checkbox
-                            selectors = ['input[type="checkbox"]', '.ctp-checkbox-label', '.mark', '#challenge-stage']
-                            for selector in selectors:
-                                target = cf_frame.locator(selector).first
-                                if await target.count() > 0 and await target.is_visible():
-                                    print(f"[UNLOCKER] Turnstile checkbox/challenge found ({selector}). Clicking...")
-                                    # hover() is vital: it handles iframe offsets correctly!
-                                    await target.hover(timeout=5000)
-                                    await asyncio.sleep(0.5)
-                                    await target.click(timeout=5000)
-                                    print("[UNLOCKER] Click performed.")
-                                    await asyncio.sleep(3) # Give it time to register
-                                    break
-                        except Exception as e:
-                            # Frame might not be ready or detached during check
-                            pass
-                        
-                        # 4. Check if the 'Continuer' button is now enabled (solved)
-                        if await btn.is_enabled():
-                            print("[UNLOCKER] Turnstile solved (subButton is enabled).")
-                            break
                             
-                        await asyncio.sleep(2)
+                            # 3. Fallback: Try a single click ONLY on the 2nd attempt after some waiting
+                            if attempt == 2 and time.time() - attempt_start > 10:
+                                checkbox = cf_frame.locator('input[type="checkbox"], .ctp-checkbox-label').first
+                                if await checkbox.count() > 0 and await checkbox.is_visible():
+                                    print("[UNLOCKER] Fallback: Clicking the Turnstile checkbox...")
+                                    await checkbox.hover(timeout=5000)
+                                    await checkbox.click(timeout=5000)
+                                    await asyncio.sleep(5) # Give it time to register
+                                    if await btn.is_enabled():
+                                        solved = True
+                                        break
+                            
+                            await asyncio.sleep(2)
+                        
+                        if solved:
+                            break
+                        
+                        if attempt == 1:
+                            print("[UNLOCKER] Still stuck. Reloading the page...")
+                            await page.reload(wait_until="networkidle")
+                    
+                    if not solved:
+                        print("[UNLOCKER] WARNING: Turnstile challenge not solved after 2 attempts.")
 
                     print("[UNLOCKER] Clicking 'Continuer' button (auto-waiting for it to be enabled)...")
                     async with page.expect_navigation(timeout=60000):

@@ -23,7 +23,6 @@ services:
       - PGID=1000
       - TZ=Europe/Paris
       - TITLE=Webtop Chromium
-      - INSTALL_PACKAGES=socat
     volumes:
       - ./webtop_data:/config
       - /var/run/docker.sock:/var/run/docker.sock

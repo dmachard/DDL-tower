@@ -25,6 +25,19 @@ docker compose up -d
 
 **Dashboard**: [http://localhost:8001](http://localhost:8001)
 
+## Cloudflare Bypass (Turnstile)
+
+To unlock links protected by Cloudflare Turnstile, DDLtower uses a remote-controlled browser within the `webtop` container.
+
+### `socat` Installation
+
+`socat` is required to bridge the network between the `ddltower` container and the browser.
+Install it manually inside the container:
+```bash
+docker exec -it ddltower-browser apt-get update
+docker exec -it ddltower-browser apt-get install -y socat
+```
+
 ### Development environment
 
 To launch the development environment:
