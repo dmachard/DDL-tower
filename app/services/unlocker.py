@@ -122,37 +122,44 @@ class LinkUnlocker:
                     print("[UNLOCKER] Waiting for Turnstile validation...")
                     await btn.wait_for(state="visible", timeout=60000)
 
-                    # --- New: Check for interactive Turnstile checkbox ---
-                    try:
-                        # Robust iframe detection
-                        cf_frame = page.frame_locator('iframe[src*="challenges.cloudflare.com"], iframe[title*="Cloudflare"]')
-                        
-                        # Try multiple common selectors for the checkbox/interaction
-                        selectors = [
-                            'input[type="checkbox"]',
-                            '#challenge-stage',
-                            '.mark',
-                            '.ctp-checkbox-label',
-                            'div[id*="turnstile"]'
-                        ]
-                        
-                        for selector in selectors:
-                            target = cf_frame.locator(selector).first
-                            if await target.count() > 0 and await target.is_visible():
-                                print(f"[UNLOCKER] Turnstile interaction detected ({selector}). Clicking...")
-                                # Get center and move mouse to look more human
-                                box = await target.bounding_box()
-                                if box:
-                                    await page.mouse.move(box['x'] + box['width']/2, box['y'] + box['height']/2)
-                                    await asyncio.sleep(0.5)
-                                
-                                await target.click(timeout=5000, force=True)
-                                await asyncio.sleep(2)
+                    # --- Improved: Check for interactive Turnstile checkbox ---
+                    print("[UNLOCKER] Monitoring Turnstile interaction...")
+                    start_time = time.time()
+                    max_wait = 45 
+                    
+                    while time.time() - start_time < max_wait:
+                        try:
+                            # 1. Detect the Turnstile Frame
+                            cf_frame = page.frame_locator('iframe[src*="challenges.cloudflare.com"], iframe[title*="Cloudflare"]').first
+                            
+                            # 2. Check if already solved (Success checkmark)
+                            if await cf_frame.locator('#success').is_visible():
+                                print("[UNLOCKER] Turnstile Success detected.")
                                 break
-                    except Exception:
-                        # Silent pass
-                        pass
-                    # -----------------------------------------------------
+
+                            # 3. Try to find and click the checkbox
+                            selectors = ['input[type="checkbox"]', '.ctp-checkbox-label', '.mark', '#challenge-stage']
+                            for selector in selectors:
+                                target = cf_frame.locator(selector).first
+                                if await target.count() > 0 and await target.is_visible():
+                                    print(f"[UNLOCKER] Turnstile checkbox/challenge found ({selector}). Clicking...")
+                                    # hover() is vital: it handles iframe offsets correctly!
+                                    await target.hover(timeout=5000)
+                                    await asyncio.sleep(0.5)
+                                    await target.click(timeout=5000)
+                                    print("[UNLOCKER] Click performed.")
+                                    await asyncio.sleep(3) # Give it time to register
+                                    break
+                        except Exception as e:
+                            # Frame might not be ready or detached during check
+                            pass
+                        
+                        # 4. Check if the 'Continuer' button is now enabled (solved)
+                        if await btn.is_enabled():
+                            print("[UNLOCKER] Turnstile solved (subButton is enabled).")
+                            break
+                            
+                        await asyncio.sleep(2)
 
                     print("[UNLOCKER] Clicking 'Continuer' button (auto-waiting for it to be enabled)...")
                     async with page.expect_navigation(timeout=60000):
