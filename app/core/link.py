@@ -12,11 +12,17 @@ class LinkManager:
     def __init__(self):
         self.hoster = Hoster()
 
-    async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str, override_filename: str = None, tags: List[str] = None) -> List[DownloadLink]:
+    async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str, 
+                          override_filename: str = None, override_title: str = None, override_year: int = None, 
+                          tags: List[str] = None) -> List[DownloadLink]:
         """
         Manages ONLY physical links: 
         AllDebrid verification AND database insertion.
-        If override_filename is provided, it's used as the base filename (useful for multi-part).
+        
+        Logic:
+        1. override_filename: If provided, it overrides the filename field in DB.
+        2. override_title/year: If provided, they serve as metadata hints (title/year fields).
+        3. Default: Uses the authentic filename from the hoster.
         """
         if not raw_links: return
 
@@ -40,15 +46,19 @@ class LinkManager:
         
         for link in new_links:
             info = hv_results.get(link, {"status": "unknown"})
-            # Source of truth for filename: override_filename if present, else what hoster found
-            filename = override_filename if override_filename else info.get('filename')
+            h_filename = info.get('filename')
             status = info.get('status', 'dead')
             
+            # Use override if provided, otherwise authentic filename
+            final_filename = override_filename if override_filename else h_filename
+
             new_db_link = DownloadLink(
                 url=link,
                 hoster=info.get('host', 'unknown'),
                 status=status,
-                filename=filename,
+                filename=final_filename,
+                title=override_title,
+                year=override_year,
                 size=format_size(info.get('size', 0)),
                 size_bytes=info.get('size', 0),
                 last_checked=datetime.now(timezone.utc),
@@ -58,7 +68,7 @@ class LinkManager:
             )
             session.add(new_db_link)
             added_links.append(new_db_link)
-            print(f"[LINK] Added link: {filename or link}")
+            print(f"[LINK] Added link: {final_filename or link}")
         
         return added_links
 

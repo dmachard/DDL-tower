@@ -179,7 +179,8 @@ class WebtopScraper(BaseScraper):
                                         yield {
                                             "links": unlocked_urls,
                                             "source_url": item_url,
-                                            "override_filename": current_filename
+                                            "override_title": f"{item.get('title')} {episode_label or ''}".strip(),
+                                            "override_year": item.get("year")
                                         }
                                 except Exception as e:
                                     print(f"[{self.name}] Specialized unlock failed for {href}: {e}")

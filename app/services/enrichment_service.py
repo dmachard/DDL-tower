@@ -110,11 +110,16 @@ class EnrichmentService:
         for link in links:
             p = parser_service.parse_filename(link.filename)
             if p:
-                link.title = p["title"]
-                if force_type: link.category = force_type
-                else: link.category = p["category"]
+                # ONLY use parsed title if we don't already have one from the scraper
+                if not link.title:
+                    link.title = p["title"]
                 
-                link.year = force_year if force_year is not None else p["year"]
+                if force_type: link.category = force_type
+                elif not link.category: link.category = p["category"]
+                
+                if force_year is not None: link.year = force_year
+                elif not link.year: link.year = p["year"]
+
                 link.season = p["season"]
                 link.episode = p["episode"]
                 link.resolution = p["resolution"]

@@ -50,16 +50,18 @@ async def run_scrapers():
                     if not links:
                         continue
 
-                    # Determine source URL for tracking: prioritize the precise URL from the batch
+                    # Determine source URL for tracking
                     s_url = batch_source_url or getattr(scraper, "entry_url", None) or getattr(scraper, "rss_url", None)
 
-                    # check the status of links
+                    # Check the status of links
                     new_links = await link_manager.check_links(
                         session=session,
                         raw_links=links,
                         source_url=s_url,
                         source_name=scraper.name,
-                        override_filename=override_filename,
+                        override_filename=batch.get("override_filename") if isinstance(batch, dict) else None,
+                        override_title=batch.get("override_title") if isinstance(batch, dict) else None,
+                        override_year=batch.get("override_year") if isinstance(batch, dict) else None,
                         tags=batch_tags
                     )
                     
