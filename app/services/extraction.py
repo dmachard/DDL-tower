@@ -117,18 +117,18 @@ class ExtractionService:
                         except Exception as e:
                             print(f"[EXTRACTION] Could not delete {part}: {e}")
                 
-                # 2. Cleanup: Delete everything that is NOT mkv
+                # 2. Cleanup: Delete everything that is NOT a video file
                 video_files = []
-                print(f"[EXTRACTION] Cleaning up non-MKV files in {dest_dir}...")
+                print(f"[EXTRACTION] Cleaning up non-video files in {dest_dir}...")
                 for root, dirs, files in os.walk(dest_dir, topdown=False):
                     for file in files:
                         file_p = Path(root) / file
-                        if file_p.suffix.lower() == '.mkv':
+                        if file_p.suffix.lower() in settings.VIDEO_EXTENSIONS:
                             video_files.append(file_p)
                         else:
                             try:
                                 file_p.unlink()
-                                print(f"[EXTRACTION] Deleted non-MKV: {file}")
+                                print(f"[EXTRACTION] Deleted non-video: {file}")
                             except Exception as e:
                                 print(f"[EXTRACTION] Could not delete {file_p}: {e}")
                     
@@ -143,7 +143,7 @@ class ExtractionService:
                 
                 # 3. Promote video file to root and remove empty folder
                 if video_files:
-                    # If multiple MKVs, we move all of them to parent
+                    # If multiple video files, we move all of them to parent
                     for video_p in video_files:
                         new_path = path.parent / video_p.name
                         try:

@@ -1,8 +1,8 @@
 # DDLtower
 
-DDLtower is a automation tool for web link extraction, tagging and management.
+> This project is a vibe coding project with Antigravity.
 
-* This project is a vibe coding project with Antigravity.
+DDLtower is a automation tool for web link extraction, tagging and management.
 
 ## Features
 

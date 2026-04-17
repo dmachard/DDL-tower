@@ -28,7 +28,7 @@ async def get_active_downloads():
 @router.get("/downloads")
 async def get_downloads():
     """
-    Lists files in the download directory, filtering for MKV only.
+    Lists files in the download directory, filtering for video files only.
     """
     download_dir = Path(settings.DOWNLOAD_DIR)
     if not download_dir.exists():
@@ -38,7 +38,7 @@ async def get_downloads():
     for item in download_dir.iterdir():
         if item.is_dir():
             continue
-        if item.suffix.lower() != '.mkv':
+        if item.suffix.lower() not in settings.VIDEO_EXTENSIONS:
             continue
             
         stats = item.stat()
