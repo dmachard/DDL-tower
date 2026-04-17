@@ -9,8 +9,8 @@ DDLtower is a automation tool for web link extraction, tagging and management.
 - **Quick-Scan**: Instant URL extraction via headless browser.
 - **Tagging**: Metadata fetching via **TMDb** with automatic translation for plots and posters.
 - **Ratings**: Visual rating scale (1-10) integrated into the dashboard.
-- **Categorization**: Intelligent filename parsing (PTN) for quality, language, and season/episode detection.
 - **Stats Dashboard**: Complete overview of library volume and health.
+- **Embedded Browser**: Dedicated Chromium instance via **Webtop** for manual navigation and Cloudflare bypass.
 
 ## Getting Started
 
@@ -23,7 +23,8 @@ echo -e "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: 
 docker compose up -d
 ```
 
-**Dashboard**: [http://localhost:8001](http://localhost:8001)
+**Dashboard**: [http://localhost:8001](http://localhost:8001)  
+**Browser (Webtop)**: [http://localhost:8002](http://localhost:8002)
 
 ## Cloudflare Bypass (Turnstile)
 

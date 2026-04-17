@@ -1,3 +1,7 @@
+networks:
+  ddltower:
+
+
 services:
   ddltower:
     build: .
@@ -10,8 +14,12 @@ services:
       - ./config:/app/config
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8001:8001"
-    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload" ]
+      - "8001:8000"
+    networks:
+      - ddltower
+    command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
+    depends_on:
+      - ddltower-browser
     restart: always
 
   ddltower-browser:
@@ -27,11 +35,12 @@ services:
       - PGID=${GID:-1000}
       - TZ=Europe/Paris
       - SUBFOLDER=/ #optional
-      - TITLE=Webtop Chromium
+      - TITLE=DDLtower Chromium
     volumes:
       - ./webtop_data:/config
-      - /var/run/docker.sock:/var/run/docker.sock #optional
+    networks:
+      - ddltower
     ports:
-      - 3000:3000
+      - 8002:3000
     shm_size: "1gb"
     restart: unless-stopped

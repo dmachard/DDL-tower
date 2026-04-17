@@ -1,3 +1,7 @@
+networks:
+  ddltower:
+
+
 services:
   ddltower:
     image: dmachard/ddl-tower:latest
@@ -10,7 +14,11 @@ services:
       - ./config:/app/config
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8001:8001"
+      - "8001:8000"
+    networks:
+      - ddltower
+    depends_on:
+      - ddltower-browser
     restart: always
 
   ddltower-browser:
@@ -22,11 +30,12 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
-      - TITLE=Webtop Chromium
+      - TITLE=DDLtower Chromium
     volumes:
       - ./webtop_data:/config
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - 3000:3000
+      - 8002:3000
+    networks:
+      - ddltower
     shm_size: "1gb"
     restart: unless-stopped
