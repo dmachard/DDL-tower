@@ -35,8 +35,8 @@ To unlock links protected by Cloudflare Turnstile, DDLtower uses a remote-contro
 `socat` is required to bridge the network between the `ddltower` container and the browser.
 Install it manually inside the container:
 ```bash
-docker exec -it ddltower-browser apt-get update
-docker exec -it ddltower-browser apt-get install -y socat
+sudo docker exec -it ddltower-browser apt-get update
+sudo docker exec -it ddltower-browser apt-get install -y socat
 ```
 
 ### Development environment

@@ -96,6 +96,17 @@ class DBCommands:
             print("SUCCESS: All metadata cleared. Library is now fresh.")
 
     @staticmethod
+    async def wipe():
+        from app.db.models import ScrapedURL
+        print(f"--- [DB] WIPING ENTIRE DATABASE (Links, Metadata, History) ---")
+        async with AsyncSessionLocal() as session:
+            await session.execute(delete(DownloadLink))
+            await session.execute(delete(MediaMetadata))
+            await session.execute(delete(ScrapedURL))
+            await session.commit()
+            print("SUCCESS: Database is now completely empty.")
+
+    @staticmethod
     async def audit():
         print("--- [DB] Database Metadata Audit ---")
         res = await maintenance_service.audit_metadata()

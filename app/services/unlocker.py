@@ -1,7 +1,5 @@
 import asyncio
 import re
-import docker
-import socket
 import time
 from typing import List
 from playwright.async_api import async_playwright
@@ -9,185 +7,183 @@ from app.core.config import settings
 
 class LinkUnlocker:
     """
-    Advanced Link Unlocker that uses the Webtop container via Docker SDK
+    Advanced Link Unlocker that uses the Webtop container 
     to bypass Cloudflare/Turnstile.
     """
-    def __init__(self, container_name=None, cdp_port=9222, local_cdp_port=9223):
-        self.container_name = container_name or settings.WEBTOP_CONTAINER_NAME
-        self.cdp_port = cdp_port
-        self.local_cdp_port = local_cdp_port
-        try:
-            self.client = docker.from_env()
-        except Exception as e:
-            print(f"[UNLOCKER] Could not connect to Docker: {e}")
-            self.client = None
-
-    async def get_container_ip(self):
-        try:
-            return socket.gethostbyname(self.container_name)
-        except socket.gaierror:
-            return "127.0.0.1"
-
-    def setup_container_env(self, url):
-        """Prepares the Webtop container for extraction."""
-        if not self.client:
-            print("[UNLOCKER] ERROR: No Docker client available.")
-            return None
-            
-        try:
-            container = self.client.containers.get(self.container_name)
-        except Exception as e:
-            print(f"[UNLOCKER] ERROR: Container '{self.container_name}' not found or unreachable: {e}")
-            return None
-
-        # 1. Ensure socat is present
-        try:
-            res = container.exec_run("which socat")
-            if res.exit_code != 0:
-                print(f"[UNLOCKER] ERROR: socat not found in {self.container_name}.")
-                return None
-            print(f"[UNLOCKER] socat is ready in {self.container_name}")
-        except Exception as e:
-            print(f"[UNLOCKER] Warning: Failed to verify socat: {e}")
-
-        # 2. Cleanup previous runs
-        container.exec_run("pkill chromium", user="root")
-        container.exec_run("pkill socat", user="root")
-
-        # 3. Launch Browser inside Webtop container
-        print(f"[UNLOCKER] Launching Chromium in {self.container_name} for {url}")
-        container.exec_run(
-            cmd=f"env DISPLAY=:1 chromium --no-sandbox --remote-debugging-port={self.local_cdp_port} --remote-allow-origins=* --user-data-dir=/tmp/automation-profile '{url}'",
-            detach=True,
-            user="abc"
-        )
-
-        # 4. Bridge the CDP port to the container's network interface
-        container.exec_run(
-            cmd=f"socat TCP-LISTEN:{self.cdp_port},fork,reuseaddr TCP:127.0.0.1:{self.local_cdp_port}",
-            detach=True,
-            user="root"
-        )
-        return container
+    def __init__(self):
+        pass
 
     async def unlock(self, url: str) -> List[str]:
         """Unlocks a dl-protect.link and returns the final file hoster links."""
         print(f"[UNLOCKER] Starting unlock process for: {url}")
         
-        container = self.setup_container_env(url)
-        if not container:
-            return []
-
-        # Give the container some time to start Chromium and socat
-        await asyncio.sleep(4)
-        
-        ip = await self.get_container_ip()
-        cdp_url = f"http://{ip}:{self.cdp_port}"
+        from app.services.browser_manager import browser_manager
         
         final_links = []
         async with async_playwright() as p:
-            browser = None
-            # Retry connection loop (3 attempts)
-            for attempt in range(1, 4):
-                try:
-                    print(f"[UNLOCKER] Connecting to remote browser (Attempt {attempt}/3)...")
-                    browser = await p.chromium.connect_over_cdp(cdp_url, timeout=15000)
-                    break 
-                except Exception as e:
-                    if attempt == 3:
-                        print(f"[UNLOCKER] Final connection failure: {e}")
-                        return []
-                    await asyncio.sleep(3)
+            # Use browser_manager to handle Webtop lifecycle
+            browser = await browser_manager.get_browser(p, url=url)
+            if not browser:
+                return []
 
             try:
-                # Use the existing tab or create a new one
-                context = browser.contexts[0]
-                page = context.pages[0] if context.pages else await context.new_page()
-                
+                # Always use a NEW page for isolation
+                page = await browser.new_page()
+
+                # IMPORTANT: Force navigation to the target URL
+                print(f"[UNLOCKER] Navigating to target URL: {url}")
+                await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+
                 print(f"[UNLOCKER] Page title: '{await page.title()}'")
-                
-                # Wait for the validation button (Turnstile success)
-                btn = page.locator("#subButton")
-                try:
-                    print("[UNLOCKER] Waiting for Turnstile validation...")
-                    await btn.wait_for(state="attached", timeout=60000)
+  
+                # --- MultiUp Mirror Traversal ---
+                if "multiup.io" in url:
+                    print("[UNLOCKER] MultiUp page detected. Looking for mirror link...")
+                    try:
+                        # Wait a bit for the page to stabilize
+                        await asyncio.sleep(3)
+                        # Flexible search for /mirror/ (supports /fr/mirror/, /en/mirror/, etc.)
+                        mirror_locator = page.locator('a[href*="/mirror/"], form[action*="/mirror/"]')
+                        count = await mirror_locator.count()
+                        if count > 0:
+                            mirror_url = await mirror_locator.first.get_attribute("href") or await mirror_locator.first.get_attribute("action")
+                            if mirror_url:
+                                if not mirror_url.startswith("http"):
+                                    from urllib.parse import urljoin
+                                    mirror_url = urljoin(url, mirror_url)
+                                print(f"[UNLOCKER] SUCCESS: Found mirror link ({mirror_url}). Navigating...")
+                                await page.goto(mirror_url, wait_until="domcontentloaded", timeout=30000)
+                        else:
+                            print("[UNLOCKER] WARNING: No mirror link found on MultiUp page. Staying here.")
+                    except Exception as me:
+                        print(f"[UNLOCKER] MultiUp traversal error: {me}")
 
-                    print("[UNLOCKER] Waiting for Turnstile validation...")
-                    await btn.wait_for(state="visible", timeout=60000)
+                # Wait for the validation button (Turnstile success) - Skips if on MultiUp
+                if "multiup.io" in page.url:
+                    print("[UNLOCKER] MultiUp detected, skipping Turnstile check.")
+                    solved = True
+                else:
+                    btn = page.locator("#subButton")
+                    try:
+                        print("[UNLOCKER] Waiting for Turnstile validation...")
+                        await btn.wait_for(state="attached", timeout=15000)
 
-                    # --- Multi-attempt strategy: Wait -> Reload -> Fallback Click ---
-                    solved = False
-                    for attempt in range(1, 3):
-                        print(f"[UNLOCKER] Turnstile attempt {attempt}/2...")
-                        attempt_start = time.time()
-                        attempt_timeout = 25 # seconds per attempt
-                        
-                        while time.time() - attempt_start < attempt_timeout:
-                            # 1. Detect the Turnstile Frame
-                            cf_frame = page.frame_locator('iframe[src*="challenges.cloudflare.com"], iframe[title*="Cloudflare"]').first
+                        print("[UNLOCKER] Waiting for Turnstile validation...")
+                        await btn.wait_for(state="visible", timeout=15000)
+
+                        # --- Multi-attempt strategy: Wait -> Reload -> Fallback Click ---
+                        solved = False
+                        for attempt in range(1, 3):
+                            print(f"[UNLOCKER] Turnstile attempt {attempt}/2...")
+                            attempt_start = time.time()
+                            attempt_timeout = 25 # seconds per attempt
                             
-                            # 2. Check if already solved (Success checkmark or button enabled)
-                            is_success = await cf_frame.locator('#success:not([style*="display: none"])').is_visible()
-                            if is_success or await btn.is_enabled():
-                                print(f"[UNLOCKER] Turnstile solved on attempt {attempt}!")
-                                solved = True
+                            while time.time() - attempt_start < attempt_timeout:
+                                # 1. Detect the Turnstile Frame
+                                cf_frame = page.frame_locator('iframe[src*="challenges.cloudflare.com"], iframe[title*="Cloudflare"]').first
+                                
+                                # 2. Check if already solved (Success checkmark or button enabled)
+                                is_success = await cf_frame.locator('#success:not([style*="display: none"])').is_visible()
+                                if is_success or await btn.is_enabled():
+                                    print(f"[UNLOCKER] Turnstile solved on attempt {attempt}!")
+                                    solved = True
+                                    break
+                                
+                                # 3. Fallback: Try a single click ONLY on the 2nd attempt after some waiting
+                                if attempt == 2 and time.time() - attempt_start > 10:
+                                    checkbox = cf_frame.locator('input[type="checkbox"], .ctp-checkbox-label').first
+                                    if await checkbox.count() > 0 and await checkbox.is_visible():
+                                        print("[UNLOCKER] Fallback: Clicking the Turnstile checkbox...")
+                                        await checkbox.hover(timeout=5000)
+                                        await checkbox.click(timeout=5000)
+                                        await asyncio.sleep(5) # Give it time to register
+                                        if await btn.is_enabled():
+                                            solved = True
+                                            break
+                                
+                                await asyncio.sleep(2)
+                            
+                            if solved:
                                 break
                             
-                            # 3. Fallback: Try a single click ONLY on the 2nd attempt after some waiting
-                            if attempt == 2 and time.time() - attempt_start > 10:
-                                checkbox = cf_frame.locator('input[type="checkbox"], .ctp-checkbox-label').first
-                                if await checkbox.count() > 0 and await checkbox.is_visible():
-                                    print("[UNLOCKER] Fallback: Clicking the Turnstile checkbox...")
-                                    await checkbox.hover(timeout=5000)
-                                    await checkbox.click(timeout=5000)
-                                    await asyncio.sleep(5) # Give it time to register
-                                    if await btn.is_enabled():
-                                        solved = True
-                                        break
-                            
-                            await asyncio.sleep(2)
+                            if attempt == 1:
+                                print("[UNLOCKER] Still stuck. Reloading the page...")
+                                try:
+                                    await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                    await asyncio.sleep(5)
+                                except Exception as err_reload:
+                                    print(f"[UNLOCKER] Reload timeout (non-critical): {err_reload}")
                         
-                        if solved:
-                            break
+                        if not solved:
+                            print("[UNLOCKER] WARNING: Turnstile challenge not solved after 2 attempts.")
+
+                        print("[UNLOCKER] Clicking 'Continuer' button (auto-waiting for it to be enabled)...")
+                        async with page.expect_navigation(timeout=60000):
+                            # click() will wait for the button to be enabled (Turnstile solved)
+                            await btn.click(timeout=60000)
                         
-                        if attempt == 1:
-                            print("[UNLOCKER] Still stuck. Reloading the page...")
-                            await page.reload(wait_until="networkidle")
-                    
-                    if not solved:
-                        print("[UNLOCKER] WARNING: Turnstile challenge not solved after 2 attempts.")
+                        print("[UNLOCKER] Turnstile passed!")
+                    except Exception as e:
+                        print(f"[UNLOCKER] Turnstile step skipped or failed: {e}")
 
-                    print("[UNLOCKER] Clicking 'Continuer' button (auto-waiting for it to be enabled)...")
-                    async with page.expect_navigation(timeout=60000):
-                        # click() will wait for the button to be enabled (Turnstile solved)
-                        await btn.click(timeout=60000)
-                    
-                    print("[UNLOCKER] Turnstile passed!")
-                    
-                    print(f"[UNLOCKER] Reached final page: {page.url}")
-
-                    # Extract final hoster links using configured global patterns
-                    content = await page.content()
-                    
-                    for pattern in settings.DIRECT_SCAN_PATTERNS:
-                        found = list(set(re.findall(pattern, content, re.IGNORECASE)))
-                        if found:
-                            print(f"[UNLOCKER] {len(found)} link(s) extracted from final page.")
-                            final_links.extend(found)
-
-                except Exception as e:
-                    print(f"[UNLOCKER] Page error or timeout: {e}")
+                # --- Final extraction (Common for all flows) ---
+                print(f"[UNLOCKER] Reached final page: {page.url}")
                 
-                if browser:
-                    await browser.close()
+                # MultiUp specific: wait for the mirror list to appear
+                if "multiup.io" in page.url:
+                    print("[UNLOCKER] MultiUp mirror page detected. Waiting for hoster links to load...")
+                    try:
+                        # Wait for a known hoster or the table
+                        await page.wait_for_selector("a[href*='1fichier.com'], a[href*='rapidgator'], table", timeout=15000)
+                        await asyncio.sleep(3) # Extra stability for dynamic elements
+                    except Exception as e:
+                        print(f"[UNLOCKER] Note: Timeout waiting for specific selectors ({e}). Proceeding with current content.")
+
+                content = await page.content()
+                total_extracted = 0
                 
-                # Cleanup container processes
-                container.exec_run("pkill chromium", user="root")
-                container.exec_run("pkill socat", user="root")
+                # 1. Standard pattern matching
+                for pattern in settings.DIRECT_SCAN_PATTERNS:
+                    found = list(set(re.findall(pattern, content, re.IGNORECASE)))
+                    if found:
+                        print(f"[UNLOCKER] {len(found)} link(s) extracted from final page using pattern.")
+                        final_links.extend(found)
+                        total_extracted += len(found)
+                
+                # 2. Fallback: Search for hoster domains in ALL links if patterns failed
+                if total_extracted == 0:
+                    print("[UNLOCKER] Patterns failed. Attempting fallback link discovery...")
+                    try:
+                        # Extract all href attributes
+                        all_links = await page.evaluate("() => Array.from(document.querySelectorAll('a[href]')).map(a => a.href)")
+                        hoster_domains = ["1fichier.com", "rapidgator.net", "nitroflare.com"]
+                        
+                        for l in all_links:
+                            if any(dom in l for dom in hoster_domains):
+                                # Basic cleanup (MultiUp sometimes adds garbage or redirect prefix)
+                                if "multiup.io" in l and "/download/" in l:
+                                    continue # Skip MultiUp internal links
+                                
+                                final_links.append(l)
+                                total_extracted += 1
+                        
+                        if total_extracted > 0:
+                            print(f"[UNLOCKER] Fallback SUCCESS: Found {total_extracted} link(s) via DOM search.")
+                    except Exception as fe:
+                        print(f"[UNLOCKER] Fallback search error: {fe}")
+
+                if total_extracted == 0:
+                    print(f"[UNLOCKER] WARNING: No links extracted from {page.url}")
+                    print(f"[UNLOCKER] Page Title: '{await page.title()}'")
+                    # print(f"[UNLOCKER] Content length: {len(content)}")
+                
+                # Close only the page, not the browser connection
+                await page.close()
+                
             except Exception as e:
                 print(f"[UNLOCKER] Error during extraction: {e}")
-                if browser: await browser.close()
-                container.exec_run("pkill chromium", user="root")
-                container.exec_run("pkill socat", user="root")
+                try:
+                    if 'page' in locals() and page: await page.close()
+                except: pass
                 
         return sorted(list(set(final_links)))

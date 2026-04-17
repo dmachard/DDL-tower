@@ -39,6 +39,7 @@ async def run_cli():
     update_title_p.add_argument("--title", help="Old title to find")
     update_title_p.add_argument("--new-title", required=True, help="New title to apply")
     reset_all_p = db_sub.add_parser("reset-all", help="WIPE ALL metadata and start fresh")
+    wipe_p = db_sub.add_parser("wipe", help="COMPLETELY WIPE DATABASE (Links, History, Metadata)")
 
     tag_parser = subparsers.add_parser("tag", help="Metadata tagging/matching")
     tag_parser.add_argument("--title", help="Specify a title to tag manually")
@@ -82,6 +83,8 @@ async def run_cli():
                 await DBCommands.update_title(args.id, args.title, args.new_title)
             elif args.subcommand == "reset-all":
                 await DBCommands.reset_all()
+            elif args.subcommand == "wipe":
+                await DBCommands.wipe()
             else:
                 db_parser.print_help()
 

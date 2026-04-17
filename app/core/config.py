@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     EXTRACT_RAR: bool = _yaml_config.get("extract_rar", True)
     DELETE_RAR_AFTER_EXTRACTION: bool = _yaml_config.get("delete_rar_after_extraction", True)
     KEEP_ONLY_VIDEO_FILES: bool = _yaml_config.get("keep_only_video_files", True)
+    VIDEO_EXTENSIONS: List[str] = [".mkv", ".mp4", ".avi", ".m4v", ".mov", ".wmv", ".ts"]
     
     # Scraper Settings
     SCAN_INTERVAL_MINUTES: int = _yaml_config.get("scan_interval_minutes", 15)

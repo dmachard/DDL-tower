@@ -12,6 +12,8 @@ RUN sed -i 's/main/main non-free non-free-firmware/g' /etc/apt/sources.list.d/de
     sed -i 's/main/main non-free non-free-firmware/g' /etc/apt/sources.list
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
+    curl \
+    iproute2 \
     gnupg \
     sqlite3 \
     unrar \

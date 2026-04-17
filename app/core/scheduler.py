@@ -5,17 +5,23 @@ from app.db.database import AsyncSessionLocal
 from app.scrapers.crawl_scraper import CrawlScraper
 from app.scrapers.rss_scraper import RSSScraper
 from app.scrapers.webtop_scraper import WebtopScraper
+from app.scrapers.scnlog_scraper import ScnLogScraper
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
 
 scheduler = AsyncIOScheduler()
 
 async def run_scrapers():
+    from app.services.browser_manager import browser_manager
+    await browser_manager.run_diagnostics()
+    
     print(f"[SCHEDULER] [{datetime.now().strftime('%H:%M:%S')}] Starting sequence...")
     
     scrapers = []
     for config in settings.SCRAPER_SOURCES:
-        if "rss_url" in config:
+        if config.get("is_scnlog"):
+            scrapers.append(ScnLogScraper(config))
+        elif "rss_url" in config:
             scrapers.append(RSSScraper(config))
         elif "js_items" in config or config.get("use_webtop"):
             scrapers.append(WebtopScraper(config))

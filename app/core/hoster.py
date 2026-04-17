@@ -40,7 +40,6 @@ class Hoster:
             return {}
 
         direct_links = []
-        ad_links = []
         results = {}
 
         # 1. Dispatch links
@@ -65,11 +64,11 @@ class Hoster:
                 tasks = [wrapped_check(link, mapper, session) for link, mapper in direct_links]
                 for coro in asyncio.as_completed(tasks):
                     link, res = await coro
-                    results[link] = res
+                    if res.get("status") == "alive":
+                        results[link] = res
+                    else:
+                        # If direct check fails or is unknown, fallback to AllDebrid
+                        print(f"[HOSTER] {link[:60]}... check {res.get('status') or 'failed'}.")
 
-        if ad_links:
-            print(f"[HOSTER-MANAGER] Checking {len(ad_links)} links via AllDebrid fallback...")
-            ad_results = await self.ad_client.check_links(ad_links)
-            results.update(ad_results)
 
         return results

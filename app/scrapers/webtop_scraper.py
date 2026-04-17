@@ -42,33 +42,30 @@ class WebtopScraper(BaseScraper):
         return self._name
 
     async def _get_browser(self, playwright):
-        """Connects to remote browser if configured, or launches local."""
-        if settings.BROWSER_URL:
-            try:
-                print(f"[{self.name}] Attempting connection to remote browser at {settings.BROWSER_URL}")
-                return await playwright.chromium.connect_over_cdp(settings.BROWSER_URL, timeout=5000)
-            except Exception as e:
-                print(f"[{self.name}] Remote browser not reachable ({e}). Falling back to local.")
-        
-        print(f"[{self.name}] Launching local browser (Headless)")
-        return await playwright.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-        )
+        """Uses BrowserManager to get a connection to the Webtop browser."""
+        from app.services.browser_manager import browser_manager
+        return await browser_manager.get_browser(playwright)
 
     async def run(self, session: Optional[AsyncSession] = None) -> AsyncGenerator[Dict[str, Any], None]:
         async with async_playwright() as p:
             browser = await self._get_browser(p)
-            # Create a dedicated context with a common user agent
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-            )
+            if not browser:
+                print(f"[{self.name}] ABORTING: Browser not available.")
+                return
+
+            # Create a dedicated context (letting it use the browser's native UA)
+            context = await browser.new_context()
             page = await context.new_page()
             
             try:
                 # 1. Discovery Phase
                 print(f"[{self.name}] Accessing entry URL: {self.entry_url}")
-                await page.goto(self.entry_url, wait_until="networkidle", timeout=45000)
+                # Use domcontentloaded + manual sleep to be more resilient to Cloudflare/Ads
+                await page.goto(self.entry_url, wait_until="domcontentloaded", timeout=60000)
+                
+                # Wait for Cloudflare to settle
+                print(f"[{self.name}] Waiting 10s for Cloudflare/JS challenges...")
+                await asyncio.sleep(10)
                 
                 if self.entry_wait_for:
                     try: await page.wait_for_selector(self.entry_wait_for, timeout=15000)
@@ -109,7 +106,8 @@ class WebtopScraper(BaseScraper):
                     print(f"[{self.name}] Processing item {idx}/{len(items_to_process)}: {item_url}")
                     
                     try:
-                        await page.goto(item_url, wait_until="domcontentloaded", timeout=30000)
+                        await page.goto(item_url, wait_until="domcontentloaded", timeout=45000)
+                        await asyncio.sleep(5)
                         
                         # Extract links via JS
                         found_links = []
