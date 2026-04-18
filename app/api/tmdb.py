@@ -69,9 +69,9 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
         # 1. Fetch metadata from TMDb
         res_data = None
         if req.imdb_id:
-            res_data = await tmdb_service.fetch_metadata_by_imdb_id(req.imdb_id, media_type=req.category)
+            res_data = await tmdb_service.fetch_metadata_by_imdb_id(req.imdb_id, title=req.title, year=req.year)
         elif req.tmdb_id:
-            res_data = await tmdb_service.fetch_metadata_by_tmdb_id(req.tmdb_id, media_type=req.category)
+            res_data = await tmdb_service.fetch_metadata_by_tmdb_id(req.tmdb_id, media_type=req.category, language=req.lang)
         elif req.title:
             res_data = await tmdb_service.fetch_metadata(req.title, req.year, req.category, language=req.lang)
             
@@ -79,24 +79,23 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
             raise HTTPException(status_code=404, detail="Could not find metadata for provided info")
             
         # 2. Update MediaMetadata or create if new
-        imdb_id = res_data.get("imdb_id") or f"local_{res_data.get('official_title').replace(' ', '_').lower()}"
+        imdb_id = res_data.get("imdb_id") or f"local_{res_data.get('official_title', 'unknown').replace(' ', '_').lower()}"
         
         stmt = select(MediaMetadata).where(MediaMetadata.imdb_id == imdb_id)
         existing_meta = (await db.execute(stmt)).scalar()
         
         if not existing_meta:
-            existing_meta = MediaMetadata(
-                imdb_id=imdb_id,
-                official_title=res_data.get("official_title"),
-                title_fr=res_data.get("title_fr"),
-                year=res_data.get("year"),
-                poster_path=None, 
-                plot_en=res_data.get("plot_en"),
-                plot_fr=res_data.get("plot_fr"),
-                rating=res_data.get("rating")
-            )
+            existing_meta = MediaMetadata(imdb_id=imdb_id)
             db.add(existing_meta)
             await db.flush()
+
+        # Update all fields (for new AND existing records)
+        if res_data.get("official_title"): existing_meta.official_title = res_data.get("official_title")
+        if res_data.get("title_fr"): existing_meta.title_fr = res_data.get("title_fr")
+        if res_data.get("year"): existing_meta.year = res_data.get("year")
+        if res_data.get("plot_en"): existing_meta.plot_en = res_data.get("plot_en")
+        if res_data.get("plot_fr"): existing_meta.plot_fr = res_data.get("plot_fr")
+        if res_data.get("rating"): existing_meta.rating = res_data.get("rating")
             
         p_url = res_data.get("poster_url")
         if p_url:

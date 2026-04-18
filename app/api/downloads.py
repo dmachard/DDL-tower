@@ -36,19 +36,23 @@ async def get_downloads():
     
     files = []
     for item in download_dir.iterdir():
-        if item.is_dir():
+        try:
+            if item.is_dir():
+                continue
+            if item.suffix.lower() not in settings.VIDEO_EXTENSIONS:
+                continue
+                
+            stats = item.stat()
+            files.append({
+                "name": item.name,
+                "is_dir": item.is_dir(),
+                "size": format_size(stats.st_size),
+                "size_bytes": stats.st_size,
+                "modified": datetime.fromtimestamp(stats.st_mtime, tz=timezone.utc).isoformat()
+            })
+        except FileNotFoundError:
+            # File was deleted during iteration or is a broken symlink
             continue
-        if item.suffix.lower() not in settings.VIDEO_EXTENSIONS:
-            continue
-            
-        stats = item.stat()
-        files.append({
-            "name": item.name,
-            "is_dir": item.is_dir(),
-            "size": format_size(stats.st_size),
-            "size_bytes": stats.st_size,
-            "modified": datetime.fromtimestamp(stats.st_mtime, tz=timezone.utc).isoformat()
-        })
     
     # Sort by date desc
     return sorted(files, key=lambda x: x["modified"], reverse=True)

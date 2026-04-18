@@ -134,18 +134,23 @@ class TMDbService:
             print(f"[TMDB] Error fetching metadata for '{title}': {e}")
             return None
 
-    async def fetch_metadata_by_tmdb_id(self, tmdb_id: int, media_type: str = "movie") -> Optional[Dict[str, Any]]:
+    async def fetch_metadata_by_tmdb_id(self, tmdb_id: int, media_type: str = "movie", language: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Fetch metadata from TMDb using a TMDb ID.
         """
         if not self.api_key or not tmdb_id:
             return None
 
+        search_lang = language or settings.DEFAULT_LANGUAGE
+        if len(search_lang) == 2:
+            search_lang = f"{search_lang}-{search_lang.upper()}"
+
         try:
-            print(f"[TMDB] Fetching details for tmdb_id '{tmdb_id}' ({media_type})...")
+            print(f"[TMDB] Fetching details for tmdb_id '{tmdb_id}' ({media_type}) in {search_lang}...")
             async with httpx.AsyncClient(timeout=10.0) as client:
                 detail_params = {
                     "api_key": self.api_key,
+                    "language": search_lang,
                     "append_to_response": "translations,external_ids"
                 }
                 
