@@ -191,7 +191,7 @@ class TMDbService:
             print(f"[TMDB] Error fetching details for tmdb_id '{tmdb_id}': {e}")
             return None
 
-    async def fetch_metadata_by_imdb_id(self, imdb_id: str, title: Optional[str] = None, year: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    async def fetch_metadata_by_imdb_id(self, imdb_id: str, title: Optional[str] = None, year: Optional[int] = None, language: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Fetch metadata from TMDb using an IMDB ID.
         Uses the /find endpoint, with fallback to title search.
@@ -221,13 +221,14 @@ class TMDbService:
                         return await self.fetch_metadata(
                             title=best_match.get("title") or best_match.get("name"),
                             year=year,
-                            media_type=media_type
+                            media_type=media_type,
+                            language=language
                         )
 
             # Fallback to title search if ID failed or not provided
             if title:
                 print(f"[TMDB] IMDB ID lookup failed, falling back to title search for '{title}'...")
-                return await self.fetch_metadata(title=title, year=year)
+                return await self.fetch_metadata(title=title, year=year, language=language)
 
             return None
         except Exception as e:

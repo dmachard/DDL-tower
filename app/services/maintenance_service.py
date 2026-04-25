@@ -195,6 +195,7 @@ class MaintenanceService:
                     MediaMetadata.plot_fr == "",
                     MediaMetadata.rating == None,
                     MediaMetadata.rating == "",
+                    MediaMetadata.year == None,
                     MediaMetadata.imdb_id == "N/A",
                     and_(MediaMetadata.official_title == MediaMetadata.title_fr, MediaMetadata.title_fr != None, MediaMetadata.title_fr != "")
                 )
@@ -246,6 +247,7 @@ class MaintenanceService:
                     
                     if not meta.title_fr: meta.title_fr = res_data.get("title_fr") or ""
                     if not meta.rating: meta.rating = res_data.get("rating") or ""
+                    if not meta.year: meta.year = res_data.get("year")
                     
                     await session.commit()
                 except Exception as e:
