@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.core.utils import format_size
 from app.services.downloader import downloader_service
-from app.services.alldebrid import AllDebridClient
+from app.services.debrid import debrid_service
 from app.db.database import AsyncSessionLocal
 from pydantic import BaseModel
 
@@ -99,7 +99,7 @@ async def run_download_task(urls: List[str]):
     """
     Background task to unlock and download files.
     """
-    client = AllDebridClient()
+    client = debrid_service
     
     # 1. Unlock all links in parallel
     print(f"[API] Unlocking {len(urls)} links in parallel...")

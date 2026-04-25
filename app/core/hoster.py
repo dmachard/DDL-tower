@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from app.hosters.one_fichier import OneFichierService
 from app.hosters.nitroflare import NitroflareService
 from app.hosters.rapidgator import RapidgatorService
-from app.services.alldebrid import AllDebridClient
+from app.services.debrid import debrid_service
 
 class Hoster:
     """
@@ -14,7 +14,7 @@ class Hoster:
     or falling back to AllDebrid for unsupported hosts.
     """
     def __init__(self):
-        self.ad_client = AllDebridClient()
+        self.debrid = debrid_service
         self.direct_mappers = {
             "1fichier.com": OneFichierService,
             "nitroflare.com": NitroflareService,
@@ -40,6 +40,7 @@ class Hoster:
             return {}
 
         direct_links = []
+        debrid_links = []
         results = {}
 
         # 1. Dispatch links
@@ -48,7 +49,7 @@ class Hoster:
             if domain in self.direct_mappers:
                 direct_links.append((link, self.direct_mappers[domain]))
             else:
-                ad_links.append(link)
+                debrid_links.append(link)
 
         # 2. Execute direct checks in parallel
         if direct_links:
@@ -67,8 +68,14 @@ class Hoster:
                     if res.get("status") == "alive":
                         results[link] = res
                     else:
-                        # If direct check fails or is unknown, fallback to AllDebrid
-                        print(f"[HOSTER] {link[:60]}... check {res.get('status') or 'failed'}.")
+                        # If direct check fails or is unknown, fallback to Debrid
+                        print(f"[HOSTER] {link[:60]}... check {res.get('status') or 'failed'}. Falling back to Debrid.")
+                        debrid_links.append(link)
 
+        # 3. Check remaining links via Debrid service
+        if debrid_links:
+            print(f"[HOSTER] Checking {len(debrid_links)} links via Debrid...")
+            ad_results = await self.debrid.check_links(debrid_links)
+            results.update(ad_results)
 
         return results

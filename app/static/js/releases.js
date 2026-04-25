@@ -34,7 +34,7 @@ export const createReleaseCard = (rel) => {
                     <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].copy_links}">
                         <i class="fas fa-copy"></i>
                     </button>
-                    ${state.config.alldebrid_enabled ? `
+                    ${(state.config.alldebrid_enabled || state.config.realdebrid_enabled || state.config.bestdebrid_enabled) ? `
                     <button class="rel-p-download" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].download_links}">
                         <i class="fas fa-download"></i>
                     </button>` : ''}

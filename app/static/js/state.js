@@ -26,5 +26,5 @@ export const state = {
     sources: [],
     years: [],
     networks: [],
-    config: { alldebrid_enabled: false }
+    config: { alldebrid_enabled: false, realdebrid_enabled: false, bestdebrid_enabled: false }
 };

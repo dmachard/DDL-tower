@@ -27,10 +27,17 @@ class Settings(BaseSettings):
     # Database Settings
     DATABASE_URL: str = _yaml_config.get("database_url", "sqlite+aiosqlite:///./data/ddl.db")
     
-    # AllDebrid API Settings (Environment variable takes priority)
-    _yaml_alldebrid = _yaml_config.get("alldebrid", {})
+    # Downloader API Settings (Environment variable takes priority)
+    _yaml_downloader = _yaml_config.get("downloader", {})
+    _yaml_alldebrid = _yaml_downloader.get("alldebrid", _yaml_config.get("alldebrid", {}))
+    _yaml_realdebrid = _yaml_downloader.get("realdebrid", {})
+    _yaml_bestdebrid = _yaml_downloader.get("bestdebrid", {})
+
     ALLDEBRID_API_KEY: str = os.getenv("ALLDEBRID_API_KEY", _yaml_alldebrid.get("api_key", ""))
     ALLDEBRID_AGENT: str = _yaml_alldebrid.get("agent", "ddl-tower")
+    
+    REALDEBRID_API_KEY: str = os.getenv("REALDEBRID_API_KEY", _yaml_realdebrid.get("api_key", ""))
+    BESTDEBRID_API_KEY: str = os.getenv("BESTDEBRID_API_KEY", _yaml_bestdebrid.get("api_key", ""))
     
     # Download Settings
     DOWNLOAD_DIR: str = os.getenv("DOWNLOAD_DIR", _yaml_config.get("download_dir", "/app/data/download"))

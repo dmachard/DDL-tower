@@ -15,10 +15,15 @@ library_series_dir: "/app/data/series"
 delete_rar_after_extraction: true
 keep_only_video_files: true
 
-# --- AllDebrid API Settings ---
-# You can also use the ALLDEBRID_API_KEY environment variable
-alldebrid:
-  api_key: "[YOUR_KEY]"
+# --- Downloader API Settings ---
+# You can also use the ALLDEBRID_API_KEY or REALDEBRID_API_KEY environment variables
+downloader:
+  alldebrid:
+    api_key: "[YOUR_KEY]"
+  realdebrid:
+    api_key: "[YOUR_KEY]"
+  bestdebrid:
+    api_key: "[YOUR_KEY]"
 
 # TMDB API Settings
 tmdb:
@@ -44,71 +49,71 @@ webtop_container_name: "ddltower-browser"
 # --- Direct & Global Extraction Patterns ---
 # Regular expressions used to identify download links on any page
 direct_scan_patterns:
-  - 'https?://(?:www\.)?1fichier\.com/\?[^\s"''<>]+'
+  - 'https?://(?:www\.)?1fichier\.com/(?:\?)?[^\s"''<>]+'
   - 'https?://(?:www\.)?rapidgator\.net/file/[^\s"''<>]+'
   - 'https?://(?:www\.)?nitroflare\.com/view/[^\s"''<>]+'
 
 # --- Automated Discovery Sources (Scrapers) ---
 sources:
-  - name: "LinuxISO-Sample"
-    # load the entry url
-    entry_url: "https://example.com/linux-isos"
-    # wait for the following selector to be present (optional)
-    entry_wait_for: ".content-loaded"
-    # and crawl the following patterns (optional)
-    crawls:
-      # list of url to follow
-      - pattern: 'https?://example\.com/subpage/[\w-]+'
-        # expected selector to be present
-        wait_for: "a[href*='1fichier.com']"
-        # skip if already visited
-        scrape_once: true
-    # finally search for the following patterns
-    target_patterns:
-      - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+  # - name: "LinuxISO-Sample"
+  #   # load the entry url
+  #   entry_url: "https://example.com/linux-isos"
+  #   # wait for the following selector to be present (optional)
+  #   entry_wait_for: ".content-loaded"
+  #   # and crawl the following patterns (optional)
+  #   crawls:
+  #     # list of url to follow
+  #     - pattern: 'https?://example\.com/subpage/[\w-]+'
+  #       # expected selector to be present
+  #       wait_for: "a[href*='1fichier.com']"
+  #       # skip if already visited
+  #       scrape_once: true
+  #   # finally search for the following patterns
+  #   target_patterns:
+  #     - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
 
-  - name: "Manual-Paste-Example" 
-    # load the entry url
-    entry_url: "https://rentry.co/sample-links"
-    # and search for the following patterns
-    target_patterns:
-      - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+  # - name: "Manual-Paste-Example" 
+  #   # load the entry url
+  #   entry_url: "https://rentry.co/sample-links"
+  #   # and search for the following patterns
+  #   target_patterns:
+  #     - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
 
-  - name: "RSS-Example"
-    # load rss feed
-    rss_url: "https://example.com/rss"
-    # and search for the following keywords in each items
-    required_keywords:
-      - "Subtitle.*French": "VOST"
-    # if required keywords are present, click on the following selector
-    click_selector: ".content-loaded"
-    # then search for the following patterns
-    target_patterns:
-      - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
+  # - name: "RSS-Example"
+  #   # load rss feed
+  #   rss_url: "https://example.com/rss"
+  #   # and search for the following keywords in each items
+  #   required_keywords:
+  #     - "Subtitle.*French": "VOST"
+  #   # if required keywords are present, click on the following selector
+  #   click_selector: ".content-loaded"
+  #   # then search for the following patterns
+  #   target_patterns:
+  #     - 'https?://(?:www\.)?1fichier\.com/\?[\w-]+'
 
-  - name: "protected"
-    use_webtop: true
-    entry_url: "https://www.protected.link/"
-    js_items: |
-      () => {
-        const elements = document.querySelectorAll('a.top-last.thumbnails');
-        return Array.from(elements).map(el => ({
-          href: el.href,
-          title: el.querySelector('.top-title')?.innerText.trim(),
-          release: el.querySelector('.top-lasttitle')?.innerText.trim(),
-          img: el.querySelector('.img-post')?.src
-        }));
-      }
-    js_links: |
-      (meta) => {
-        const results = [];
-        const anchors = document.querySelectorAll('a[href*="protected.link"]');
-        anchors.forEach(a => {
-          const heb = a.querySelector('.hebergeur');
-          if (heb) { results.push({ href: a.href, provider: heb.innerText.trim() }); }
-        });
-        return results;
-      }
-    unlock_patterns:
-      - provider: "1fichier"
-        pattern: "https?://protected\\.link/.*"
+  # - name: "protected"
+  #   use_webtop: true
+  #   entry_url: "https://www.protected.link/"
+  #   js_items: |
+  #     () => {
+  #       const elements = document.querySelectorAll('a.top-last.thumbnails');
+  #       return Array.from(elements).map(el => ({
+  #         href: el.href,
+  #         title: el.querySelector('.top-title')?.innerText.trim(),
+  #         release: el.querySelector('.top-lasttitle')?.innerText.trim(),
+  #         img: el.querySelector('.img-post')?.src
+  #       }));
+  #     }
+  #   js_links: |
+  #     (meta) => {
+  #       const results = [];
+  #       const anchors = document.querySelectorAll('a[href*="protected.link"]');
+  #       anchors.forEach(a => {
+  #         const heb = a.querySelector('.hebergeur');
+  #         if (heb) { results.push({ href: a.href, provider: heb.innerText.trim() }); }
+  #       });
+  #       return results;
+  #     }
+  #   unlock_patterns:
+  #     - provider: "1fichier"
+  #       pattern: "https?://protected\\.link/.*"
