@@ -133,6 +133,14 @@ export const startDirectScan = async (url) => {
     });
 };
 
+export const extractText = async (text) => {
+    return fetch('/api/scan/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+    });
+};
+
 export const downloadUrls = async (urls) => {
     return fetch('/api/download', {
         method: 'POST',

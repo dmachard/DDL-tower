@@ -21,8 +21,9 @@ class DirectScanner:
 
     async def scan_urls(self, urls: List[str]):
         """
-        Processes a list of URLs in the background.
+        Processes a list of URLs and returns stats.
         """
+        results = []
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             # Use a realistic User-Agent to avoid basic bot blocks
@@ -37,82 +38,96 @@ class DirectScanner:
                 page = await context.new_page()
                 start_time = datetime.now(timezone.utc)
                 try:
-                    # 1. Visit the URL
-                    await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-
-                    # 3. Wait for dynamic content
-                    await asyncio.sleep(3) # Safe buffer for JS rendering
+                    await page.goto(url, wait_until="networkidle", timeout=60000)
                     
-                    # 4. Extract from ALL frames (Essential for ControlC/PrivateBin iframes)
-                    all_html = []
+                    # Extract from all frames
+                    all_content = [await page.content()]
                     for frame in page.frames:
                         try:
-                            frame_html = await frame.content()
-                            all_html.append(frame_html)
-                        except Exception:
+                            all_content.append(await frame.content())
+                        except:
                             continue
                     
-                    full_html = " ".join(all_html)
-                    print("[DIRECT-SCAN] Page loaded. Size: ", len(full_html))
-   
-                    # 5. Extract target links only
+                    combined_content = " ".join(all_content)
+                    
                     found_links = set()
                     for pattern in self.target_patterns:
-                        found_links.update(re.findall(pattern, full_html))
+                        found_links.update(re.findall(pattern, combined_content))
                     
-                    duration = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-
-                    # 6. Store and process results
+                    total_found = len(found_links)
+                    
                     async with AsyncSessionLocal() as session:
-                        # Record visit
-                        scraped_entry = ScrapedURL(
-                            url=url,
-                            source_name="Direct-Scan",
-                            status="success" if found_links else "no_links",
-                            scrape_once=True,
-                            last_scraped=datetime.now(timezone.utc),
-                            duration_ms=duration
-                        )
-                        await session.merge(scraped_entry)
-                        
                         if not found_links:
-                            print(f"[DIRECT-SCAN] No links found on {url}")
+                            scraped_entry = ScrapedURL(
+                                url=url,
+                                source_name="Direct-Scan",
+                                status="finished",
+                                scrape_once=True,
+                                last_scraped=datetime.now(timezone.utc),
+                                duration_ms=int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+                            )
+                            await session.merge(scraped_entry)
                             await session.commit()
+                            results.append({"url": url, "total": 0, "new": 0})
                             continue
                         
-                        print(f"[DIRECT-SCAN] Found {len(found_links)} links on {url}")
-                        # Use LinkManager to check mortality and store in DownloadLink
-                        # It returns only the NEW links added to the database
+                        print(f"[DIRECT-SCAN] Found {total_found} links on {url}")
                         new_links = await self.link_manager.check_links(
                             session=session,
                             raw_links=list(found_links),
                             source_url=url,
                             source_name="Direct-Scan"
                         )
-                            
-                        # Commit so Categorizer can see them
+                        new_added = len(new_links) if new_links else 0
                         await session.commit()
                         
-                        # Enrich metadata ONLY for the newly added links!
                         if new_links:
                             await self.categorizer.enrich_links(session, links=new_links)
                             await session.commit()
                         
+                        results.append({"url": url, "total": total_found, "new": new_added})
+                        
                 except Exception as e:
                     print(f"[DIRECT-SCAN] Error scanning {url}: {e}")
-                    duration = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-                    async with AsyncSessionLocal() as session:
-                        scraped_entry = ScrapedURL(
-                            url=url,
-                            source_name="Direct-Scan",
-                            status="failed",
-                            scrape_once=True,
-                            last_scraped=datetime.now(timezone.utc),
-                            duration_ms=duration
-                        )
-                        await session.merge(scraped_entry)
-                        await session.commit()
+                    results.append({"url": url, "error": str(e)})
                 finally:
                     await page.close()
             
             await browser.close()
+        return results
+
+    async def scan_text(self, text: str):
+        """
+        Extracts links from raw text using configured patterns and processes them.
+        """
+        found_links = set()
+        for pattern in self.target_patterns:
+            found_links.update(re.findall(pattern, text))
+        
+        if not found_links:
+            print("[DIRECT-SCAN] No links found in provided text.")
+            return []
+
+        total_found = len(found_links)
+        print(f"[DIRECT-SCAN] Found {total_found} links in text.")
+        
+        async with AsyncSessionLocal() as session:
+            new_links = await self.link_manager.check_links(
+                session=session,
+                raw_links=list(found_links),
+                source_url="manual-paste",
+                source_name="Quick-Scan"
+            )
+            await session.commit()
+            
+            new_added = len(new_links) if new_links else 0
+            
+            if new_links:
+                await self.categorizer.enrich_links(session, links=new_links)
+                await session.commit()
+            
+            return {
+                "total_found": total_found,
+                "new_added": new_added,
+                "links": new_links
+            }

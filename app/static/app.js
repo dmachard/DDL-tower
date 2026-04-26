@@ -6,6 +6,7 @@ import { setLanguage } from './js/i18n.js';
 import { initModals } from './js/modals.js';
 import { initNavigation } from './js/navigation.js';
 import { initScanner } from './js/scanner.js';
+import { initQuickScan } from './js/quick-scan.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -30,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Navigation & Scanner ──────────────────────────────────────────────────
     initNavigation();
     initScanner();
+    initQuickScan();
 
     // ── Filter Tags ───────────────────────────────────────────────────────────
     document.getElementById('filter-tags-releases')?.addEventListener('click', (e) => handleTagClick(e, 'releases'));

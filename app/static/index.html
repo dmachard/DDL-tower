@@ -27,9 +27,10 @@
                     <h1>DDL<span>tower</span></h1>
                 </div>
                 <div class="header-search">
-                    <div class="search-wrapper scan-wrapper">
-                        <input type="text" id="direct-scan-input" placeholder="Scan a URL">
-                        <div id="scan-indicator" class="scan-indicator hidden"></div>
+                    <!-- Global Search Bar in Header -->
+                    <div class="search-wrapper global-search">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="target-search" placeholder="Chercher..." data-i18n="search_placeholder">
                     </div>
                 </div>
                 <div class="header-actions">
@@ -61,17 +62,17 @@
                     <span class="nav-count" id="count-downloads">0</span>
                 </button>
 
+                <button class="nav-item" data-view="quick-scan">
+                    <i class="fas fa-bolt"></i>
+                    <span data-i18n="nav_quick_scan">Scanner</span>
+                </button>
+
                 <button class="nav-item" data-view="sources">
                     <i class="fas fa-satellite-dish"></i>
                     <span data-i18n="nav_sources">Sources</span>
                 </button>
 
-                <!-- Global Search Bar in Nav -->
-                <div class="search-wrapper global-search">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="target-search" placeholder="Chercher..." data-i18n="search_placeholder">
-                </div>
-
+                <!-- Removed Global Search from Nav -->
                 <div id="live-toggle" class="live-status">
                     <div class="live-indicator"></div>
                     <span class="live-label">LIVE</span>
@@ -135,6 +136,48 @@
                     </div>
                 </div>
                 <div class="sources-dashboard-grid" id="sources-dashboard-container"></div>
+            </div>
+
+            <!-- Quick Scan View -->
+            <div id="quick-scan-view" class="view-section hidden">
+                <div class="quick-scan-container">
+                    <!-- Section URL -->
+                    <div class="quick-scan-section">
+                        <h2 data-i18n="scan_url_title">Scan URL</h2>
+                        <div class="card">
+                            <div class="search-wrapper scan-wrapper mb-1">
+                                <input type="text" id="direct-scan-input" placeholder="https://...">
+                                <div id="scan-indicator" class="scan-indicator hidden"></div>
+                            </div>
+                            <div id="direct-scan-results" class="quick-scan-results hidden mt-1">
+                                <div class="success-alert">
+                                    <span id="direct-scan-message"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Text -->
+                    <div class="quick-scan-section">
+                        <h2 data-i18n="quick_scan_title">Quick Extract</h2>
+                        <div class="card">
+                            <textarea id="quick-scan-textarea"></textarea>
+                            <div class="quick-scan-actions">
+                                <button id="btn-quick-scan-clear" class="btn-secondary">
+                                    <span data-i18n="btn_clear">Clear</span>
+                                </button>
+                                <button id="btn-quick-scan" class="btn-primary btn-lg">
+                                    <span data-i18n="btn_extract">Extract & Add</span>
+                                </button>
+                            </div>
+                            <div id="quick-scan-results" class="quick-scan-results hidden mt-1">
+                                <div class="success-alert">
+                                    <span id="quick-scan-message"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>

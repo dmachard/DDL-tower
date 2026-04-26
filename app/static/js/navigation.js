@@ -21,6 +21,7 @@ export const initNavigation = () => {
             state.currentView = view;
             if (view === 'sources') { fetchStats(); fetchSourcesDashboard(); }
             else if (view === 'downloads') fetchDownloads();
+            else if (view === 'quick-scan') { /* No data to fetch */ }
             else fetchData(view);
         });
     });

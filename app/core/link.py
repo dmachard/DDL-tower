@@ -24,7 +24,7 @@ class LinkManager:
         2. override_title/year: If provided, they serve as metadata hints (title/year fields).
         3. Default: Uses the authentic filename from the hoster.
         """
-        if not raw_links: return
+        if not raw_links: return []
         
         # Deduplicate incoming links to avoid UNIQUE constraint errors in the same batch
         raw_links = list(set(raw_links))
@@ -40,7 +40,7 @@ class LinkManager:
         
         if not new_links:
             print(f"[LINK] No new links for {source_name}.")
-            return
+            return []
 
         print(f"[LINK] Verifying {len(new_links)} new links via hoster...")
         hv_results = await self.hoster.check_links(new_links)

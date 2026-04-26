@@ -1,0 +1,121 @@
+.quick-scan-container {
+    max-width: 800px;
+    margin: 3rem auto;
+    padding: 0 1rem;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.quick-scan-section {
+    margin-bottom: 3rem;
+}
+
+.quick-scan-container .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.quick-scan-container h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#quick-scan-textarea {
+    width: 100%;
+    min-height: 250px;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    color: #fff;
+    font-family: monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+    margin-bottom: 1rem;
+}
+
+.quick-scan-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.btn-lg {
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#direct-scan-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: #000;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    color: #fff;
+    font-size: 1rem;
+}
+
+.help-box {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    margin-top: 1rem;
+}
+
+.help-box i {
+    color: var(--accent-primary);
+}
+
+.mb-1 { margin-bottom: 1rem; }
+.mt-1 { margin-top: 1rem; }
+
+#quick-scan-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb), 0.1);
+}
+
+.quick-scan-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-lg {
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+#quick-scan-results {
+    margin-top: 1.5rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+.success-alert {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    padding: 1.25rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 600;
+}
+
+.success-alert i {
+    font-size: 1.25rem;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}

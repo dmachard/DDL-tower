@@ -56,7 +56,16 @@ export const TRANSLATIONS = {
         modal_identify_title: "Identify Release",
         btn_cancel: "Cancel",
         btn_confirm: "Confirm",
-        nav_sources: "Sources"
+        nav_sources: "Sources",
+        nav_quick_scan: "Scanner",
+        scan_url_title: "Scan a Page",
+        scan_url_subtitle: "Enter a URL to visit and crawl for links automatically",
+        quick_scan_title: "Quick Extract",
+        quick_scan_subtitle: "Paste text containing download links (1fichier, Rapidgator, etc.)",
+        quick_scan_placeholder: "Paste your text here...",
+        btn_extract: "Scan",
+        btn_clear: "Clear",
+        help_scan_enter: "Press Enter to start crawling"
     },
     fr: {
         nav_releases: "Explorer",
@@ -110,7 +119,16 @@ export const TRANSLATIONS = {
         modal_identify_title: "Identifier la release",
         btn_cancel: "Annuler",
         btn_confirm: "Confirmer",
-        nav_sources: "Sources"
+        nav_sources: "Sources",
+        nav_quick_scan: "Scanner",
+        scan_url_title: "Scanner une Page",
+        scan_url_subtitle: "Entrez une URL pour visiter et extraire les liens automatiquement",
+        quick_scan_title: "Extraction Rapide",
+        quick_scan_subtitle: "Collez du texte contenant des liens (1fichier, Rapidgator, etc.)",
+        quick_scan_placeholder: "Collez votre texte ici...",
+        btn_extract: "Scanner",
+        btn_clear: "Effacer",
+        help_scan_enter: "Appuyez sur Entrée pour lancer le crawl"
     }
 };
 
@@ -122,14 +140,15 @@ export const setLanguage = (lang) => {
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         const text = TRANSLATIONS[lang][key];
-        if (text) el.textContent = text;
-    });
+        if (!text) return;
 
-    // Update placeholders
-    const directScanInput = document.getElementById('direct-scan-input');
-    const targetSearch = document.getElementById('target-search');
-    if (directScanInput) directScanInput.placeholder = TRANSLATIONS[lang].placeholder_scan;
-    if (targetSearch) targetSearch.placeholder = TRANSLATIONS[lang].placeholder_search_titles;
+        // Don't set textContent on inputs/textareas as it fills the actual value
+        if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+            el.placeholder = text;
+        } else {
+            el.textContent = text;
+        }
+    });
 
     // Update language label
     const currentLangLabel = document.getElementById('current-lang');
