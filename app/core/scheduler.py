@@ -6,6 +6,7 @@ from app.scrapers.crawl_scraper import CrawlScraper
 from app.scrapers.rss_scraper import RSSScraper
 from app.scrapers.webtop_scraper import WebtopScraper
 from app.scrapers.scnlog_scraper import ScnLogScraper
+from app.scrapers.json_scraper import JSONScraper
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
 
@@ -21,6 +22,8 @@ async def run_scrapers():
     for config in settings.SCRAPER_SOURCES:
         if config.get("is_scnlog"):
             scrapers.append(ScnLogScraper(config))
+        elif config.get("is_json"):
+            scrapers.append(JSONScraper(config))
         elif "rss_url" in config:
             scrapers.append(RSSScraper(config))
         elif "js_items" in config or config.get("use_webtop"):

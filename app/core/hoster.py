@@ -10,8 +10,8 @@ from app.debrid.debrid import debrid_service
 
 class Hoster:
     """
-    Orchestrates link verification by dispatching links to direct check services
-    or falling back to AllDebrid for unsupported hosts.
+    Orchestrates link verification by dispatching links to direct check services.
+    If a host is unknown, it is added as 'unknown' without external verification.
     """
     def __init__(self):
         self.debrid = debrid_service
@@ -40,7 +40,6 @@ class Hoster:
             return {}
 
         direct_links = []
-        debrid_links = []
         results = {}
 
         # 1. Dispatch links
@@ -49,7 +48,13 @@ class Hoster:
             if domain in self.direct_mappers:
                 direct_links.append((link, self.direct_mappers[domain]))
             else:
-                debrid_links.append(link)
+                # UNKNOWN HOST: Add as unknown without verification
+                results[link] = {
+                    "status": "unknown",
+                    "host": domain or "unknown",
+                    "filename": None,
+                    "size": 0
+                }
 
         # 2. Execute direct checks in parallel
         if direct_links:
@@ -65,17 +70,6 @@ class Hoster:
                 tasks = [wrapped_check(link, mapper, session) for link, mapper in direct_links]
                 for coro in asyncio.as_completed(tasks):
                     link, res = await coro
-                    if res.get("status") == "alive":
-                        results[link] = res
-                    else:
-                        # If direct check fails or is unknown, fallback to Debrid
-                        print(f"[HOSTER] {link[:60]}... check {res.get('status') or 'failed'}. Falling back to Debrid.")
-                        debrid_links.append(link)
-
-        # 3. Check remaining links via Debrid service
-        if debrid_links:
-            print(f"[HOSTER] Checking {len(debrid_links)} links via Debrid...")
-            ad_results = await self.debrid.check_links(debrid_links)
-            results.update(ad_results)
+                    results[link] = res
 
         return results

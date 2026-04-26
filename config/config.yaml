@@ -55,6 +55,39 @@ direct_scan_patterns:
 
 # --- Automated Discovery Sources (Scrapers) ---
 sources:
+  # - name: "JSON-Test-Chain"
+  #   is_json: true
+  #   scrape_once: true
+  #   steps:
+  #     - name: "discovery"
+  #       url: "https://api.themoviedb.org/3/discover/movie?api_key={{ settings.TMDB_API_KEY }}&language=fr-FR&sort_by=release_date.desc&with_watch_providers=8&watch_region=FR"
+  #       items_path: "$.results[*]"
+  #       pagination:
+  #         param: "page"
+  #         max_pages: 15
+  #         total_path: "$.total_pages"
+        
+  #     - name: "search"
+  #       url: "https://api.test.com/"
+  #       headers:
+  #         Accept: "application/json"
+  #         Origin: "https://test.com"
+  #       filter: "$.results[?(@.tmdb_id == {{ discovery.id }})]"
+  #       result_path: "$[0]"
+
+  #     - name: "links"
+  #       url: "https://api.test.com/"
+  #       headers:
+  #         Accept: "application/json"
+  #         Origin: "https://test.com"
+  #       yield_links: "$.all[*].lien"
+  #       regex_patterns:
+  #         - 'https?://(?:www\.)?1fichier\.com/(?:\?)?[^\s"''<>]+'
+  #         - 'https?://(?:www\.)?rapidgator\.net/file/[^\s"''<>]+'
+  #       tags: "NETFLIX"
+  #       override_title: "{{ discovery.title }}"
+  #       override_year: "{{ discovery.release_date[0:4] }}"
+
   # - name: "LinuxISO-Sample"
   #   # load the entry url
   #   entry_url: "https://example.com/linux-isos"

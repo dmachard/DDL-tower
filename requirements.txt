@@ -17,3 +17,4 @@ feedparser
 pytest
 pytest-asyncio
 docker
+jsonpath-ng
