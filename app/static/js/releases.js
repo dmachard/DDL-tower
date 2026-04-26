@@ -169,6 +169,20 @@ export const renderReleases = (groups) => {
         };
         actionsEl.appendChild(btnIdentify);
 
+        const btnShowAll = document.createElement('div');
+        btnShowAll.className = `btn-action-round btn-all-toggle ${state.releases.showAllVersions ? 'active' : ''}`;
+        btnShowAll.title = "Afficher toutes les versions";
+        btnShowAll.innerHTML = '<span>ALL</span>';
+        btnShowAll.onclick = (e) => {
+            e.stopPropagation();
+            state.releases.showAllVersions = !state.releases.showAllVersions;
+            import('./api.js').then(m => {
+                m.fetchData('releases');
+            });
+        };
+        actionsEl.appendChild(btnShowAll);
+
+
         if (group.poster_path) {
             let pPath = group.poster_path;
             if (pPath.startsWith('static/posters/')) pPath = pPath.replace('static/posters/', 'posters/');

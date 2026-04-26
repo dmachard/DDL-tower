@@ -45,6 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Show All Toggle ───────────────────────────────────────────────────────
+    const showAllToggle = document.getElementById('show-all-toggle');
+    if (showAllToggle) {
+        showAllToggle.addEventListener('click', () => {
+            state.releases.showAllVersions = !state.releases.showAllVersions;
+            showAllToggle.classList.toggle('active', state.releases.showAllVersions);
+            fetchData('releases');
+        });
+    }
+
     // ── Init ──────────────────────────────────────────────────────────────────
     initCustomSelect();
     initModals();

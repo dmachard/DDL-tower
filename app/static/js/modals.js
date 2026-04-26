@@ -111,28 +111,32 @@ export const initModals = () => {
     const identifyResults = document.getElementById('identify-results');
     const btnDoIdentifySearch = document.getElementById('btn-do-identify-search');
     const closeIdentifyModal = document.getElementById('close-identify-modal');
+    
+    if (closeIdentifyModal) closeIdentifyModal.onclick = () => identifyModal.classList.remove('active');
 
-    closeIdentifyModal.onclick = () => identifyModal.classList.remove('active');
+    if (btnDoIdentifySearch) {
+        btnDoIdentifySearch.onclick = async () => {
+            const query = identifySearchInput.value.trim();
+            if (!query) return;
 
-    btnDoIdentifySearch.onclick = async () => {
-        const query = identifySearchInput.value.trim();
-        if (!query) return;
+            identifyResults.innerHTML = '<div style="padding:20px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+            try {
+                const catSelect = document.getElementById('identify-category-select');
+                const selectedCat = catSelect ? catSelect.value : 'movie';
+                const res = await fetch(`/api/tmdb/search?query=${encodeURIComponent(query)}&type=${selectedCat === 'series' ? 'tv' : 'movie'}&lang=${state.language}`);
+                const data = await res.json();
+                renderIdentifyResults(data);
+            } catch (err) {
+                identifyResults.innerHTML = '<div style="color:var(--accent-red);padding:20px;">Search failed.</div>';
+            }
+        };
+    }
 
-        identifyResults.innerHTML = '<div style="padding:20px;text-align:center;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
-        try {
-            const catSelect = document.getElementById('identify-category-select');
-            const selectedCat = catSelect ? catSelect.value : 'movie';
-            const res = await fetch(`/api/tmdb/search?query=${encodeURIComponent(query)}&type=${selectedCat === 'series' ? 'tv' : 'movie'}&lang=${state.language}`);
-            const data = await res.json();
-            renderIdentifyResults(data);
-        } catch (err) {
-            identifyResults.innerHTML = '<div style="color:var(--accent-red);padding:20px;">Search failed.</div>';
-        }
-    };
-
-    identifySearchInput.onkeypress = (e) => {
-        if (e.key === 'Enter') btnDoIdentifySearch.click();
-    };
+    if (identifySearchInput) {
+        identifySearchInput.onkeypress = (e) => {
+            if (e.key === 'Enter') btnDoIdentifySearch.click();
+        };
+    }
 
     window.addEventListener('click', (event) => {
         if (event.target == identifyModal) identifyModal.classList.remove('active');

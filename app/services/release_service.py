@@ -46,7 +46,8 @@ class ReleaseService:
         year: int = None,
         network: str = None,
         recent: bool = False,
-        hours: int = None
+        hours: int = None,
+        show_all: bool = False
     ):
         """Returns grouped download links (releases) for movies and series."""
         threshold = await ReleaseService.get_threshold(db, recent, hours)
@@ -130,17 +131,19 @@ class ReleaseService:
                 DownloadLink.status == "alive"
             )
             
-            if source: rel_stmt = rel_stmt.where(DownloadLink.source_name == source)
-            if resolution:
-                if resolution == "2160p":
-                    rel_stmt = rel_stmt.where(DownloadLink.resolution.ilike("2160p") | 
-                                              DownloadLink.resolution.ilike("4K") | 
-                                              DownloadLink.resolution.ilike("4Klight") |
-                                              DownloadLink.resolution.ilike("4KLIGHT"))
-                else:
-                    rel_stmt = rel_stmt.where(DownloadLink.resolution == resolution)
-            if recent and threshold:
-                rel_stmt = rel_stmt.where(DownloadLink.last_checked >= threshold)
+            # Sub-filtering logic: if show_all is False, we respect the filters inside the group
+            if not show_all:
+                if source: rel_stmt = rel_stmt.where(DownloadLink.source_name == source)
+                if resolution:
+                    if resolution == "2160p":
+                        rel_stmt = rel_stmt.where(DownloadLink.resolution.ilike("2160p") | 
+                                                  DownloadLink.resolution.ilike("4K") | 
+                                                  DownloadLink.resolution.ilike("4Klight") |
+                                                  DownloadLink.resolution.ilike("4KLIGHT"))
+                    else:
+                        rel_stmt = rel_stmt.where(DownloadLink.resolution == resolution)
+                if recent and threshold:
+                    rel_stmt = rel_stmt.where(DownloadLink.last_checked >= threshold)
 
             rel_stmt = rel_stmt.order_by(DownloadLink.last_checked.desc())
             rel_result = await db.execute(rel_stmt)
@@ -180,7 +183,7 @@ class ReleaseService:
                         l_checked = r.last_checked.replace(tzinfo=timezone.utc) if r.last_checked.tzinfo is None else r.last_checked
                         is_sub_new = l_checked >= threshold
                     if is_sub_new: card["is_new"] = True
-
+ 
                     card["sub_releases"][sub_key] = {
                         "filename": r.filename, "is_new": is_sub_new,
                         "part_sizes": {}, "parts": []

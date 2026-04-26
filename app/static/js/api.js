@@ -18,6 +18,7 @@ export const fetchData = async (view) => {
         if (view === 'releases' && viewState.resolution) url.searchParams.append('resolution', viewState.resolution);
         if (view === 'releases' && viewState.year) url.searchParams.append('year', viewState.year);
         if (view === 'releases' && viewState.network) url.searchParams.append('network', viewState.network);
+        if (view === 'releases' && viewState.showAllVersions) url.searchParams.append('show_all', 'true');
         if (viewState.recent) url.searchParams.append('recent', 'true');
         if (viewState.hours) url.searchParams.append('hours', viewState.hours);
 

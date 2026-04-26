@@ -79,11 +79,12 @@ async def get_releases(
     year: int = Query(None),
     network: str = Query(None),
     recent: bool = Query(False),
-    hours: int = Query(None)
+    hours: int = Query(None),
+    show_all: bool = Query(False)
 ):
     """
     Returns grouped download links (releases) for movies and series.
     """
     return await release_service.get_grouped_releases(
-        db, page, limit, q, category, source, resolution, year, network, recent, hours
+        db, page, limit, q, category, source, resolution, year, network, recent, hours, show_all
     )

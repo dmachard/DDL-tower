@@ -21,7 +21,7 @@ export const state = {
     currentView: 'releases',
     language: 'fr',
     autoRefresh: false,
-    releases: { items: [], page: 1, limit: 20, total: 0, pages: 0, query: '', category: '', source: '', resolution: '', year: '', network: '', recent: true, hours: 12 },
+    releases: { items: [], page: 1, limit: 20, total: 0, pages: 0, query: '', category: '', source: '', resolution: '', year: '', network: '', recent: true, hours: 12, showAllVersions: false },
     downloads: { items: [], active: {}, query: '' },
     sources: [],
     years: [],

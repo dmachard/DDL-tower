@@ -144,3 +144,42 @@
         font-size: 12px;
     }
 }
+/* Toolbar Toggles (ALL, LIVE, etc.) */
+.toolbar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 40px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-left: 10px;
+    height: 30px;
+}
+
+.toolbar-toggle i {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.toolbar-toggle.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+}
+
+.toolbar-toggle.active i {
+    opacity: 1;
+    color: #60a5fa;
+}
+
+.toolbar-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}

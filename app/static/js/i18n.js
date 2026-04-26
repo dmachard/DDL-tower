@@ -65,7 +65,8 @@ export const TRANSLATIONS = {
         quick_scan_placeholder: "Paste your text here...",
         btn_extract: "Scan",
         btn_clear: "Clear",
-        help_scan_enter: "Press Enter to start crawling"
+        help_scan_enter: "Press Enter to start crawling",
+        modal_view_links_title: "Available Links"
     },
     fr: {
         nav_releases: "Explorer",
@@ -128,7 +129,8 @@ export const TRANSLATIONS = {
         quick_scan_placeholder: "Collez votre texte ici...",
         btn_extract: "Scanner",
         btn_clear: "Effacer",
-        help_scan_enter: "Appuyez sur Entrée pour lancer le crawl"
+        help_scan_enter: "Appuyez sur Entrée pour lancer le crawl",
+        modal_view_links_title: "Liens Disponibles"
     }
 };
 
