@@ -1,8 +1,8 @@
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
-from app.services.alldebrid import AllDebridClient
-from app.services.realdebrid import RealDebridClient
-from app.services.bestdebrid import BestDebridClient
+from app.debrid.alldebrid import AllDebridClient
+from app.debrid.realdebrid import RealDebridClient
+from app.debrid.bestdebrid import BestDebridClient
 
 class DebridService:
     def __init__(self):

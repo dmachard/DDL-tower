@@ -26,7 +26,7 @@ class OneFichierService:
                 # Connect to the Webtop browser
                 browser = await browser_manager.get_browser(p, url=target_url)
                 if not browser:
-                    return {"status": "error", "host": "1fichier.com", "error": "Could not connect to browser (Check socat!)"}
+                    return {"status": "error", "host": "1fichier.com", "error": "Could not connect to browser"}
 
                 try:
                     # Use a NEW page for isolation

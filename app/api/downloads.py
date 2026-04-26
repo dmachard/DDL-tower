@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.core.utils import format_size
 from app.services.downloader import downloader_service
-from app.services.debrid import debrid_service
+from app.debrid.debrid import debrid_service
 from app.db.database import AsyncSessionLocal
 from pydantic import BaseModel
 

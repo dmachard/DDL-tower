@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from app.hosters.one_fichier import OneFichierService
 from app.hosters.nitroflare import NitroflareService
 from app.hosters.rapidgator import RapidgatorService
-from app.services.debrid import debrid_service
+from app.debrid.debrid import debrid_service
 
 class Hoster:
     """
