@@ -25,6 +25,9 @@ class LinkManager:
         3. Default: Uses the authentic filename from the hoster.
         """
         if not raw_links: return
+        
+        # Deduplicate incoming links to avoid UNIQUE constraint errors in the same batch
+        raw_links = list(set(raw_links))
 
         # 1. Filter links already present in the DB
         q_links = await session.execute(

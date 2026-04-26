@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     @property
     def SCRAPER_SOURCES(self) -> List[dict]:
         # Directly read the 'sources' block from the main YAML
-        return _yaml_config.get("sources", [])
+        return _yaml_config.get("sources") or []
 
     model_config = ConfigDict(env_file=".env", extra="ignore")
 
