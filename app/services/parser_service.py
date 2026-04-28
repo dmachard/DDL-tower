@@ -44,20 +44,29 @@ class ParserService:
 
     @staticmethod
     def clean_search_title(title: str) -> str:
-        """Cleans the title for better TMDb matching."""
+        """Cleans the title for better TMDb matching using PTN logic."""
         if not title:
-            return title
+            return ""
             
-        t = title.replace('.', ' ').replace('_', ' ')
-        t = re.sub(r'\b(vol|volume|part|partie|pt)\.?\s*\d+\b', '', t, flags=re.I)
-        t = re.sub(r'\b\d+(?:er|e|eme|ème)\s+(?:partie|volet)\b', '', t, flags=re.I)
-        t = re.sub(r'\b(?:part|pt)\.?\s+(?:one|two|three|four|five|six|seven|eight|nine|ten)\b', '', t, flags=re.I)
-        t = re.sub(r'\b(int[ée]grale|pack|complet)\b', '', t, flags=re.I)
-        t = re.sub(r'\s+\d{4}$', '', t)
-        t = t.replace('-', ' ').replace(':', ' ').replace(',', ' ')
-        t = re.sub(r'\s+', ' ', t).strip()
+        # Use PTN to parse the string as if it were a filename
+        # This is the most reliable way to get the core title
+        p = PTN.parse(title)
+        core_title = p.get('title')
         
-        return t
+        if core_title and len(core_title) > 2:
+            # If it's a series, add season/episode if they are not already in the title
+            # (TMDb search works better with just the series title usually, 
+            # but for episodes we might need them if searching for specific items)
+            return core_title.strip()
+
+        # Fallback to manual cleaning if PTN fails
+        t = title.split(' – ')[0].split(' - ')[0]
+        t = t.replace('.', ' ').replace('_', ' ')
+        noise = [r'\d{3,4}p', r'H[\.\s]?264', r'x[\.\s]?264', 'WEB-DL', 'BluRay']
+        for n in noise:
+            t = re.sub(rf'\b{n}\b', ' ', t, flags=re.I)
+        
+        return re.sub(r'\s+', ' ', t).strip()
 
     @staticmethod
     def parse_filename(filename: str) -> Dict[str, Any]:

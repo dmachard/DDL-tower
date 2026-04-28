@@ -45,11 +45,17 @@ class OneFichierService:
                                 continue
                             raise e
 
-                    # Wait for stability (important for #122)
-                    await asyncio.sleep(5)
+                    # Wait for stability
+                    await asyncio.sleep(1)
                     
-                    # Check if we are still on the error page
                     content = await page.content()
+                    # flood error #293
+                    if "error #293" in content.lower():
+                        print("[1FICHIER] Flood error #293. Trying to wait more...")
+                        await asyncio.sleep(10)
+                        content = await page.content()
+
+                    # Check if we are still on the error page
                     if "error #122" in content.lower() or "Javascript" in content:
                         print("[1FICHIER] Browser also blocked by #122. Trying to wait more...")
                         await asyncio.sleep(10)

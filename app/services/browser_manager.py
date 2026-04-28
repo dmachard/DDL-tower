@@ -98,7 +98,7 @@ class BrowserManager:
             container = self.docker_client.containers.get(self.container_name)
             
             if self._is_browser_running(container):
-                print(f"[BROWSER-MGR] Browser is already running and ready in {self.container_name}")
+                # print(f"[BROWSER-MGR] Browser is already running and ready in {self.container_name}")
                 return container
 
             print(f"[BROWSER-MGR] Browser not started. Launching Chromium and socat in {self.container_name}...")
@@ -147,7 +147,7 @@ class BrowserManager:
         ip = await self.get_container_ip()
         cdp_url = f"http://{ip}:{self.cdp_port}"
         
-        print(f"[BROWSER-MGR] Connecting to {cdp_url}...")
+        # print(f"[BROWSER-MGR] Connecting to {cdp_url}...")
         try:
             return await playwright.chromium.connect_over_cdp(cdp_url, timeout=15000)
         except Exception as e:

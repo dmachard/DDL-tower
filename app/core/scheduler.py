@@ -1,122 +1,91 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime
-from app.core.config import settings
-from app.db.database import AsyncSessionLocal
-from app.scrapers.crawl_scraper import CrawlScraper
-from app.scrapers.rss_scraper import RSSScraper
-from app.scrapers.webtop_scraper import WebtopScraper
-from app.scrapers.scnlog_scraper import ScnLogScraper
-from app.scrapers.json_scraper import JSONScraper
+import asyncio
+import traceback
+from typing import List
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.scraper import Scraper
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
+from app.core.config import settings
+from app.db.database import get_db
 
-scheduler = AsyncIOScheduler()
-
-async def run_scrapers():
-    from app.services.browser_manager import browser_manager
-    await browser_manager.run_diagnostics()
-    
-    print(f"[SCHEDULER] [{datetime.now().strftime('%H:%M:%S')}] Starting sequence...")
-    
+async def get_scrapers():
+    """Initialize scrapers based on settings."""
     scrapers = []
     for config in settings.SCRAPER_SOURCES:
-        if config.get("is_scnlog"):
-            scrapers.append(ScnLogScraper(config))
-        elif config.get("is_json"):
-            scrapers.append(JSONScraper(config))
-        elif "rss_url" in config:
-            scrapers.append(RSSScraper(config))
-        elif "js_items" in config or config.get("use_webtop"):
-            scrapers.append(WebtopScraper(config))
-        else:
-            scrapers.append(CrawlScraper(config))
+        scrapers.append(Scraper(config))
+    return scrapers
 
-    link_manager = LinkManager()
-    categorizer = Categorizer()
-    
-    async with AsyncSessionLocal() as session:
-        # STEP A: DISCOVERY & LINK STORAGE (Per scraper)
+async def run_scraper(scraper, db: AsyncSession):
+    """Run a single scraper and process found links."""
+    print(f"[SCHEDULER] Running scraper: {scraper.name}")
+    try:
+        manager = LinkManager()
+        async for batch in scraper.run(session=db):
+            links = batch.get("links", [])
+            source_url = batch.get("source_url")
+            override_title = batch.get("override_title")
+            override_year = batch.get("override_year")
+            tags = batch.get("tags", [])
+
+            if links:
+                # Use check_links which handles verification and DB insertion
+                added = await manager.check_links(
+                    db, 
+                    links, 
+                    source_url=source_url, 
+                    source_name=scraper.name, 
+                    override_title=override_title, 
+                    override_year=int(override_year) if override_year and str(override_year).isdigit() else None,
+                    tags=tags
+                )
+                if added:
+                    # Enrich and commit this batch immediately
+                    await Categorizer.enrich_links(db, links=added)
+                    await db.commit()
+    except Exception as e:
+        print(f"[SCHEDULER] Error running scraper {scraper.name}: {e}")
+        traceback.print_exc()
+
+async def run_scrapers(source_name: str = None):
+    """Runs all scrapers or a specific one once. Used by manual trigger."""
+    async for db in get_db():
+        scrapers = await get_scrapers()
         for scraper in scrapers:
-            try:
-                print(f"[SCHEDULER] Running scraper: {scraper.name}")
-                # Iterate over the async generator to process links in real-time
-                async for batch in scraper.run(session):
-                    if not batch:
-                        continue
-                    
-                    # Scrapers now return a dictionary with links and optional metadata
-                    if isinstance(batch, dict):
-                        links = batch.get("links")
-                        override_filename = batch.get("override_filename")
-                        batch_source_url = batch.get("source_url")
-                        batch_tags = batch.get("tags")
-                    else:
-                        links = batch
-                        override_filename = None
-                        batch_source_url = None
-                        batch_tags = None
-                    
-                    if not links:
-                        continue
-
-                    # Determine source URL for tracking
-                    s_url = batch_source_url or getattr(scraper, "entry_url", None) or getattr(scraper, "rss_url", None)
-
-                    # Check the status of links
-                    new_links = await link_manager.check_links(
-                        session=session,
-                        raw_links=links,
-                        source_url=s_url,
-                        source_name=scraper.name,
-                        override_filename=batch.get("override_filename") if isinstance(batch, dict) else None,
-                        override_title=batch.get("override_title") if isinstance(batch, dict) else None,
-                        override_year=batch.get("override_year") if isinstance(batch, dict) else None,
-                        tags=batch_tags
-                    )
-                    
-                    # Commit immediately for UI display
-                    await session.commit()
-                    
-                    if new_links:
-                        print(f"[SCHEDULER] Batch of {len(new_links)} new links from '{scraper.name}' stored. Starting enrichment...")
-                        # Immediate enrichment for badge display (WOW effect)
-                        try:
-                            await categorizer.enrich_links(session, links=new_links)
-                            await session.commit()
-                            print(f"[SCHEDULER] Real-time enrichment for '{scraper.name}' finished.")
-                        except Exception as e:
-                            print(f"[SCHEDULER] Real-time enrichment error for '{scraper.name}': {e}")
-                    else:
-                        print(f"[SCHEDULER] No new links from '{scraper.name}' in this batch.")
-                
-                print(f"[SCHEDULER] Full scan for '{scraper.name}' finished.")
-            except Exception as e:
-                print(f"[SCHEDULER] Error in cycle for '{scraper.name}': {e}")
-                await session.rollback()
+            if source_name and scraper.name.lower() != source_name.lower():
+                continue
+            await run_scraper(scraper, db)
+        
+        # Categorization (Enrichment)
+        await Categorizer.enrich_links(db)
+        await db.commit()
 
 async def run_categorization():
-    """
-    Runs only the metadata enrichment process for raw links.
-    """
-    print(f"[SCHEDULER] [{datetime.now().strftime('%H:%M:%S')}] Starting standalone enrichment...")
-    categorizer = Categorizer()
-    async with AsyncSessionLocal() as session:
+    """Runs the categorization process only."""
+    async for db in get_db():
+        await Categorizer.enrich_links(db)
+        await db.commit()
+
+async def scheduler_loop():
+    """Main scheduler loop."""
+    print(f"[SCHEDULER] Starting with interval: {settings.SCAN_INTERVAL_MINUTES} minutes")
+    
+    while True:
         try:
-            await categorizer.enrich_links(session)
-            await session.commit()
-            print("[SCHEDULER] Standalone enrichment finished.")
+            print(f"[SCHEDULER] [{datetime_now()}] Starting sequence...")
+            await run_scrapers()
+            print(f"[SCHEDULER] Sequence finished. Waiting {settings.SCAN_INTERVAL_MINUTES} minutes.")
+            await asyncio.sleep(settings.SCAN_INTERVAL_MINUTES * 60)
+            
         except Exception as e:
-            print(f"[SCHEDULER] Error in standalone enrichment: {e}")
-            await session.rollback()
-            raise e
+            print(f"[SCHEDULER] Critical error: {e}")
+            traceback.print_exc()
+            await asyncio.sleep(60)
+
+def datetime_now():
+    from datetime import datetime
+    return datetime.now().strftime("%H:%M:%S")
 
 def start_scheduler():
-    scheduler.add_job(
-        run_scrapers, 
-        'interval', 
-        minutes=settings.SCAN_INTERVAL_MINUTES, 
-        id='periodic_scan_job',
-        next_run_time=datetime.now()
-    )
-    scheduler.start()
-    print(f"[SCHEDULER] Sequential scan scheduled every {settings.SCAN_INTERVAL_MINUTES} minutes.")
+    """Starts the scheduler in the background."""
+    asyncio.create_task(scheduler_loop())

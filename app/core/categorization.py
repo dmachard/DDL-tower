@@ -28,8 +28,16 @@ class Categorizer:
         Orchestrates filename parsing and TMDb enrichment.
         """
         if links is None:
-            from sqlalchemy import select
-            stmt = select(DownloadLink).where(DownloadLink.title == None, DownloadLink.filename != None)
+            from sqlalchemy import select, or_
+            stmt = select(DownloadLink).where(
+                or_(
+                    DownloadLink.title == None, 
+                    DownloadLink.title == "",
+                    DownloadLink.imdb_id == None,
+                    DownloadLink.imdb_id == "N/A"
+                ),
+                DownloadLink.filename != None
+            )
             q = await session.execute(stmt)
             processed_links = q.scalars().all()
         else:
@@ -38,6 +46,7 @@ class Categorizer:
         if not processed_links:
             return
 
+        print(f"[CATEGORIZER] Processing {len(processed_links)} links for enrichment...")
         await enrichment_service.process_batch(session, processed_links, force_year, force_type, force_imdb_id)
 
     @staticmethod

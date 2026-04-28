@@ -30,7 +30,10 @@ class TMDbService:
 
         search_lang = language or settings.DEFAULT_LANGUAGE
         if len(search_lang) == 2:
-            search_lang = f"{search_lang}-{search_lang.upper()}"
+            if search_lang.lower() == "en":
+                search_lang = "en-US"
+            else:
+                search_lang = f"{search_lang}-{search_lang.upper()}"
 
         try:
             print(f"[TMDB] Searching for '{title}' ({year}) in {search_lang}...")
@@ -56,6 +59,32 @@ class TMDbService:
                         del search_params["year" if media_type == "movie" else "first_air_date_year"]
                         r = await client.get(f"{self.base_url}/{endpoint}", params=search_params)
                         search_data = r.json()
+
+                if not search_data.get("results"):
+                    # Fallback: try the other media type if we found nothing
+                    alt_media_type = "tv" if media_type == "movie" else "movie"
+                    alt_endpoint = "search/movie" if alt_media_type == "movie" else "search/tv"
+                    print(f"[TMDB] No results as {media_type}, trying as {alt_media_type} for '{title}'...")
+                    
+                    alt_params = {
+                        "api_key": self.api_key,
+                        "query": title,
+                        "language": search_lang
+                    }
+                    if year:
+                        alt_params["year" if alt_media_type == "movie" else "first_air_date_year"] = year
+                    
+                    r = await client.get(f"{self.base_url}/{alt_endpoint}", params=alt_params)
+                    search_data = r.json()
+                    
+                    if not search_data.get("results") and year:
+                        # Try general search for the alternative type too
+                        del alt_params["year" if alt_media_type == "movie" else "first_air_date_year"]
+                        r = await client.get(f"{self.base_url}/{alt_endpoint}", params=alt_params)
+                        search_data = r.json()
+                    
+                    if search_data.get("results"):
+                        media_type = alt_media_type # Update media_type for subsequent calls
 
                 if not search_data.get("results"):
                     print(f"[TMDB] No results found at all for '{title}'.")

@@ -13,7 +13,7 @@ class LinkUnlocker:
     def __init__(self):
         pass
 
-    async def unlock(self, url: str) -> List[str]:
+    async def unlock(self, url: str, extra_patterns: List[str] = None) -> List[str]:
         """Unlocks a dl-protect.link and returns the final file hoster links."""
         print(f"[UNLOCKER] Starting unlock process for: {url}")
         
@@ -67,8 +67,6 @@ class LinkUnlocker:
                     try:
                         print("[UNLOCKER] Waiting for Turnstile validation...")
                         await btn.wait_for(state="attached", timeout=15000)
-
-                        print("[UNLOCKER] Waiting for Turnstile validation...")
                         await btn.wait_for(state="visible", timeout=15000)
 
                         # --- Multi-attempt strategy: Wait -> Reload -> Fallback Click ---
@@ -143,34 +141,14 @@ class LinkUnlocker:
                 total_extracted = 0
                 
                 # 1. Standard pattern matching
-                for pattern in settings.DIRECT_SCAN_PATTERNS:
+                patterns_to_check = extra_patterns if extra_patterns else list(settings.DIRECT_SCAN_PATTERNS)
+                
+                for pattern in patterns_to_check:
                     found = list(set(re.findall(pattern, content, re.IGNORECASE)))
                     if found:
                         print(f"[UNLOCKER] {len(found)} link(s) extracted from final page using pattern.")
                         final_links.extend(found)
                         total_extracted += len(found)
-                
-                # 2. Fallback: Search for hoster domains in ALL links if patterns failed
-                if total_extracted == 0:
-                    print("[UNLOCKER] Patterns failed. Attempting fallback link discovery...")
-                    try:
-                        # Extract all href attributes
-                        all_links = await page.evaluate("() => Array.from(document.querySelectorAll('a[href]')).map(a => a.href)")
-                        hoster_domains = ["1fichier.com", "rapidgator.net", "nitroflare.com"]
-                        
-                        for l in all_links:
-                            if any(dom in l for dom in hoster_domains):
-                                # Basic cleanup (MultiUp sometimes adds garbage or redirect prefix)
-                                if "multiup.io" in l and "/download/" in l:
-                                    continue # Skip MultiUp internal links
-                                
-                                final_links.append(l)
-                                total_extracted += 1
-                        
-                        if total_extracted > 0:
-                            print(f"[UNLOCKER] Fallback SUCCESS: Found {total_extracted} link(s) via DOM search.")
-                    except Exception as fe:
-                        print(f"[UNLOCKER] Fallback search error: {fe}")
 
                 if total_extracted == 0:
                     print(f"[UNLOCKER] WARNING: No links extracted from {page.url}")

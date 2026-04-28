@@ -26,7 +26,7 @@ export const createReleaseCard = (rel) => {
         });
 
         const providerRows = Object.values(providers).map(p => `
-            <div class="rel-provider-row ${sub.is_new ? 'is-new' : ''}" title="${sub.filename}">
+            <div class="rel-provider-row ${sub.is_new ? 'is-new' : ''}" title="${sub.raw_title || sub.title || sub.filename}">
                 <span class="rel-p-name">${p.name}</span>
                 <span class="rel-p-count">${p.partsCount}F</span>
                 <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
@@ -168,19 +168,6 @@ export const renderReleases = (groups) => {
             import('./modals.js').then(({ openIdentifyModal }) => openIdentifyModal(allLinks, group.official_title || group.title || ''));
         };
         actionsEl.appendChild(btnIdentify);
-
-        const btnShowAll = document.createElement('div');
-        btnShowAll.className = `btn-action-round btn-all-toggle ${state.releases.showAllVersions ? 'active' : ''}`;
-        btnShowAll.title = "Afficher toutes les versions";
-        btnShowAll.innerHTML = '<span>ALL</span>';
-        btnShowAll.onclick = (e) => {
-            e.stopPropagation();
-            state.releases.showAllVersions = !state.releases.showAllVersions;
-            import('./api.js').then(m => {
-                m.fetchData('releases');
-            });
-        };
-        actionsEl.appendChild(btnShowAll);
 
 
         if (group.poster_path) {

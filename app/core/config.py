@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     # Scraper Settings
     SCAN_INTERVAL_MINUTES: int = _yaml_config.get("scan_interval_minutes", 15)
     SCAN_NOVELTY_MULTIPLIER: int = _yaml_config.get("scan_novelty_multiplier", 2)
+    CONCURRENT_HOSTER_CHECKS: int = _yaml_config.get("concurrent_hoster_checks", 10)
     BROWSER_URL: Optional[str] = _yaml_config.get("browser_url", None)
     WEBTOP_CONTAINER_NAME: str = _yaml_config.get("webtop_container_name", "ddltower-browser")
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])

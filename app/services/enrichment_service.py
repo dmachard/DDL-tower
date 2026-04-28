@@ -37,6 +37,7 @@ class EnrichmentService:
 
         if not existing_meta:
             search_title = parser_service.clean_search_title(link.title)
+            print(f"[ENRICHMENT] 🔍 Searching TMDb for: {search_title} ({link.year or 'any year'})")
             res_data = None
             
             if force_imdb_id:
@@ -46,6 +47,8 @@ class EnrichmentService:
                 res_data = await tmdb_service.fetch_metadata(search_title, link.year, link.category)
             
             if res_data:
+                official_title = res_data.get("official_title")
+                print(f"[ENRICHMENT] ✅ Found match: {official_title} ({res_data.get('year')})")
                 imdb_id = res_data.get("imdb_id")
                 if not imdb_id:
                     clean_t = re.sub(r'[^a-zA-Z0-9\s]', '', link.title).lower()
@@ -108,7 +111,19 @@ class EnrichmentService:
         """
         # First, ensure all links have technical parsing done
         for link in links:
-            p = parser_service.parse_filename(link.filename)
+            # Prioritize parsing the 'good name' (link.title from feed) if available, 
+            # as it's more reliable than the obfuscated filename.
+            parse_target = link.title if link.title else link.filename
+            p = parser_service.parse_filename(parse_target)
+            
+            # If we parsed from the title, we might still want to check the filename 
+            # for technical details (resolution, codec) that are often missing from feed titles.
+            if link.title and link.filename:
+                p_file = parser_service.parse_filename(link.filename)
+                for key in ["resolution", "quality", "codec", "v_quality"]:
+                    if not p.get(key) and p_file.get(key):
+                        p[key] = p_file[key]
+
             if p:
                 # ONLY use parsed title if we don't already have one from the scraper
                 if not link.title:

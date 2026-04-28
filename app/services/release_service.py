@@ -47,7 +47,7 @@ class ReleaseService:
         network: str = None,
         recent: bool = False,
         hours: int = None,
-        show_all: bool = False
+        show_all: bool = True # Default to True now
     ):
         """Returns grouped download links (releases) for movies and series."""
         threshold = await ReleaseService.get_threshold(db, recent, hours)
@@ -131,19 +131,9 @@ class ReleaseService:
                 DownloadLink.status == "alive"
             )
             
-            # Sub-filtering logic: if show_all is False, we respect the filters inside the group
-            if not show_all:
-                if source: rel_stmt = rel_stmt.where(DownloadLink.source_name == source)
-                if resolution:
-                    if resolution == "2160p":
-                        rel_stmt = rel_stmt.where(DownloadLink.resolution.ilike("2160p") | 
-                                                  DownloadLink.resolution.ilike("4K") | 
-                                                  DownloadLink.resolution.ilike("4Klight") |
-                                                  DownloadLink.resolution.ilike("4KLIGHT"))
-                    else:
-                        rel_stmt = rel_stmt.where(DownloadLink.resolution == resolution)
-                if recent and threshold:
-                    rel_stmt = rel_stmt.where(DownloadLink.last_checked >= threshold)
+            # Sub-filtering logic: ALWAYS show all versions inside the expanded card
+            # as per user request to remove the toggle.
+            pass 
 
             rel_stmt = rel_stmt.order_by(DownloadLink.last_checked.desc())
             rel_result = await db.execute(rel_stmt)
@@ -185,7 +175,10 @@ class ReleaseService:
                     if is_sub_new: card["is_new"] = True
  
                     card["sub_releases"][sub_key] = {
-                        "filename": r.filename, "is_new": is_sub_new,
+                        "filename": r.filename, 
+                        "title": r.title,
+                        "raw_title": r.raw_title,
+                        "is_new": is_sub_new,
                         "part_sizes": {}, "parts": []
                     }
                 
@@ -210,7 +203,10 @@ class ReleaseService:
                     total_bytes = sum(sub["part_sizes"].values())
                     sub["parts"].sort(key=lambda x: x["part"])
                     formatted_subs.append({
-                        "filename": sub["filename"], "is_new": sub["is_new"],
+                        "filename": sub["filename"], 
+                        "title": sub.get("title"),
+                        "raw_title": sub.get("raw_title"),
+                        "is_new": sub["is_new"],
                         "total_bytes": total_bytes, "total_size": format_size(total_bytes),
                         "parts": sub["parts"]
                     })

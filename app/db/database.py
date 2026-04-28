@@ -64,5 +64,9 @@ async def init_db():
             if dl_columns and "v_quality" not in dl_columns:
                 print("[DB] Migration: Adding 'v_quality' column to 'download_links' table")
                 sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN v_quality TEXT")
+            
+            if dl_columns and "raw_title" not in dl_columns:
+                print("[DB] Migration: Adding 'raw_title' column to 'download_links' table")
+                sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN raw_title TEXT")
         
         await conn.run_sync(migrate)

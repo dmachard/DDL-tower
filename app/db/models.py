@@ -18,7 +18,8 @@ class DownloadLink(Base):
     source_url = Column(String, nullable=True)
     
     # Metadata extracted from filename
-    title = Column(String, nullable=True) # Title extracted from file
+    title = Column(String, nullable=True) # Enriched title
+    raw_title = Column(String, nullable=True) # Original scraper/feed title
     category = Column(String, nullable=True) # movie/series
     year = Column(Integer, nullable=True)
     season = Column(String, nullable=True)

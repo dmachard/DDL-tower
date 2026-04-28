@@ -58,6 +58,7 @@ async def run_cli():
     view_p.add_argument("query", help="Title or partial filename to view")
     
     scan_parser = subparsers.add_parser("scan", help="Manually trigger a full scan of all sources")
+    scan_parser.add_argument("--source", help="Only scan this specific source name")
 
     args = parser.parse_args()
 
@@ -108,7 +109,7 @@ async def run_cli():
                 links_parser.print_help()
         
         elif args.command == "scan":
-            await ScanCommands.trigger()
+            await ScanCommands.trigger(source_name=args.source)
 
     except Exception as e:
         print(f"Error executing command: {e}")
