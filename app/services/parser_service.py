@@ -74,12 +74,14 @@ class ParserService:
         for n in noise:
             t = re.sub(rf'\b{n}\b', ' ', t, flags=re.I)
             
-        # 6. Remove everything after common separators or group tags
-        # Often titles end with "-GROUP" or "  GROUP"
-        t = re.split(r' \- | \– | \s\s+', t)[0]
-            
-        # 7. Final cleanup
+        # 6. Normalize spaces BEFORE splitting on group separators
         t = re.sub(r'\s+', ' ', t).strip()
+
+        # 7. Remove everything after common separators (often titles end with " - GROUP")
+        t = re.split(r' \- | \– ', t)[0]
+            
+        # 8. Final cleanup
+        t = t.strip()
         t = re.sub(r'[, \-–]+$', '', t)
         
         if len(t) < 2 and p.get('title'):
