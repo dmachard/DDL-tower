@@ -135,6 +135,18 @@
     animation: star-pulsate 2s infinite ease-in-out;
 }
 
+.release-card.is-new {
+    border-color: rgba(251, 191, 36, 0.4) !important;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(251, 191, 36, 0.04) 100%) !important;
+    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.1);
+}
+
+.release-card.is-new:hover {
+    border-color: rgba(251, 191, 36, 0.7) !important;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.06) 100%) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(251, 191, 36, 0.2);
+}
+
 /* Seasons layout fix */
 .seasons-container {
     flex-grow: 1;

@@ -97,40 +97,61 @@ class BrowserManager:
         try:
             container = self.docker_client.containers.get(self.container_name)
             
+            # Check if both processes are running and port is responding
             if self._is_browser_running(container):
-                # print(f"[BROWSER-MGR] Browser is already running and ready in {self.container_name}")
-                return container
+                res = container.exec_run(f"curl -s http://127.0.0.1:{self.cdp_port}/json/version")
+                if res.exit_code == 0:
+                    return container
+                print("[BROWSER-MGR] Browser port not responding. Restarting...")
 
-            print(f"[BROWSER-MGR] Browser not started. Launching Chromium and socat in {self.container_name}...")
+            print(f"[BROWSER-MGR] Launching Chromium and socat in {self.container_name}...")
             
-            # 1. Cleanup just in case
-            container.exec_run("pkill chromium", user="root")
-            container.exec_run("pkill socat", user="root")
+            # 1. Cleanup
+            container.exec_run("pkill -9 chromium", user="root")
+            container.exec_run("pkill -9 socat", user="root")
+            # Thoroughly remove all Singleton locks to prevent "Profile in use" errors
+            container.exec_run("rm -rf /config/.config/chromium/Singleton*", user="root")
 
-            # 2. Launch Chromium with stealth flags and real user profile to share cookies/sessions
+            # 2. Launch Chromium on local port (internal only)
             stealth_flags = (
                 "--disable-blink-features=AutomationControlled "
                 "--disable-infobars "
                 "--no-first-run "
+                "--disable-gpu "
+                "--disable-dev-shm-usage "
             )
-            # Standard profile path for Linuxserver Webtop
             profile_path = "/config/.config/chromium" 
 
             container.exec_run(
-                cmd=f"env DISPLAY=:1 chromium --no-sandbox {stealth_flags} --remote-debugging-port={self.local_cdp_port} --remote-allow-origins=* --user-data-dir={profile_path} '{url}'",
+                cmd=(
+                    f"env DISPLAY=:1 chromium --no-sandbox {stealth_flags} "
+                    f"--remote-debugging-port={self.local_cdp_port} "
+                    f"--remote-allow-origins=* "
+                    f"--user-data-dir={profile_path} '{url}'"
+                ),
                 detach=True,
-                user="abc"
+                user="root"
             )
 
-            # 3. Bridge the CDP port with socat
+            # 3. Bridge the CDP port with socat (to allow external connections)
             container.exec_run(
                 cmd=f"socat TCP-LISTEN:{self.cdp_port},fork,reuseaddr TCP:127.0.0.1:{self.local_cdp_port}",
                 detach=True,
                 user="root"
             )
 
-            # Wait for startup (give it enough time to open the port)
-            await asyncio.sleep(5)
+            # Wait for startup and check readiness (up to 10s)
+            for i in range(10):
+                await asyncio.sleep(1)
+                # Check internal port first
+                res = container.exec_run(f"curl -s http://127.0.0.1:{self.local_cdp_port}/json/version")
+                if res.exit_code == 0:
+                    # Then check external bridged port
+                    res_ext = container.exec_run(f"curl -s http://127.0.0.1:{self.cdp_port}/json/version")
+                    if res_ext.exit_code == 0:
+                        return container
+            
+            print("[BROWSER-MGR] WARNING: Browser started but port not responding after 10s")
             return container
 
         except Exception as e:

@@ -8,7 +8,7 @@ import { downloadUrls } from './api.js';
 
 export const createReleaseCard = (rel) => {
     const card = document.createElement('div');
-    card.className = 'release-card';
+    card.className = `release-card ${rel.is_new ? 'is-new' : ''}`;
 
     const seasonEp = formatSeasonEp(rel.season, rel.episode);
 

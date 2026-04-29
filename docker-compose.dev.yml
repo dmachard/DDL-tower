@@ -1,7 +1,6 @@
 networks:
   ddltower:
 
-
 services:
   ddltower:
     build: .
@@ -32,9 +31,10 @@ services:
       - apparmor=unconfined
     cap_add:
       - SYS_ADMIN
+    user: root
     environment:
-      - PUID=${UID:-1000}
-      - PGID=${GID:-1000}
+      - PUID=0
+      - PGID=0
       - TZ=Europe/Paris
       - SUBFOLDER=/ #optional
       - TITLE=DDLtower Chromium
