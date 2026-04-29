@@ -125,8 +125,9 @@ class EnrichmentService:
                         p[key] = p_file[key]
 
             if p:
-                # ONLY use parsed title if we don't already have one from the scraper
-                if not link.title:
+                # Always use the cleaned title from parsing, even if override_title was used.
+                # The original raw title from the scraper is preserved in link.raw_title.
+                if p.get("title"):
                     link.title = p["title"]
                 
                 if force_type: link.category = force_type

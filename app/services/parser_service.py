@@ -48,43 +48,40 @@ class ParserService:
         if not title:
             return ""
             
-        # Initial normalization
-        t = title.replace('.', ' ').replace('_', ' ')
+        # 1. Remove bracketed content [TAG] often found in RSS
+        t = re.sub(r'\[[^\]]+\]', ' ', title)
         
-        # 1. Remove Volume/Part markers (common in scene releases but bad for TMDB search)
-        # Handle "Vol 2", "Vol.2", "Pt 1", "Part 2", "2e partie", etc.
+        # 2. Initial normalization
+        t = t.replace('.', ' ').replace('_', ' ')
+        
+        # 3. Remove Volume/Part markers
         t = re.sub(r'\b(Vol|Pt|Part|Partie)[\.\s]?\d+\b', ' ', t, flags=re.I)
         t = re.sub(r'\b\d+(?:e|ème|re|nd|rd|th)?\s+partie\b', ' ', t, flags=re.I)
         
-        # 2. Use PTN to identify year but don't trust its 'title' blindly
-        # as it often truncates legitimate parts of the title (e.g. "en enfer" seen as encoder)
+        # 4. Use PTN to identify year
         p = PTN.parse(title)
-        
-        # If PTN found a year, remove it from our working string
         year = p.get('year')
         if year:
             t = re.sub(rf'\b{year}\b', ' ', t)
             
-        # 3. Remove common technical noise
+        # 5. Remove common technical noise
         noise = [
             r'\d{3,4}p', r'\d{1}k', r'H[\.\s]?26[45]', r'x[\.\s]?26[45]', 
             'WEB-DL', 'WEBRip', 'BluRay', 'BDRip', 'DVDRip', 'REPACK', 'PROPER', 'FINAL',
             'MULTI', 'FRENCH', 'TRUEFRENCH', 'VOSTFR', 'SUBFRENCH', 'VFF', 'VFI', 'VFQ',
-            'UHD', 'DV', 'HDR', 'HEVC', r'DDP\d[\.\s]?\d', 'Atmos', 'AC3', 'DTS'
+            'UHD', 'DV', 'HDR', 'HEVC', r'DDP\d[\.\s]?\d', 'Atmos', 'AC3', 'DTS', 'INTERNAL', 'CUSTOM'
         ]
         for n in noise:
             t = re.sub(rf'\b{n}\b', ' ', t, flags=re.I)
             
-        # 4. Remove everything after common separators if it looks like extra info
-        t = t.split(' – ')[0].split(' - ')[0]
+        # 6. Remove everything after common separators or group tags
+        # Often titles end with "-GROUP" or "  GROUP"
+        t = re.split(r' \- | \– | \s\s+', t)[0]
             
-        # 5. Final cleanup
+        # 7. Final cleanup
         t = re.sub(r'\s+', ' ', t).strip()
-        
-        # Remove trailing punctuation often left after cleaning (commas, dashes)
         t = re.sub(r'[, \-–]+$', '', t)
         
-        # If manual cleaning resulted in something too short but PTN has a title, use PTN
         if len(t) < 2 and p.get('title'):
             return p.get('title').strip()
             
