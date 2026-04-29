@@ -123,10 +123,14 @@ sudo docker compose exec ddltower python3 -m app.cli.main links reverify
 Trigger scraping manually:
 
 ```bash
-# Manually trigger a full scan of all configured sources (RSS & Crawl)
+# Manually trigger a full scan of all configured sources 
 sudo docker compose exec ddltower python3 -m app.cli.main scan
 ```
 
+```bash
+# Manually trigger a full scan of all configured sources (RSS & Crawl)
+sudo docker compose exec ddltower python3 -m app.cli.main scan --source "MySource"
+```
 
 ### Sqlite
 
@@ -137,7 +141,7 @@ sudo docker compose exec ddltower sqlite3 ./data/ddl.db "DELETE FROM download_li
 
 ```
 
-## Universal Scraper (ChainScraper)
+## Universal Scraper
 
 The Universal Scraper allows complex multi-step scraping (chaining) where results from one step serve as input for the next.
 
@@ -208,13 +212,9 @@ The structure of this dictionary depends on how the links were extracted:
 
 ### Debugging Config
 
-1. **Test a single source**:
-   ```bash
-   sudo docker compose exec ddltower python3 -m app.cli.main scan --source "MySource"
-   ```
-2. **Visual Inspection**:
+- **Visual Inspection**:
    Open `http://localhost:8002` to see the browser in action.
-3. **Debug Files**:
+- **Debug Files**:
    Check `./data/debug/` for screenshots and HTML dumps generated via `debug: true`.
 
 

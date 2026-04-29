@@ -44,29 +44,51 @@ class ParserService:
 
     @staticmethod
     def clean_search_title(title: str) -> str:
-        """Cleans the title for better TMDb matching using PTN logic."""
+        """Cleans the title for better TMDb matching."""
         if not title:
             return ""
             
-        # Use PTN to parse the string as if it were a filename
-        # This is the most reliable way to get the core title
-        p = PTN.parse(title)
-        core_title = p.get('title')
+        # Initial normalization
+        t = title.replace('.', ' ').replace('_', ' ')
         
-        if core_title and len(core_title) > 2:
-            # If it's a series, add season/episode if they are not already in the title
-            # (TMDb search works better with just the series title usually, 
-            # but for episodes we might need them if searching for specific items)
-            return core_title.strip()
-
-        # Fallback to manual cleaning if PTN fails
-        t = title.split(' – ')[0].split(' - ')[0]
-        t = t.replace('.', ' ').replace('_', ' ')
-        noise = [r'\d{3,4}p', r'H[\.\s]?264', r'x[\.\s]?264', 'WEB-DL', 'BluRay']
+        # 1. Remove Volume/Part markers (common in scene releases but bad for TMDB search)
+        # Handle "Vol 2", "Vol.2", "Pt 1", "Part 2", "2e partie", etc.
+        t = re.sub(r'\b(Vol|Pt|Part|Partie)[\.\s]?\d+\b', ' ', t, flags=re.I)
+        t = re.sub(r'\b\d+(?:e|ème|re|nd|rd|th)?\s+partie\b', ' ', t, flags=re.I)
+        
+        # 2. Use PTN to identify year but don't trust its 'title' blindly
+        # as it often truncates legitimate parts of the title (e.g. "en enfer" seen as encoder)
+        p = PTN.parse(title)
+        
+        # If PTN found a year, remove it from our working string
+        year = p.get('year')
+        if year:
+            t = re.sub(rf'\b{year}\b', ' ', t)
+            
+        # 3. Remove common technical noise
+        noise = [
+            r'\d{3,4}p', r'\d{1}k', r'H[\.\s]?26[45]', r'x[\.\s]?26[45]', 
+            'WEB-DL', 'WEBRip', 'BluRay', 'BDRip', 'DVDRip', 'REPACK', 'PROPER', 'FINAL',
+            'MULTI', 'FRENCH', 'TRUEFRENCH', 'VOSTFR', 'SUBFRENCH', 'VFF', 'VFI', 'VFQ',
+            'UHD', 'DV', 'HDR', 'HEVC', r'DDP\d[\.\s]?\d', 'Atmos', 'AC3', 'DTS'
+        ]
         for n in noise:
             t = re.sub(rf'\b{n}\b', ' ', t, flags=re.I)
+            
+        # 4. Remove everything after common separators if it looks like extra info
+        t = t.split(' – ')[0].split(' - ')[0]
+            
+        # 5. Final cleanup
+        t = re.sub(r'\s+', ' ', t).strip()
         
-        return re.sub(r'\s+', ' ', t).strip()
+        # Remove trailing punctuation often left after cleaning (commas, dashes)
+        t = re.sub(r'[, \-–]+$', '', t)
+        
+        # If manual cleaning resulted in something too short but PTN has a title, use PTN
+        if len(t) < 2 and p.get('title'):
+            return p.get('title').strip()
+            
+        return t
 
     @staticmethod
     def parse_filename(filename: str) -> Dict[str, Any]:
