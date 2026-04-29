@@ -161,6 +161,7 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 - **`debug: true`**: Saves the HTML content and a screenshot of the step in `/app/data/debug/` for troubleshooting.
 - **`hoster_patterns`** (or `hoster_patterns_url`): Regex patterns to extract the final hoster links (e.g., 1fichier). If defined, the unlocker will exclusively search for these patterns on the unlocked page.
 - **`dig_patterns`** (or `dig_patterns_url`): Regex patterns to extract intermediate links that must be navigated/dug into during the next step (e.g., rentry, idrix).
+- **`ignore_patterns`**: List of regex patterns to explicitly ignore. If an extracted link matches one of these, it will be discarded (useful for filtering out tags, comments, or help pages).
 - **`unlock_patterns`**: Defines specific patterns that should be automatically sent to the LinkUnlocker (e.g., MultiUp). Any links matching these patterns are sent to the unlocker; all others are saved directly.
 - **`type: "json"`**: Tells the scraper to parse the response as JSON (perfect for APIs).
 - **`headers`**: Dictionary of custom HTTP headers to send with the request (e.g., `Accept`, `Origin`, `Authorization`).

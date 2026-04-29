@@ -55,175 +55,189 @@ class Scraper:
         if step_idx == 0 and "scrape_once" not in step:
             step_scrape_once = False
 
-        # Build URL
-        raw_url = step.get("url", "")
-        if not raw_url and step_idx > 0:
-            prev_step_name = self.steps[step_idx-1].get("name", f"step_{step_idx-1}")
-            prev_data = context.get(prev_step_name, {})
-            raw_url = prev_data.get("url") if isinstance(prev_data, dict) else prev_data
+        # Build URL(s) to process
+        raw_url_field = step.get("url", "")
+        urls_to_process = raw_url_field if isinstance(raw_url_field, list) else [raw_url_field]
 
-        base_url = self._render_string(raw_url, context)
-        if not base_url or not base_url.startswith("http"):
-            print(f"[{self.name}] [{step_name}] Skipping: Invalid or empty URL '{base_url}'")
-            return
+        for raw_url in urls_to_process:
+            if not raw_url and step_idx > 0:
+                prev_step_name = self.steps[step_idx-1].get("name", f"step_{step_idx-1}")
+                prev_data = context.get(prev_step_name, {})
+                raw_url = prev_data.get("url") if isinstance(prev_data, dict) else prev_data
 
-        current_page = 1
-        while True:
-            url = base_url
-            if step.get("pagination") and current_page > 1:
-                url = self._update_url_param(base_url, step["pagination"]["param"], current_page)
-            
-            if step_scrape_once and session:
-                stmt = select(ScrapedURL).where(ScrapedURL.url == url)
-                res = await session.execute(stmt)
-                if res.scalar_one_or_none():
-                    print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
-                    break
+            base_url = self._render_string(raw_url, context)
+            if not base_url or not base_url.startswith("http"):
+                if base_url: # Only print warning if it wasn't just empty
+                    print(f"[{self.name}] [{step_name}] Skipping: Invalid URL '{base_url}'")
+                continue
 
-            # Fetch content
-            content = None
-            if use_browser:
-                content = await self._fetch_with_browser(url, step, context)
-            else:
-                try:
-                    resp = await client.get(url, headers=self.headers)
-                    resp.raise_for_status()
-                    content = resp.text
-                except Exception as e:
-                    print(f"[{self.name}] [{step_name}] Error fetching {url}: {e}")
-                    break
+            current_page = 1
+            while True:
+                url = base_url
+                if step.get("pagination") and current_page > 1:
+                    url = self._update_url_param(base_url, step["pagination"]["param"], current_page)
+                
+                if step_scrape_once and session:
+                    stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+                    res = await session.execute(stmt)
+                    if res.scalar_one_or_none():
+                        print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
+                        break
 
-            if not content: break
-
-            # Process results
-            results = []
-            if step_type == "rss":
-                results = self._extract_rss(content)
-            elif step_type == "json":
-                results = self._extract_json(content, step.get("items_path"))
-            else:
-                if step.get("js_code") and use_browser:
+                # Fetch content
+                content = None
+                if use_browser:
+                    content = await self._fetch_with_browser(url, step, context)
+                else:
                     try:
-                        results = json.loads(content)
-                        if not isinstance(results, list): results = [results]
-                    except:
-                        results = [content]
+                        resp = await client.get(url, headers=self.headers)
+                        resp.raise_for_status()
+                        content = resp.text
+                    except Exception as e:
+                        print(f"[{self.name}] [{step_name}] Error fetching {url}: {e}")
+                        break
+
+                if not content: break
+
+                # Process results
+                results = []
+                if step_type == "rss":
+                    results = self._extract_rss(content)
+                elif step_type == "json":
+                    results = self._extract_json(content, step.get("items_path"))
                 else:
-                    results = [content]
-
-            print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
-
-            if step_scrape_once and session and results:
-                try:
-                    session.add(ScrapedURL(url=url, source_name=self.name))
-                    await session.commit()
-                except Exception:
-                    await session.rollback()
-
-            # Iterate over results
-            for item in results:
-                new_context = context.copy()
-                
-                if isinstance(item, str):
-                    item_data = {"content": item, "url": url}
-                    text_to_check = item
-                elif isinstance(item, dict):
-                    item_data = item.copy()
-                    if "url" not in item_data: item_data["url"] = url
-                    if "content" not in item_data: item_data["content"] = str(item)
-                    text_to_check = str(item)
-                else:
-                    item_data = {"content": str(item), "url": url}
-                    text_to_check = str(item)
-                
-                new_context[step_name] = item_data
-                
-                # 1. Keyword filtering
-                current_tags = []
-                required_keywords = step.get("required_keywords", {})
-                if required_keywords:
-                    match_found = False
-                    for kw, tag in required_keywords.items():
-                        if re.search(kw, text_to_check, re.IGNORECASE):
-                            current_tags.append(tag)
-                            match_found = True
-                    if not match_found:
-                        label = item_data.get("title") or item_data.get("name") or "item"
-                        print(f"[{self.name}] [{step_name}] ⏭ Skipping: {label} (No keywords match)")
-                        continue
-
-                # 2. Link extraction
-                raw_extracted = []
-                regex_patterns = step.get("regex_patterns", []) or step.get("dig_patterns", []) or step.get("dig_patterns_url", [])
-                hoster_patterns = step.get("hoster_patterns", [])
-                unlock_patterns = step.get("unlock_patterns", [])
-                
-                all_extract_patterns = list(set(regex_patterns + hoster_patterns + unlock_patterns))
-                
-                if all_extract_patterns:
-                    for pat in all_extract_patterns:
-                        matches = re.findall(pat, text_to_check)
-                        for m in matches:
-                            link = m[0] if isinstance(m, tuple) else m
-                            if link.startswith("http") and link not in raw_extracted:
-                                raw_extracted.append(link)
-
-                if raw_extracted:
-                    print(f"[{self.name}] [{step_name}] Found {len(raw_extracted)} link(s) to process")
-
-                # 3. Unlocking
-                final_links = []
-                for href in raw_extracted:
-                    should_unlock = any(re.search(pat, href) for pat in unlock_patterns) if unlock_patterns else step.get("unlock_links", False)
-                    if should_unlock:
-                        print(f"[{self.name}] [{step_name}] Unlocking: {href}")
+                    if step.get("js_code") and use_browser:
                         try:
-                            unlocked = await self.unlocker.unlock(href, extra_patterns=regex_patterns)
-                            if unlocked: final_links.extend(unlocked)
+                            results = json.loads(content)
+                            if not isinstance(results, list): results = [results]
                         except:
-                            pass
+                            results = [content]
                     else:
-                        final_links.append(href)
+                        results = [content]
 
-                # 4. Yield or Follow
-                is_last_step = (step_idx == len(self.steps) - 1)
-                is_yield = step.get("yield_links")
-                should_yield = (is_last_step and is_yield is not False) or (is_yield is True)
-                
-                if should_yield:
-                    valid_links = [l for l in final_links if isinstance(l, str) and l.startswith("http")]
-                    if valid_links:
-                        final_title = self._render_string(step.get("override_title"), new_context) or "Untitled"
-                        print(f"[{self.name}] [{step_name}] 🚀 SUCCESS: Found {len(valid_links)} link(s) for '{final_title}'")
-                        all_tags = list(set(context.get("__accumulated_tags__", []) + current_tags))
-                        yield {
-                            "links": list(set(valid_links)),
-                            "source_url": url,
-                            "override_title": final_title if step.get("override_title") else None,
-                            "override_year": str(self._render_string(step.get("override_year", ""), new_context)) if step.get("override_year") else None,
-                            "tags": all_tags
-                        }
+                print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
 
-                new_context["__accumulated_tags__"] = list(set(context.get("__accumulated_tags__", []) + current_tags))
-                is_follow = step.get("follow_links")
-                should_follow = (not is_last_step and is_follow is not False) or (is_follow is True)
-                
-                if should_follow:
-                    # If we extracted links, we follow each of them
+                if step_scrape_once and session and results:
+                    try:
+                        session.add(ScrapedURL(url=url, source_name=self.name))
+                        await session.commit()
+                    except Exception:
+                        await session.rollback()
+
+                # Iterate over results
+                for item in results:
+                    new_context = context.copy()
+                    
+                    if isinstance(item, str):
+                        item_data = {"content": item, "url": url}
+                        text_to_check = item
+                    elif isinstance(item, dict):
+                        item_data = item.copy()
+                        if "url" not in item_data: item_data["url"] = url
+                        if "content" not in item_data: item_data["content"] = str(item)
+                        text_to_check = str(item)
+                    else:
+                        item_data = {"content": str(item), "url": url}
+                        text_to_check = str(item)
+                    
+                    new_context[step_name] = item_data
+                    
+                    # 1. Keyword filtering
+                    current_tags = []
+                    required_keywords = step.get("required_keywords", {})
+                    if required_keywords:
+                        match_found = False
+                        for kw, tag in required_keywords.items():
+                            if re.search(kw, text_to_check, re.IGNORECASE):
+                                current_tags.append(tag)
+                                match_found = True
+                        if not match_found:
+                            label = item_data.get("title") or item_data.get("name") or "item"
+                            print(f"[{self.name}] [{step_name}] ⏭ Skipping: {label} (No keywords match)")
+                            continue
+
+                    # 2. Link extraction
+                    raw_extracted = []
+                    regex_patterns = step.get("regex_patterns", []) or step.get("dig_patterns", []) or step.get("dig_patterns_url", [])
+                    hoster_patterns = step.get("hoster_patterns", [])
+                    unlock_patterns = step.get("unlock_patterns", [])
+                    
+                    all_extract_patterns = list(set(regex_patterns + hoster_patterns + unlock_patterns))
+                    
+                    if all_extract_patterns:
+                        for pat in all_extract_patterns:
+                            matches = re.findall(pat, text_to_check)
+                            for m in matches:
+                                link = m[0] if isinstance(m, tuple) else m
+                                if link.startswith("http") and link not in raw_extracted:
+                                    raw_extracted.append(link)
+
                     if raw_extracted:
-                        for entry_link in raw_extracted:
-                            next_context = new_context.copy()
-                            # Override the step data with just the link for the next step
-                            next_context[step_name] = {"url": entry_link, "content": ""}
-                            async for next_batch in self._execute_step(client, step_idx + 1, next_context, session):
+                        ignore_patterns = step.get("ignore_patterns", [])
+                        if ignore_patterns:
+                            filtered = []
+                            for link in raw_extracted:
+                                if any(re.search(pat, link) for pat in ignore_patterns):
+                                    continue
+                                filtered.append(link)
+                            raw_extracted = filtered
+
+                    if raw_extracted:
+                        print(f"[{self.name}] [{step_name}] Found {len(raw_extracted)} link(s) to process")
+
+                    # 3. Unlocking
+                    final_links = []
+                    for href in raw_extracted:
+                        should_unlock = any(re.search(pat, href) for pat in unlock_patterns) if unlock_patterns else step.get("unlock_links", False)
+                        if should_unlock:
+                            print(f"[{self.name}] [{step_name}] Unlocking: {href}")
+                            try:
+                                unlocked = await self.unlocker.unlock(href, extra_patterns=regex_patterns)
+                                if unlocked: final_links.extend(unlocked)
+                            except:
+                                pass
+                        else:
+                            final_links.append(href)
+
+                    # 4. Yield or Follow
+                    is_last_step = (step_idx == len(self.steps) - 1)
+                    is_yield = step.get("yield_links")
+                    should_yield = (is_last_step and is_yield is not False) or (is_yield is True)
+                    
+                    if should_yield:
+                        valid_links = [l for l in final_links if isinstance(l, str) and l.startswith("http")]
+                        if valid_links:
+                            final_title = self._render_string(step.get("override_title"), new_context) or "Untitled"
+                            print(f"[{self.name}] [{step_name}] 🚀 SUCCESS: Found {len(valid_links)} link(s) for '{final_title}'")
+                            all_tags = list(set(context.get("__accumulated_tags__", []) + current_tags))
+                            yield {
+                                "links": list(set(valid_links)),
+                                "source_url": url,
+                                "override_title": final_title if step.get("override_title") else None,
+                                "override_year": str(self._render_string(step.get("override_year", ""), new_context)) if step.get("override_year") else None,
+                                "tags": all_tags
+                            }
+
+                    new_context["__accumulated_tags__"] = list(set(context.get("__accumulated_tags__", []) + current_tags))
+                    is_follow = step.get("follow_links")
+                    should_follow = (not is_last_step and is_follow is not False) or (is_follow is True)
+                    
+                    if should_follow:
+                        # If we extracted links, we follow each of them
+                        if raw_extracted:
+                            for entry_link in raw_extracted:
+                                next_context = new_context.copy()
+                                # Override the step data with just the link for the next step
+                                next_context[step_name] = {"url": entry_link, "content": ""}
+                                async for next_batch in self._execute_step(client, step_idx + 1, next_context, session):
+                                    yield next_batch
+                        else:
+                            # Otherwise just move to next step with current context
+                            async for next_batch in self._execute_step(client, step_idx + 1, new_context, session):
                                 yield next_batch
-                    else:
-                        # Otherwise just move to next step with current context
-                        async for next_batch in self._execute_step(client, step_idx + 1, new_context, session):
-                            yield next_batch
-            
-            if not step.get("pagination"): break
-            current_page += 1
+                
+                if not step.get("pagination"): break
+                current_page += 1
 
     async def _fetch_with_browser(self, url: str, step: dict, context: dict) -> Optional[str]:
         from playwright.async_api import async_playwright
@@ -288,6 +302,15 @@ class Scraper:
             return template_str
 
     def _update_url_param(self, url: str, param: str, value: Any) -> str:
+        if param.startswith("/"):
+            # Path-based pagination (e.g. /page/2/)
+            # Remove trailing slash if present to avoid double slashes
+            base = url.rstrip("/")
+            # Remove any existing pagination segment (to avoid /page/2/page/3/)
+            clean_param = param.strip("/")
+            base = re.sub(rf"/{clean_param}/\d+", "", base)
+            return f"{base}/{clean_param}/{value}/"
+            
         parsed = urlparse(url)
         query = parse_qs(parsed.query)
         query[param] = [str(value)]

@@ -57,6 +57,31 @@ class LinkUnlocker:
                             print("[UNLOCKER] WARNING: No mirror link found on MultiUp page. Staying here.")
                     except Exception as me:
                         print(f"[UNLOCKER] MultiUp traversal error: {me}")
+                
+                # --- Zoneurs / ZT-Protect Traversal ---
+                if "zoneurs.net" in url:
+                    print("[UNLOCKER] Zoneurs.net detected. Waiting for unlock button...")
+                    try:
+                        unlock_btn = page.locator("#continueBtn")
+                        await unlock_btn.wait_for(state="visible", timeout=15000)
+                        print("[UNLOCKER] Clicking 'Déverrouiller le lien'...")
+                        await unlock_btn.click()
+                        
+                        # Wait for the result input to appear and have a value
+                        result_input = page.locator(".result-input")
+                        await result_input.wait_for(state="visible", timeout=15000)
+                        await asyncio.sleep(2) # Stability
+                        
+                        final_url = await result_input.get_attribute("value")
+                        if final_url:
+                            print(f"[UNLOCKER] SUCCESS: Link found in input: {final_url}")
+                            # We can directly add it to final_links and skip the rest of the generic extraction if we want,
+                            # but let's keep the flow standard by navigating to it or just adding it.
+                            final_links.append(final_url)
+                            await page.close()
+                            return [final_url]
+                    except Exception as ze:
+                        print(f"[UNLOCKER] Zoneurs traversal error: {ze}")
 
                 # Wait for the validation button (Turnstile success) - Skips if on MultiUp
                 if "multiup.io" in page.url:
