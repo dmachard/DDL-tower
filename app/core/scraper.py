@@ -238,6 +238,8 @@ class Scraper:
                 
                 if not step.get("pagination"): break
                 current_page += 1
+                if "max_pages" in step["pagination"] and current_page > step["pagination"]["max_pages"]:
+                    break
 
     async def _fetch_with_browser(self, url: str, step: dict, context: dict) -> Optional[str]:
         from playwright.async_api import async_playwright
