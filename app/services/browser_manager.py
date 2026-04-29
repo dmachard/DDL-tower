@@ -119,6 +119,8 @@ class BrowserManager:
                 "--no-first-run "
                 "--disable-gpu "
                 "--disable-dev-shm-usage "
+                "--disable-service-worker "
+                "--disable-features=ServiceWorker "
             )
             profile_path = "/config/.config/chromium" 
 
