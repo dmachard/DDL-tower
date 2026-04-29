@@ -9,8 +9,11 @@ os.makedirs("./data", exist_ok=True)
 
 DATABASE_URL = settings.DATABASE_URL
 
-# Connect arguments for SQLite busy_timeout (30 seconds)
-connect_args = {"timeout": 30}
+# Connect arguments for SQLite busy_timeout (60 seconds)
+connect_args = {
+    "timeout": 60,
+    "check_same_thread": False
+}
 
 engine = create_async_engine(
     DATABASE_URL, 
@@ -23,7 +26,16 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+    cursor.execute("PRAGMA temp_store=MEMORY")
+    cursor.execute("PRAGMA mmap_size=268435456") # 256MB mmap
     cursor.close()
+
+@event.listens_for(engine.sync_engine, "begin")
+def do_begin(conn):
+    # This forces a write lock at the start of the transaction 
+    # to avoid 'database is locked' during concurrent writes
+    conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 AsyncSessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
