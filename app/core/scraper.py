@@ -296,7 +296,8 @@ class Scraper:
                 
                 if step.get("js_code"):
                     rendered_js = self._render_string(step["js_code"], context)
-                    result = await page.evaluate(rendered_js)
+                    # Pass the context as an argument to the JS function
+                    result = await page.evaluate(rendered_js, context)
                     return json.dumps(result)
                 
                 return await page.content()
