@@ -108,6 +108,8 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
         
         for link in links:
             link.imdb_id = existing_meta.imdb_id
+            # Normalize category: TMDb uses 'tv' but our DB uses 'series'
+            link.category = "series" if req.category in ["tv", "series"] else "movie"
             if existing_meta.official_title:
                 link.title = existing_meta.official_title
             if existing_meta.year:
