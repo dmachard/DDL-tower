@@ -1,8 +1,11 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import event
+from sqlalchemy import event, text
+from sqlalchemy.exc import OperationalError
+from contextlib import asynccontextmanager
 from app.core.config import settings
 import os
+import asyncio
 
 # Create data directory if it doesn't exist
 os.makedirs("./data", exist_ok=True)
@@ -43,9 +46,29 @@ AsyncSessionLocal = sessionmaker(
 
 Base = declarative_base()
 
+@asynccontextmanager
 async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
+    """Provides a transactional database session with retry logic for SQLite locks."""
+    max_retries = 5
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        async with AsyncSessionLocal() as session:
+            try:
+                # BEGIN IMMEDIATE is already handled by the @event listener
+                yield session
+                await session.commit()
+                return # Success
+            except OperationalError as e:
+                await session.rollback()
+                if "database is locked" in str(e) and attempt < max_retries - 1:
+                    print(f"[DB] Database is locked, retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    continue
+                raise
+            except Exception:
+                await session.rollback()
+                raise
 
 async def init_db():
     async with engine.begin() as conn:
