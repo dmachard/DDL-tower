@@ -73,9 +73,12 @@ class LinkManager:
                         # Only update titles if we have a new override, or if they were empty
                         if override_title:
                             existing.title = override_title
-                            existing.raw_title = override_title
-                        elif not existing.raw_title:
+                        
+                        # raw_title should ALWAYS be the full filename if available (for tooltips)
+                        if final_filename:
                             existing.raw_title = final_filename
+                        elif not existing.raw_title:
+                            existing.raw_title = override_title
                         
                         existing.year = override_year
                         existing.size = format_size(info.get('size', 0))
@@ -91,8 +94,8 @@ class LinkManager:
                             hoster=info.get('host', 'unknown'),
                             status=status,
                             filename=final_filename,
-                            title=override_title, # Can be None, will be filled by Categorizer
-                            raw_title=override_title or final_filename, # Use filename as raw fallback for tooltips
+                            title=override_title, 
+                            raw_title=final_filename or override_title or link, # Priority to filename for tooltip
                             year=override_year,
                             size=format_size(info.get('size', 0)),
                             size_bytes=info.get('size', 0),
