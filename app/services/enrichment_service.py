@@ -130,8 +130,12 @@ class EnrichmentService:
                 if p.get("title"):
                     link.title = p["title"]
                 
-                if force_type: link.category = force_type
-                elif not link.category: link.category = p["category"]
+                # Force category to series if season/episode info is found, 
+                # otherwise fallback to existing or default to movie
+                if p.get("season") or p.get("episode"):
+                    link.category = "series"
+                elif not link.category:
+                    link.category = "movie"
                 
                 if force_year is not None: link.year = force_year
                 elif not link.year: link.year = p["year"]

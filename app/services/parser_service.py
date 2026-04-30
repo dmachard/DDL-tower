@@ -48,8 +48,9 @@ class ParserService:
         if not title:
             return ""
             
-        # 1. Remove bracketed content [TAG] often found in RSS
+        # 1. Remove bracketed content [TAG] or decorative tags like @@Group@@, **TAG**
         t = re.sub(r'\[[^\]]+\]', ' ', title)
+        t = re.sub(r'[@*#]{2,}.*?[@*#]{2,}', ' ', t)
         
         # 2. Initial normalization
         t = t.replace('.', ' ').replace('_', ' ')
