@@ -325,16 +325,16 @@ class Scraper:
             return template_str
 
     def _update_url_param(self, url: str, param: str, value: Any) -> str:
+        parsed = urlparse(url)
         if param.startswith("/"):
             # Path-based pagination (e.g. /page/2/)
-            # Remove trailing slash if present to avoid double slashes
-            base = url.rstrip("/")
-            # Remove any existing pagination segment (to avoid /page/2/page/3/)
             clean_param = param.strip("/")
-            base = re.sub(rf"/{clean_param}/\d+", "", base)
-            return f"{base}/{clean_param}/{value}/"
+            # Remove any existing pagination segment from the path
+            new_path = re.sub(rf"/{clean_param}/\d+", "", parsed.path)
+            # Ensure it ends with /page/X/
+            new_path = f"{new_path.rstrip('/')}/{clean_param}/{value}/"
+            return urlunparse(parsed._replace(path=new_path))
             
-        parsed = urlparse(url)
         query = parse_qs(parsed.query)
         query[param] = [str(value)]
         return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
