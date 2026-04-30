@@ -46,7 +46,6 @@ AsyncSessionLocal = sessionmaker(
 
 Base = declarative_base()
 
-@asynccontextmanager
 async def get_db():
     """Provides a transactional database session with retry logic for SQLite locks."""
     max_retries = 5
@@ -66,9 +65,15 @@ async def get_db():
                     await asyncio.sleep(retry_delay)
                     continue
                 raise
+            except (GeneratorExit, asyncio.CancelledError):
+                # Critical: do not retry if the generator is being closed or task cancelled
+                await session.rollback()
+                raise
             except Exception:
                 await session.rollback()
                 raise
+
+get_db_ctx = asynccontextmanager(get_db)
 
 async def init_db():
     async with engine.begin() as conn:

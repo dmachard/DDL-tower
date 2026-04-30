@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from app.db.models import ScrapedURL
+from app.db.database import get_db_ctx
 from app.services.unlocker import LinkUnlocker
 from app.core.config import settings
 
@@ -30,11 +31,11 @@ class Scraper:
     def name(self) -> str:
         return self._name
 
-    async def run(self, session: Optional[AsyncSession] = None) -> AsyncGenerator[Dict[str, Any], None]:
+    async def run(self) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
                 context = {"settings": settings}
-                async for batch in self._execute_step(client, 0, context, session):
+                async for batch in self._execute_step(client, 0, context):
                     yield batch
         except (GeneratorExit, asyncio.CancelledError):
             pass
@@ -42,7 +43,7 @@ class Scraper:
             print(f"[{self.name}] Error in run: {e}")
             traceback.print_exc()
 
-    async def _execute_step(self, client: httpx.AsyncClient, step_idx: int, context: dict, session: Optional[AsyncSession]) -> AsyncGenerator[Dict[str, Any], None]:
+    async def _execute_step(self, client: httpx.AsyncClient, step_idx: int, context: dict) -> AsyncGenerator[Dict[str, Any], None]:
         if step_idx >= len(self.steps):
             return
 
@@ -77,12 +78,13 @@ class Scraper:
                 if step.get("pagination") and current_page > 1:
                     url = self._update_url_param(base_url, step["pagination"]["param"], current_page)
                 
-                if step_scrape_once and session:
-                    stmt = select(ScrapedURL).where(ScrapedURL.url == url)
-                    res = await session.execute(stmt)
-                    if res.scalar_one_or_none():
-                        print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
-                        break
+                if step_scrape_once:
+                    async with get_db_ctx() as session:
+                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+                        res = await session.execute(stmt)
+                        if res.scalar_one_or_none():
+                            print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
+                            break
 
                 # Fetch content
                 content = None
@@ -117,12 +119,14 @@ class Scraper:
 
                 print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
 
-                if step_scrape_once and session and results:
-                    try:
-                        session.add(ScrapedURL(url=url, source_name=self.name))
-                        await session.commit()
-                    except Exception:
-                        await session.rollback()
+                if step_scrape_once and results:
+                    async with get_db_ctx() as session:
+                        # Double check before adding to avoid IntegrityError at commit
+                        # in case of race condition between tasks
+                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+                        exists = (await session.execute(stmt)).scalar()
+                        if not exists:
+                            session.add(ScrapedURL(url=url, source_name=self.name))
 
                 # Iterate over results
                 for item in results:
@@ -207,14 +211,30 @@ class Scraper:
                     if should_yield:
                         valid_links = [l for l in final_links if isinstance(l, str) and l.startswith("http")]
                         if valid_links:
-                            final_title = self._render_string(step.get("override_title"), new_context) or "Untitled"
+                            # Try to find a title/year in the context if not explicitly overridden
+                            final_title = self._render_string(step.get("override_title"), new_context)
+                            final_year = self._render_string(step.get("override_year"), new_context)
+
+                            if not final_title or final_title == "None":
+                                # Search backwards through steps to find a title
+                                for prev_step in reversed(self.steps[:step_idx + 1]):
+                                    prev_name = prev_step.get("name")
+                                    if prev_name in new_context and isinstance(new_context[prev_name], dict):
+                                        if new_context[prev_name].get("title"):
+                                            final_title = new_context[prev_name]["title"]
+                                            if not final_year or final_year == "None":
+                                                final_year = new_context[prev_name].get("year")
+                                            break
+                            
+                            if not final_title: final_title = "Untitled"
+                            
                             print(f"[{self.name}] [{step_name}] 🚀 SUCCESS: Found {len(valid_links)} link(s) for '{final_title}'")
                             all_tags = list(set(context.get("__accumulated_tags__", []) + current_tags))
                             yield {
                                 "links": list(set(valid_links)),
                                 "source_url": url,
-                                "override_title": final_title if step.get("override_title") else None,
-                                "override_year": str(self._render_string(step.get("override_year", ""), new_context)) if step.get("override_year") else None,
+                                "override_title": final_title,
+                                "override_year": str(final_year) if final_year and str(final_year).isdigit() else None,
                                 "tags": all_tags
                             }
 
@@ -227,13 +247,13 @@ class Scraper:
                         if raw_extracted:
                             for entry_link in raw_extracted:
                                 next_context = new_context.copy()
-                                # Override the step data with just the link for the next step
-                                next_context[step_name] = {"url": entry_link, "content": ""}
-                                async for next_batch in self._execute_step(client, step_idx + 1, next_context, session):
+                                # Preserve existing item data (like title, year) while updating URL for the next step
+                                next_context[step_name] = {**item_data, "url": entry_link, "content": ""}
+                                async for next_batch in self._execute_step(client, step_idx + 1, next_context):
                                     yield next_batch
                         else:
                             # Otherwise just move to next step with current context
-                            async for next_batch in self._execute_step(client, step_idx + 1, new_context, session):
+                            async for next_batch in self._execute_step(client, step_idx + 1, new_context):
                                 yield next_batch
                 
                 if not step.get("pagination"): break
@@ -263,7 +283,8 @@ class Scraper:
                 if wait_for:
                     wait_timeout = step.get("wait_timeout", 15)
                     try: 
-                        await page.wait_for_selector(wait_for, timeout=wait_timeout * 1000)
+                        # Use state="attached" because many links are in hidden inputs (not visible)
+                        await page.wait_for_selector(wait_for, state="attached", timeout=wait_timeout * 1000)
                     except: 
                         print(f"[{self.name}] [{step_name}] Timeout waiting for '{wait_for}'")
                 

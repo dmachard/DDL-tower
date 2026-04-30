@@ -1,7 +1,7 @@
 import asyncio
 from typing import Optional
 from app.services.maintenance_service import maintenance_service
-from app.db.database import AsyncSessionLocal
+from app.db.database import get_db_ctx
 from app.db.models import DownloadLink, MediaMetadata
 from sqlalchemy import select, update, delete
 
@@ -25,12 +25,11 @@ class DBCommands:
     async def reset_scans(pattern: str = None):
         from app.db.models import ScrapedURL
         print(f"--- [DB] Resetting scan history (Pattern: {pattern or 'ALL'}) ---")
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             stmt = delete(ScrapedURL)
             if pattern:
                 stmt = stmt.where(ScrapedURL.url.ilike(f"%{pattern}%"))
             result = await session.execute(stmt)
-            await session.commit()
             print(f"SUCCESS: {result.rowcount} entries removed from scraping history.")
 
     @staticmethod
@@ -40,7 +39,7 @@ class DBCommands:
             print("ERROR: You must provide --title or --id.")
             return
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             stmt = update(DownloadLink).values(imdb_id=None).where(DownloadLink.imdb_id != None)
             if title: stmt = stmt.where(DownloadLink.title.ilike(f"%{title}%"))
             if imdb_id: stmt = stmt.where(DownloadLink.imdb_id == imdb_id)
@@ -51,8 +50,6 @@ class DBCommands:
                 await session.execute(delete(MediaMetadata).where(MediaMetadata.official_title.ilike(f"%{title}%")))
             if imdb_id:
                 await session.execute(delete(MediaMetadata).where(MediaMetadata.imdb_id == imdb_id))
-
-            await session.commit()
             print(f"SUCCESS: Reset {affected} links. Central metadata cleaned.")
             
     @staticmethod
@@ -65,7 +62,7 @@ class DBCommands:
     @staticmethod
     async def update_title(link_id: Optional[int], old_title: Optional[str], new_title: str):
         print(f"--- [DB] Renaming links to: '{new_title}' ---")
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             if link_id:
                 stmt = select(DownloadLink).where(DownloadLink.id == link_id)
             elif old_title:
@@ -83,27 +80,24 @@ class DBCommands:
             for link in links:
                 link.title = new_title
                 link.imdb_id = None
-            await session.commit()
             print(f"SUCCESS: {len(links)} link(s) renamed to '{new_title}'. Metadata cleared.")
 
     @staticmethod
     async def reset_all():
         print(f"--- [DB] Wiping ALL library metadata ---")
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             await session.execute(update(DownloadLink).values(imdb_id=None))
             await session.execute(delete(MediaMetadata))
-            await session.commit()
             print("SUCCESS: All metadata cleared. Library is now fresh.")
 
     @staticmethod
     async def wipe():
         from app.db.models import ScrapedURL
         print(f"--- [DB] WIPING ENTIRE DATABASE (Links, Metadata, History) ---")
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             await session.execute(delete(DownloadLink))
             await session.execute(delete(MediaMetadata))
             await session.execute(delete(ScrapedURL))
-            await session.commit()
             print("SUCCESS: Database is now completely empty.")
 
     @staticmethod

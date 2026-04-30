@@ -1,13 +1,14 @@
 import asyncio
 import traceback
-from typing import List
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import DownloadLink
 from app.core.scraper import Scraper
 from app.core.link import LinkManager
 from app.core.categorization import Categorizer
 from app.core.config import settings
-from app.db.database import get_db
+from app.db.database import get_db_ctx
 
 async def get_scrapers():
     """Initialize scrapers based on settings."""
@@ -16,12 +17,12 @@ async def get_scrapers():
         scrapers.append(Scraper(config))
     return scrapers
 
-async def run_scraper(scraper, db: AsyncSession):
+async def run_scraper(scraper):
     """Run a single scraper and process found links."""
     print(f"[SCHEDULER] Running scraper: {scraper.name}")
     try:
         manager = LinkManager()
-        async for batch in scraper.run(session=db):
+        async for batch in scraper.run():
             links = batch.get("links", [])
             source_url = batch.get("source_url")
             override_title = batch.get("override_title")
@@ -29,42 +30,55 @@ async def run_scraper(scraper, db: AsyncSession):
             tags = batch.get("tags", [])
 
             if links:
-                # Use check_links which handles verification and DB insertion
-                added = await manager.check_links(
-                    db, 
-                    links, 
-                    source_url=source_url, 
-                    source_name=scraper.name, 
-                    override_title=override_title, 
-                    override_year=int(override_year) if override_year and str(override_year).isdigit() else None,
-                    tags=tags
-                )
+                # 1. Insert/Update links first (Short transaction)
+                added = []
+                async with get_db_ctx() as db:
+                    added = await manager.check_links(
+                        db, 
+                        links, 
+                        source_url=source_url, 
+                        source_name=scraper.name, 
+                        override_title=override_title, 
+                        override_year=int(override_year) if override_year and str(override_year).isdigit() else None,
+                        tags=tags
+                    )
+                
+                # 2. Enrich links (Separate transaction, can take time)
                 if added:
-                    # Enrich and commit this batch immediately
-                    await Categorizer.enrich_links(db, links=added)
-                    await db.commit()
+                    async with get_db_ctx() as db:
+                        # Re-fetch objects in new session or use IDs? 
+                        # Categorizer.enrich_links can take a list of objects, 
+                        # but they must be attached to the current session.
+                        # We'll pass the IDs to be safe or just re-run for missing titles.
+                        link_ids = [l.id for l in added if l.id]
+                        if link_ids:
+                            from sqlalchemy import select
+                            stmt = select(DownloadLink).where(DownloadLink.id.in_(link_ids))
+                            res = await db.execute(stmt)
+                            links_to_enrich = res.scalars().all()
+                            await Categorizer.enrich_links(db, links=links_to_enrich)
     except Exception as e:
         print(f"[SCHEDULER] Error running scraper {scraper.name}: {e}")
         traceback.print_exc()
 
 async def run_scrapers(source_name: str = None):
     """Runs all scrapers or a specific one once. Used by manual trigger."""
-    async for db in get_db():
-        scrapers = await get_scrapers()
-        for scraper in scrapers:
-            if source_name and scraper.name.lower() != source_name.lower():
-                continue
-            await run_scraper(scraper, db)
+    scrapers = await get_scrapers()
+    for scraper in scrapers:
+        if source_name and scraper.name.lower() != source_name.lower():
+            continue
         
-        # Categorization (Enrichment)
+        await run_scraper(scraper)
+    
+    # Categorization (Enrichment)
+    async with get_db_ctx() as db:
         await Categorizer.enrich_links(db)
-        await db.commit()
+        # commit is handled by get_db_ctx
 
 async def run_categorization():
     """Runs the categorization process only."""
-    async for db in get_db():
+    async with get_db_ctx() as db:
         await Categorizer.enrich_links(db)
-        await db.commit()
 
 async def scheduler_loop():
     """Main scheduler loop."""

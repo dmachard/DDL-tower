@@ -187,7 +187,6 @@ sources:
 
       - name: "post_page"
         url: "{{ index }}"
-        type: "html"
         use_browser: true
         wait_for: ".download-button"
         debug: true  # Saves screenshot & HTML to data/debug/

@@ -122,14 +122,27 @@ class ReleaseService:
             g_lower_title, g_title, g_year, g_cat, g_latest, g_poster, g_plot_en, g_plot_fr, g_rating, g_official, g_title_fr, g_off_year, g_imdb = g
             if not g_title: continue
             
-            rel_stmt = select(DownloadLink).where(
-                (DownloadLink.imdb_id == g_imdb if g_imdb and not g_imdb.startswith('raw') else (
-                    func.lower(DownloadLink.title) == g_lower_title and
-                    DownloadLink.year == g_year and
-                    DownloadLink.category == g_cat
-                )),
-                DownloadLink.status == "alive"
-            )
+            # Select releases belonging to this group
+            # We handle NULLs for year and category to ensure items without metadata still group correctly
+            if g_imdb and not g_imdb.startswith('local'):
+                rel_stmt = select(DownloadLink).where(
+                    DownloadLink.imdb_id == g_imdb,
+                    DownloadLink.status == "alive"
+                )
+            else:
+                rel_stmt = select(DownloadLink).where(
+                    func.lower(DownloadLink.title) == g_lower_title,
+                    DownloadLink.status == "alive"
+                )
+                if g_year is not None:
+                    rel_stmt = rel_stmt.where(DownloadLink.year == g_year)
+                else:
+                    rel_stmt = rel_stmt.where(DownloadLink.year == None)
+                
+                if g_cat:
+                    rel_stmt = rel_stmt.where(DownloadLink.category == g_cat)
+                else:
+                    rel_stmt = rel_stmt.where(DownloadLink.category == None)
             
             # Sub-filtering logic: ALWAYS show all versions inside the expanded card
             # as per user request to remove the toggle.
