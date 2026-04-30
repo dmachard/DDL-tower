@@ -120,7 +120,7 @@ class EnrichmentService:
             # for technical details (resolution, codec) that are often missing from feed titles.
             if link.title and link.filename:
                 p_file = parser_service.parse_filename(link.filename)
-                for key in ["resolution", "quality", "codec", "v_quality", "season", "episode"]:
+                for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages"]:
                     if not p.get(key) and p_file.get(key):
                         p[key] = p_file[key]
 
