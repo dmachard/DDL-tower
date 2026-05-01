@@ -18,11 +18,12 @@ export const createReleaseCard = (rel) => {
             const h = p.hoster || 'Unknown';
             const cleanName = beautifyHoster(h);
             if (!providers[cleanName]) {
-                providers[cleanName] = { name: cleanName, partsCount: 0, totalBytes: 0, urls: [] };
+                providers[cleanName] = { name: cleanName, partsCount: 0, totalBytes: 0, urls: [], ids: [] };
             }
             providers[cleanName].partsCount++;
             providers[cleanName].totalBytes += (p.size_bytes || 0);
             providers[cleanName].urls.push(p.url);
+            providers[cleanName].ids.push(p.id);
         });
 
         const providerRows = Object.values(providers).map(p => `
@@ -31,6 +32,9 @@ export const createReleaseCard = (rel) => {
                 <span class="rel-p-count">${p.partsCount}F</span>
                 <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
                 <div class="rel-p-actions">
+                    <button class="rel-p-identify" data-ids="${p.ids.join(',')}" data-title="${sub.title || sub.filename}" title="${TRANSLATIONS[state.language].modal_identify_title}">
+                        <i class="fas fa-edit"></i>
+                    </button>
                     <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].copy_links}">
                         <i class="fas fa-copy"></i>
                     </button>
@@ -66,6 +70,15 @@ export const createReleaseCard = (rel) => {
     `;
 
     card.onclick = () => card.classList.toggle('expanded');
+
+    card.querySelectorAll('.rel-p-identify').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const ids = btn.getAttribute('data-ids').split(',').map(id => parseInt(id));
+            const title = btn.getAttribute('data-title');
+            import('./modals.js').then(({ openIdentifyModal }) => openIdentifyModal(ids, title));
+        };
+    });
 
     card.querySelectorAll('.rel-p-copy').forEach(btn => {
         btn.onclick = async (e) => {

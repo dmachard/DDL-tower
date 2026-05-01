@@ -106,7 +106,7 @@ class ParserService:
         
         # Aggressive title cleaning if tags leaked into it
         if title:
-            title = re.split(r'[\.\[\s\-](?:MULTI|FRENCH|TRUEFRENCH|1080P|720P|2160P|BLURAY|UHD|VOSTFR|VFF|VFI|VFQ|DV|HDR|REPACK|PROPER|FINAL)\b', title, flags=re.I)[0]
+            title = re.split(r'[\.\[\s\-](?:S\d+|E\d+|S\d+E\d+|MULTI|FRENCH|TRUEFRENCH|1080P|720P|2160P|BLURAY|UHD|VOSTFR|VFF|VFI|VFQ|DV|HDR|REPACK|PROPER|FINAL)\b', title, flags=re.I)[0]
             title = title.replace('.', ' ').strip()
         
         # Category detection

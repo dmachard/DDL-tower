@@ -116,17 +116,27 @@ class EnrichmentService:
             parse_target = link.title if link.title else link.filename
             p = parser_service.parse_filename(parse_target)
             
-            # If we parsed from the title, we might still want to check the filename 
-            # for technical details (resolution, codec) that are often missing from feed titles.
+            # If we have both, compare titles. If they are completely different, 
+            # the scraper might have assigned a wrong group title.
             if link.title and link.filename:
                 p_file = parser_service.parse_filename(link.filename)
-                for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages"]:
+                
+                # Check for word overlap
+                t1 = set(re.findall(r'\w+', p.get("title", "").lower()))
+                t2 = set(re.findall(r'\w+', p_file.get("title", "").lower()))
+                overlap = t1.intersection(t2)
+                
+                # If no significant overlap and file title seems valid, trust the file
+                if not overlap and len(t2) >= 2:
+                    print(f"[ENRICHMENT] ⚠️ Title conflict: Scraper='{p.get('title')}' vs File='{p_file.get('title')}'. Trusting File.")
+                    p["title"] = p_file["title"]
+                
+                # Copy technical details from file if missing in scraper title
+                for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages", "year"]:
                     if not p.get(key) and p_file.get(key):
                         p[key] = p_file[key]
 
             if p:
-                # Always use the cleaned title from parsing, even if override_title was used.
-                # The original raw title from the scraper is preserved in link.raw_title.
                 if p.get("title"):
                     link.title = p["title"]
                 

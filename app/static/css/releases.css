@@ -255,7 +255,9 @@
     color: var(--text-secondary);
 }
 
-.rel-p-copy {
+.rel-p-copy,
+.rel-p-download,
+.rel-p-identify {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     color: var(--text-secondary);
@@ -277,23 +279,11 @@
     transform: scale(1.1);
 }
 
-.rel-p-copy.success {
-    color: var(--success);
-}
-
-.rel-p-download {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    color: var(--text-secondary);
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: var(--transition);
-    font-size: 12px;
+.rel-p-identify:hover {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: var(--warning);
+    color: var(--warning);
+    transform: scale(1.1);
 }
 
 .rel-p-download:hover {
@@ -303,13 +293,15 @@
 }
 
 .rel-p-copy.success,
-.rel-p-download.success {
+.rel-p-download.success,
+.rel-p-identify.success {
     background: var(--success) !important;
     color: white !important;
     border-color: transparent !important;
 }
 
-.rel-p-download.error {
+.rel-p-download.error,
+.rel-p-identify.error {
     background: var(--error) !important;
     color: white !important;
     border-color: transparent !important;
