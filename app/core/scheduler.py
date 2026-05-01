@@ -81,12 +81,36 @@ async def run_categorization():
     async with get_db_ctx() as db:
         await Categorizer.enrich_links(db)
 
+def is_in_scan_window():
+    from datetime import datetime
+    now = datetime.now()
+    start = settings.SCAN_START_HOUR
+    end = settings.SCAN_END_HOUR
+    
+    # If both are same, assume 24h scanning
+    if start == end:
+        return True
+        
+    current_hour = now.hour
+    
+    if start < end:
+        return start <= current_hour < end
+    else:
+        # Crosses midnight (e.g. 6 to 0)
+        return current_hour >= start or current_hour < end
+
 async def scheduler_loop():
     """Main scheduler loop."""
     print(f"[SCHEDULER] Starting with interval: {settings.SCAN_INTERVAL_MINUTES} minutes")
+    print(f"[SCHEDULER] Allowed window: {settings.SCAN_START_HOUR:02d}h to {settings.SCAN_END_HOUR:02d}h")
     
     while True:
         try:
+            if not is_in_scan_window():
+                print(f"[SCHEDULER] [{datetime_now()}] Outside allowed window. Sleeping 10 minutes...")
+                await asyncio.sleep(600)
+                continue
+
             print(f"[SCHEDULER] [{datetime_now()}] Starting sequence...")
             await run_scrapers()
             

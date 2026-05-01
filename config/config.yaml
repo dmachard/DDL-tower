@@ -39,6 +39,9 @@ scan_interval_minutes: 60
 scan_novelty_multiplier: 2
 concurrent_hoster_checks: 10
 
+scan_start_hour: 6 
+scan_end_hour: 0 
+
 # Browser connection for Webtop/Cloudflare bypass
 browser_url: "http://ddltower-browser:9222"
 webtop_container_name: "ddltower-browser"

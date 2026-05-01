@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     BROWSER_URL: Optional[str] = _yaml_config.get("browser_url", None)
     WEBTOP_CONTAINER_NAME: str = _yaml_config.get("webtop_container_name", "ddltower-browser")
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
+    
+    # Scheduler window (Hours when scanning is allowed, e.g. 6 to 0 for 06:00-00:00)
+    SCAN_START_HOUR: int = _yaml_config.get("scan_start_hour", 6)
+    SCAN_END_HOUR: int = _yaml_config.get("scan_end_hour", 0)
+    
     _yaml_tmdb = _yaml_config.get("tmdb", {})
     TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", _yaml_tmdb.get("api_key", ""))
     
