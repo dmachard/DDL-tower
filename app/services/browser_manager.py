@@ -106,7 +106,8 @@ class BrowserManager:
 
             print(f"[BROWSER-MGR] Launching Chromium and socat in {self.container_name}...")
             
-            # 1. Cleanup
+            # 1. Cleanup & Persistent IPv6 Priority
+            container.exec_run("sh -c \"grep -q 'fd00::/8' /etc/gai.conf || echo 'precedence fd00::/8 50' >> /etc/gai.conf\"", user="root")
             container.exec_run("pkill -9 chromium", user="root")
             container.exec_run("pkill -9 socat", user="root")
             # Thoroughly remove all Singleton locks to prevent "Profile in use" errors
@@ -121,6 +122,7 @@ class BrowserManager:
                 "--disable-dev-shm-usage "
                 "--disable-service-worker "
                 "--disable-features=ServiceWorker "
+                "--disable-async-dns " # Force system DNS (to respect IPv6 priority)
             )
             profile_path = "/config/.config/chromium" 
 
