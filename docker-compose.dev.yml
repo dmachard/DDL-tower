@@ -1,5 +1,9 @@
 networks:
   ddltower:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:dead:beef::/64
 
 services:
   ddltower:
@@ -31,6 +35,9 @@ services:
       - apparmor=unconfined
     cap_add:
       - SYS_ADMIN
+    # to avoid 127.0.0.1 resolution and IPv6 priority
+    extra_hosts:
+      - "xxxxxx.com:[IP_ADDRESS]"
     user: root
     environment:
       - PUID=0
