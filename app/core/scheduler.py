@@ -1,4 +1,5 @@
 import asyncio
+import random
 import traceback
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,8 +89,14 @@ async def scheduler_loop():
         try:
             print(f"[SCHEDULER] [{datetime_now()}] Starting sequence...")
             await run_scrapers()
-            print(f"[SCHEDULER] Sequence finished. Waiting {settings.SCAN_INTERVAL_MINUTES} minutes.")
-            await asyncio.sleep(settings.SCAN_INTERVAL_MINUTES * 60)
+            
+            # Randomize interval (jitter +/- 20%)
+            base_interval = settings.SCAN_INTERVAL_MINUTES
+            jitter = random.uniform(0.8, 1.2)
+            wait_minutes = base_interval * jitter
+            
+            print(f"[SCHEDULER] Sequence finished. Waiting {wait_minutes:.1f} minutes (randomized from {base_interval}m).")
+            await asyncio.sleep(wait_minutes * 60)
             
         except Exception as e:
             print(f"[SCHEDULER] Critical error: {e}")
