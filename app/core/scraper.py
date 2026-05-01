@@ -23,7 +23,13 @@ class Scraper:
         self._name = config.get("name", "Scraper")
         self.steps = config.get("steps", [])
         self.default_scrape_once = config.get("scrape_once", True)
-        self.headers = config.get("headers", {})
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.google.com/",
+            **config.get("headers", {})
+        }
         self.timeout = config.get("timeout", 60)
         self.unlocker = LinkUnlocker()
 
@@ -278,7 +284,15 @@ class Scraper:
             context_pw = await browser.new_context()
             page = await context_pw.new_page()
             try:
-                await page.goto(url, wait_until=wait_until, timeout=self.timeout * 1000)
+                try:
+                    await page.goto(url, wait_until=wait_until, timeout=self.timeout * 1000)
+                except Exception as e:
+                    if "Download is starting" in str(e):
+                        # Use request API to get the content if it's a download (RSS/JSON/XML)
+                        # This avoids the error and gets the raw data directly
+                        response = await page.request.get(url)
+                        return await response.text()
+                    raise e
                 
                 if wait_for:
                     wait_timeout = step.get("wait_timeout", 15)
@@ -300,7 +314,16 @@ class Scraper:
                     result = await page.evaluate(rendered_js, context)
                     return json.dumps(result)
                 
-                return await page.content()
+                # If it's an RSS feed, sometimes content() wraps it in HTML
+                # Better to get the raw body if it's not a standard HTML page
+                content = await page.content()
+                if step.get("type") == "rss" and "<?xml" in content and "<html>" in content:
+                    # Try to extract the XML from the HTML wrapper if any
+                    match = re.search(r'(<\?xml.*</rss>)', content, re.DOTALL | re.IGNORECASE)
+                    if match:
+                        return match.group(1)
+                
+                return content
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] Browser error: {e}")
                 return None
