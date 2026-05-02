@@ -199,3 +199,17 @@ async def trigger_download(request: DownloadRequest, background_tasks: Backgroun
     """
     background_tasks.add_task(run_download_task, request.urls)
     return {"message": f"Started download of {len(request.urls)} links in background."}
+
+@router.get("/download-link")
+async def trigger_download_get(url: str, background_tasks: BackgroundTasks):
+    """
+    Triggers download of one or more URLs (comma separated) via a GET request.
+    Useful for RSS feeds or simple integrations.
+    """
+    from fastapi.responses import RedirectResponse
+    urls = [u.strip() for u in url.split(",") if u.strip()]
+    if not urls:
+        return RedirectResponse(url="/?error=no_urls")
+    
+    background_tasks.add_task(run_download_task, urls)
+    return RedirectResponse(url="/?msg=download_started")

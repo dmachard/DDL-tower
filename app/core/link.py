@@ -1,5 +1,5 @@
 import math
-import PTN # NEW: For cleaning override_title
+import re
 from datetime import datetime, timezone
 from typing import List
 from sqlalchemy.future import select
@@ -11,6 +11,34 @@ from app.core.utils import format_size
 class LinkManager:
     def __init__(self):
         self.hoster = Hoster()
+
+    def _get_best_raw_title(self, override_title: str, filename: str, url: str) -> str:
+        """
+        Determines the best string for the tooltip (raw_title).
+        Prioritizes override_title (RSS) if filename is technical (.rar) or less descriptive.
+        """
+        if not override_title or override_title in ["Untitled", "None"]:
+            return filename or override_title or url
+        
+        if not filename:
+            return override_title
+            
+        # 1. If filename is clearly unhelpful (archive, part), use override_title
+        bad_exts = ['.rar', '.zip', '.7z', '.tar', '.001', '.002']
+        if any(filename.lower().endswith(ext) for ext in bad_exts) or '.part' in filename.lower():
+            return override_title
+            
+        # 2. If override_title looks like a full release name (has resolution/year) 
+        # and filename does not, use override_title
+        tags_pattern = r'\b(720p|1080p|2160p|4k|bluray|webrip|web-dl|h26[45]|x26[45]|\b(19|20)\d{2}\b)\b'
+        has_tags_override = bool(re.search(tags_pattern, override_title, re.I))
+        has_tags_filename = bool(re.search(tags_pattern, filename, re.I))
+        
+        if has_tags_override and not has_tags_filename:
+            return override_title
+            
+        # 3. Otherwise, filename is usually more specific to the actual link (version, group, etc.)
+        return filename
 
     async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str, 
                           override_filename: str = None, override_title: str = None, override_year: int = None, 
@@ -74,11 +102,8 @@ class LinkManager:
                         if override_title:
                             existing.title = override_title
                         
-                        # raw_title should ALWAYS be the full filename if available (for tooltips)
-                        if final_filename:
-                            existing.raw_title = final_filename
-                        elif not existing.raw_title:
-                            existing.raw_title = override_title
+                        # Determine best raw_title for tooltips
+                        existing.raw_title = self._get_best_raw_title(override_title, final_filename, link)
                         
                         existing.year = override_year
                         existing.size = format_size(info.get('size', 0))
@@ -95,7 +120,7 @@ class LinkManager:
                             status=status,
                             filename=final_filename,
                             title=override_title, 
-                            raw_title=final_filename or override_title or link, # Priority to filename for tooltip
+                            raw_title=self._get_best_raw_title(override_title, final_filename, link),
                             year=override_year,
                             size=format_size(info.get('size', 0)),
                             size_bytes=info.get('size', 0),

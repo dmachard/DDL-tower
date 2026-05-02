@@ -73,6 +73,41 @@ async def get_rss_feed(
         if item.get("rating"):
             description += f"<p><strong>Note :</strong> {item['rating']}/10</p>"
         
+        # Add list of files (raw_title)
+        files_sections = []
+        base_api_url = str(request.base_url).rstrip("/") + "/api"
+        
+        for res, cards in resolutions_dict.items():
+            res_files = []
+            for card in cards:
+                for sub in card.get("sub_releases", []):
+                    rt = sub.get("raw_title")
+                    if rt:
+                        size_info = f" ({sub.get('total_size')})" if sub.get('total_size') else ""
+                        
+                        # Links for individual hosters (triggers all parts for that hoster)
+                        hoster_to_urls = {}
+                        for part in sub.get("parts", []):
+                            u = part.get("url")
+                            h = part.get("hoster", "Lien")
+                            if u:
+                                if h not in hoster_to_urls: hoster_to_urls[h] = []
+                                hoster_to_urls[h].append(u)
+                        
+                        hoster_links = []
+                        for h, urls in hoster_to_urls.items():
+                            trigger_url = f"{base_api_url}/download-link?url={urllib.parse.quote(','.join(urls))}"
+                            hoster_links.append(f'<a href="{html.escape(trigger_url)}" style="color: #3498db; font-weight: bold;">[{html.escape(h)}]</a>')
+                        
+                        res_files.append(f"{rt}{size_info} {' '.join(hoster_links)}")
+            
+            if res_files:
+                unique_res_files = list(dict.fromkeys(res_files))
+                files_sections.append(f"<strong>{res} :</strong><ul>" + "".join([f"<li>{f}</li>" for f in unique_res_files]) + "</ul>")
+        
+        if files_sections:
+            description += "<h4>Fichiers disponibles :</h4>" + "".join(files_sections)
+        
         # Link to the DDL Tower dashboard
         # We use a query parameter 'q' to pre-filter the results
         base_url = str(request.base_url).rstrip("/")
