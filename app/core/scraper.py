@@ -76,39 +76,34 @@ class Scraper:
             step_scrape_once = False
 
         # Build URL(s) to process
-        raw_url_field = step.get("url", "")
+        raw_url_field = step.get("url")
+        if not raw_url_field and step_idx > 0:
+            prev_step_name = self.steps[step_idx-1].get("name", f"step_{step_idx-1}")
+            prev_data = context.get(prev_step_name, {})
+            raw_url_field = prev_data.get("url") if isinstance(prev_data, dict) else prev_data
+            
         urls_to_process = raw_url_field if isinstance(raw_url_field, list) else [raw_url_field]
 
         for raw_url in urls_to_process:
-            if not raw_url and step_idx > 0:
-                prev_step_name = self.steps[step_idx-1].get("name", f"step_{step_idx-1}")
-                prev_data = context.get(prev_step_name, {})
-                raw_url = prev_data.get("url") if isinstance(prev_data, dict) else prev_data
-
-            base_url = self._render_string(raw_url, context)
-            if not base_url or not base_url.startswith("http"):
-                if base_url: # Only print warning if it wasn't just empty
-                    print(f"[{self.name}] [{step_name}] Skipping: Invalid URL '{base_url}'")
-                continue
-
-            current_page = 1
+            current_page = step.get("pagination", {}).get("start_page", 1)
             while True:
-                url = base_url
-                if step.get("pagination") and current_page > 1:
-                    url = self._update_url_param(base_url, step["pagination"]["param"], current_page)
-                
+                # Render URL with current page context
+                page_context = {**context, "page": current_page, "index": current_page}
+                url = self._render_string(raw_url, page_context)
+                if not url or not url.startswith("http"):
+                    break
+
                 if step_scrape_once:
                     async with get_db_ctx() as session:
                         stmt = select(ScrapedURL).where(ScrapedURL.url == url)
                         res = await session.execute(stmt)
                         if res.scalar_one_or_none():
                             print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
-                            continue
+                            # Skip this URL/page and move to next in pagination or next raw_url
+                            break
                 
                 # Intelligent Throttling: only wait if we are actually going to fetch something
                 # and if the minimum delay hasn't passed since the last request.
-                import time
-                import random
                 delay = step.get("item_delay")
                 # If no explicit delay, apply 1s default if we are in a follow-up step
                 # or a list-based step (RSS/JSON)
@@ -301,8 +296,8 @@ class Scraper:
                                     yield next_batch
                         else:
                             # Otherwise just move to next step with current context
-                                async for next_batch in self._execute_step(client, step_idx + 1, new_context):
-                                    yield next_batch
+                            async for next_batch in self._execute_step(client, step_idx + 1, new_context):
+                                yield next_batch
 
                 # Record that this URL has been scraped only AFTER the loop finished successfully
                 if step_scrape_once and results:
@@ -315,7 +310,7 @@ class Scraper:
                 
                 if not step.get("pagination"): break
                 current_page += 1
-                if "max_pages" in step["pagination"] and current_page > step["pagination"]["max_pages"]:
+                if current_page > step.get("pagination", {}).get("max_pages", 999):
                     break
 
     async def _fetch_with_browser(self, url: str, step: dict, context: dict) -> Optional[str]:
