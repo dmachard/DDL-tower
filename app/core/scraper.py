@@ -33,6 +33,7 @@ class Scraper:
         }
         self.timeout = config.get("timeout", 60)
         self.unlocker = LinkUnlocker()
+        self._last_request_time = 0
 
     @property
     def name(self) -> str:
@@ -103,13 +104,32 @@ class Scraper:
                         if res.scalar_one_or_none():
                             print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
                             break
+                
+                # Intelligent Throttling: only wait if we are actually going to fetch something
+                # and if the minimum delay hasn't passed since the last request.
+                import time
+                import random
+                delay = step.get("item_delay")
+                if delay is None and (step_type in ["rss", "json"] or step.get("follow_links") or len(results) > 1):
+                    delay = 1.0 # Default 1s delay
+                
+                if delay:
+                    jitter = delay * 0.2
+                    target_delay = delay + random.uniform(-jitter, jitter)
+                    now = time.time()
+                    elapsed = now - self._last_request_time
+                    if elapsed < target_delay:
+                        wait_time = target_delay - elapsed
+                        await asyncio.sleep(wait_time)
 
                 # Fetch content
                 content = None
                 if use_browser:
                     content = await self._fetch_with_browser(url, step, context)
+                    self._last_request_time = time.time()
                 else:
                     try:
+                        self._last_request_time = time.time()
                         resp = await client.get(url, headers=self.headers)
                         resp.raise_for_status()
                         content = resp.text
@@ -140,18 +160,6 @@ class Scraper:
                 import random
                 # Iterate over results
                 for i, item in enumerate(results):
-                    # 0. Item-level delay to be "gentle"
-                    if i > 0:
-                        delay = step.get("item_delay")
-                        if delay is None and (step_type in ["rss", "json"] or step.get("follow_links") or len(results) > 1):
-                            delay = 1.0 # Default 1s delay for items in lists
-                        
-                        if delay:
-                            # Add some jitter (±20%)
-                            jitter = delay * 0.2
-                            actual_delay = delay + (random.uniform(-jitter, jitter))
-                            await asyncio.sleep(max(0.1, actual_delay))
-
                     new_context = context.copy()
                     
                     if isinstance(item, str):

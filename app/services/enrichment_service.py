@@ -126,10 +126,23 @@ class EnrichmentService:
                 t2 = set(re.findall(r'\w+', p_file.get("title", "").lower()))
                 overlap = t1.intersection(t2)
                 
-                # If no significant overlap and file title seems valid, trust the file
-                if not overlap and len(t2) >= 2:
-                    print(f"[ENRICHMENT] ⚠️ Title conflict: Scraper='{p.get('title')}' vs File='{p_file.get('title')}'. Trusting File.")
-                    p["title"] = p_file["title"]
+                # If no significant overlap, we prefer the scraper title (RSS/Override) 
+                # because filenames are often obfuscated or technical.
+                # We only switch to the file title if the scraper title is missing or too generic.
+                if not overlap:
+                    scraper_title = p.get("title", "")
+                    file_title = p_file.get("title", "")
+                    
+                    # If scraper title looks like a real movie/series title (multi-word), keep it.
+                    if " " in scraper_title.strip() and len(scraper_title) > 2:
+                        pass
+                    # Only fallback to file if scraper title is very weak AND file title looks valid.
+                    elif (not scraper_title or len(scraper_title) < 4) and " " in file_title.strip() and len(t2) >= 2:
+                        print(f"[ENRICHMENT] ⚠️ Title conflict: Scraper='{scraper_title}' vs File='{file_title}'. Trusting File.")
+                        p["title"] = file_title
+                    else:
+                        # Default to scraper title, it's safer
+                        pass
                 
                 # Copy technical details from file if missing in scraper title
                 for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages", "year"]:
