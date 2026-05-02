@@ -63,6 +63,8 @@ class Scraper:
             traceback.print_exc()
 
     async def _execute_step(self, client: httpx.AsyncClient, step_idx: int, context: dict) -> AsyncGenerator[Dict[str, Any], None]:
+        import time
+        import random
         if step_idx >= len(self.steps):
             return
 
