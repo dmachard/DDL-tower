@@ -14,7 +14,10 @@ class TagCommands:
 
             if title:
                 print(f"--- [TAG] Manual tagging for: '{title}' (Year: {year or 'Auto'}, Type: {media_type or 'Auto'}) ---")
-                stmt = select(DownloadLink).where(DownloadLink.title == title)
+                if "%" in title:
+                    stmt = select(DownloadLink).where(DownloadLink.title.like(title))
+                else:
+                    stmt = select(DownloadLink).where(DownloadLink.title == title)
                 result = await session.execute(stmt)
                 links = result.scalars().all()
                 
