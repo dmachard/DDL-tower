@@ -103,7 +103,7 @@ class Scraper:
                         res = await session.execute(stmt)
                         if res.scalar_one_or_none():
                             print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
-                            break
+                            continue
                 
                 # Intelligent Throttling: only wait if we are actually going to fetch something
                 # and if the minimum delay hasn't passed since the last request.
@@ -159,15 +159,6 @@ class Scraper:
 
                 print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
 
-                # Record that this URL has been scraped
-                if step_scrape_once and results:
-                    async with get_db_ctx() as session:
-                        # Double check to avoid IntegrityError
-                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
-                        res = await session.execute(stmt)
-                        if not res.scalar_one_or_none():
-                            session.add(ScrapedURL(url=url, source_name=self.name))
-                            await session.commit()
 
                 import random
                 # Iterate over results
@@ -310,8 +301,17 @@ class Scraper:
                                     yield next_batch
                         else:
                             # Otherwise just move to next step with current context
-                            async for next_batch in self._execute_step(client, step_idx + 1, new_context):
-                                yield next_batch
+                                async for next_batch in self._execute_step(client, step_idx + 1, new_context):
+                                    yield next_batch
+
+                # Record that this URL has been scraped only AFTER the loop finished successfully
+                if step_scrape_once and results:
+                    async with get_db_ctx() as session:
+                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+                        res = await session.execute(stmt)
+                        if not res.scalar_one_or_none():
+                            session.add(ScrapedURL(url=url, source_name=self.name))
+                            await session.commit()
                 
                 if not step.get("pagination"): break
                 current_page += 1
