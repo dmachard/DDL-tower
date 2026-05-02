@@ -110,7 +110,9 @@ class Scraper:
                 import time
                 import random
                 delay = step.get("item_delay")
-                if delay is None and (step_type in ["rss", "json"] or step.get("follow_links") or len(results) > 1):
+                # If no explicit delay, apply 1s default if we are in a follow-up step
+                # or a list-based step (RSS/JSON)
+                if delay is None and (step_idx > 0 or step_type in ["rss", "json"]):
                     delay = 1.0 # Default 1s delay
                 
                 if delay:
