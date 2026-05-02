@@ -51,118 +51,155 @@ class DownloaderService:
 
     async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None) -> str:
         """
-        Downloads a file from a URL to the download directory.
-        Returns the path to the downloaded file.
+        Downloads a file from a URL to the download directory with resume support and retries.
         """
-        async with aiohttp.ClientSession() as session:
+        max_retries = 5
+        retry_delay = 2
+        
+        # Initial filename resolution
+        if not filename:
+             async with aiohttp.ClientSession() as session:
+                 async with session.head(url, allow_redirects=True) as resp:
+                     cd = resp.headers.get("Content-Disposition")
+                     if cd and "filename=" in cd:
+                         filename = cd.split("filename=")[1].strip('"')
+                     else:
+                         filename = os.path.basename(url.split('?')[0])
+        
+        if not filename:
+            filename = "unknown_file"
+
+        file_path = self.download_dir / filename
+        group_name = self._get_group_name(filename)
+        
+        # Ensure group entry exists
+        if group_name not in self.active_downloads:
+            self.active_downloads[group_name] = {
+                "name": group_name,
+                "files": {},
+                "progress": 0,
+                "total": 0,
+                "downloaded": 0,
+                "status": "downloading",
+                "extraction_triggered": False
+            }
+        
+        group = self.active_downloads[group_name]
+        if group["status"] not in ["extracting", "error"]:
+            group["status"] = "downloading"
+
+        for attempt in range(max_retries):
             try:
-                print(f"[DOWNLOADER] Starting download of {url}...")
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        print(f"[DOWNLOADER] Failed to download {url}: HTTP {response.status}")
-                        return None
-                    
-                    if not filename:
-                        # Try to get filename from Content-Disposition
-                        cd = response.headers.get("Content-Disposition")
-                        if cd and "filename=" in cd:
-                            filename = cd.split("filename=")[1].strip('"')
-                        else:
-                            filename = os.path.basename(url.split('?')[0])
-                   
-                    group_name = self._get_group_name(filename)
-                    file_path = self.download_dir / filename
-                    total_size = int(response.headers.get('Content-Length', 0))
- 
-                    if group_name not in self.active_downloads:
+                downloaded_on_disk = file_path.stat().st_size if file_path.exists() else 0
+                headers = {}
+                if downloaded_on_disk > 0:
+                    headers["Range"] = f"bytes={downloaded_on_disk}-"
+                    print(f"[DOWNLOADER] Attempting to resume {filename} from {downloaded_on_disk} bytes (Attempt {attempt+1})")
+                else:
+                    print(f"[DOWNLOADER] Starting download of {filename} (Attempt {attempt+1})")
 
-                        self.active_downloads[group_name] = {
-                            "name": group_name,
-                            "files": {},
-                            "progress": 0,
-                            "total": 0,
-                            "downloaded": 0,
-                            "status": "downloading",
-                            "extraction_triggered": False
-                        }
-                    
-                    group = self.active_downloads[group_name]
-                    # Update status if it was previously set to something else (like waiting)
-                    if group["status"] not in ["extracting", "error"]:
-                        group["status"] = "downloading"
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers) as response:
+                        if response.status not in [200, 206]:
+                            print(f"[DOWNLOADER] Failed to download {url}: HTTP {response.status}")
+                            if attempt == max_retries - 1: return None
+                            await asyncio.sleep(retry_delay * (attempt + 1))
+                            continue
 
-                    # Update or create file entry
-                    file_info = group["files"].get(filename, {})
-                    group["files"][filename] = {
-                        "progress": file_info.get("progress", 0),
-                        "total": total_size,
-                        "downloaded": file_info.get("downloaded", 0),
-                        "status": "downloading"
-                    }
-                    
-                    # Recalculate group total (only add if we hadn't already set total for this file)
-                    if file_info.get("total") == 0:
-                        group["total"] += total_size
-
-                    downloaded_part = 0
-                    with open(file_path, "wb") as f:
-                        async for chunk in response.content.iter_chunked(1024 * 64):
-                            f.write(chunk)
-                            chunk_len = len(chunk)
-                            downloaded_part += chunk_len
-                            
-                            # Update group stats
-                            group["downloaded"] += chunk_len
-                            group["files"][filename]["downloaded"] = downloaded_part
-                            if total_size > 0:
-                                group["files"][filename]["progress"] = round((downloaded_part / total_size) * 100, 1)
-                            
-                            if group["total"] > 0:
-                                group["progress"] = round((group["downloaded"] / group["total"]) * 100, 1)
-                    
-                    print(f"[DOWNLOADER] Finished download of {filename}")
-                    
-                    group["files"][filename]["progress"] = 100
-                    group["files"][filename]["status"] = "done"
-                    
-                    # Check for extraction if enabled
-                    # Atomic check and set for extraction_triggered
-                    if settings.EXTRACT_RAR and not group.get("extraction_triggered"):
-                        if extraction_service.should_extract(str(file_path), self.active_downloads):
-                            group["extraction_triggered"] = True
-                            group["status"] = "extracting"
-                            group["progress"] = 100
-                            
-                            # Call extraction with category, title and year
-                            success = extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year)
-                            if not success:
-                                group["status"] = "error"
-                                group["error"] = "Extraction failed (Check logs/archives)"
-                                return str(file_path)
-                            else:
-                                print(f"[DOWNLOADER] Extraction successful for {group_name}, clearing group.")
-                                group["status"] = "done"
-                                self.active_downloads.pop(group_name, None)
-                                return str(file_path)
-                    
-                    # If we reach here, either it's not a RAR or extraction wasn't triggered
-                    if group["status"] != "error":
-                        # If it's a movie or series and it wasn't a RAR, organize it now
-                        if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
-                             from app.services.library_service import library_service
-                             library_service.organize_file(str(file_path), category, title=title, year=year)
-
-                        group["files"].pop(filename, None)
-                        if not group["files"]:
-                             self.active_downloads.pop(group_name, None)
+                        # Handle partial content or full content
+                        is_resume = (response.status == 206)
+                        if not is_resume:
+                             downloaded_on_disk = 0 # Server doesn't support range or we didn't ask
                         
-                    return str(file_path)
+                        content_length = int(response.headers.get('Content-Length', 0))
+                        total_size = content_length + downloaded_on_disk if is_resume else content_length
+                        
+                        # Initialize or update file info
+                        file_info = group["files"].get(filename, {})
+                        old_total = file_info.get("total", 0)
+                        
+                        group["files"][filename] = {
+                            "progress": file_info.get("progress", 0),
+                            "total": total_size,
+                            "downloaded": downloaded_on_disk,
+                            "status": "downloading"
+                        }
+                        
+                        # Adjust group total if this is the first time we know the size
+                        if old_total == 0:
+                            group["total"] += total_size
+                        
+                        mode = "ab" if is_resume else "wb"
+                        with open(file_path, mode) as f:
+                            async for chunk in response.content.iter_chunked(1024 * 64):
+                                f.write(chunk)
+                                chunk_len = len(chunk)
+                                
+                                # Update stats
+                                group["downloaded"] += chunk_len
+                                group["files"][filename]["downloaded"] += chunk_len
+                                
+                                if total_size > 0:
+                                    prog = round((group["files"][filename]["downloaded"] / total_size) * 100, 1)
+                                    group["files"][filename]["progress"] = prog
+                                
+                                if group["total"] > 0:
+                                    group["progress"] = round((group["downloaded"] / group["total"]) * 100, 1)
+
+                        # Success!
+                        print(f"[DOWNLOADER] Finished download of {filename}")
+                        group["files"][filename]["progress"] = 100
+                        group["files"][filename]["status"] = "done"
+                        
+                        # Trigger extraction or organization
+                        return await self._finalize_download(file_path, filename, group_name, category, title, year)
+
+            except (aiohttp.ClientPayloadError, aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+                print(f"[DOWNLOADER] Connection error during {filename} (attempt {attempt+1}): {str(e)}")
+                if attempt == max_retries - 1:
+                    group["status"] = "error"
+                    group["error"] = f"Download failed after {max_retries} attempts: {str(e)}"
+                    return None
+                await asyncio.sleep(retry_delay * (attempt + 1))
             except Exception as e:
-                print(f"[DOWNLOADER] Exception during download of {url}: {str(e)}")
-                if group_name in self.active_downloads:
-                     self.active_downloads[group_name]["status"] = "error"
-                     self.active_downloads[group_name]["error"] = str(e)
+                print(f"[DOWNLOADER] Unexpected exception during download of {url}: {str(e)}")
+                group["status"] = "error"
+                group["error"] = str(e)
                 return None
+        
+        return None
+
+    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int) -> str:
+        group = self.active_downloads.get(group_name)
+        if not group: return str(file_path)
+
+        if settings.EXTRACT_RAR and not group.get("extraction_triggered"):
+            if extraction_service.should_extract(str(file_path), self.active_downloads):
+                group["extraction_triggered"] = True
+                group["status"] = "extracting"
+                group["progress"] = 100
+                
+                success = extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year)
+                if not success:
+                    group["status"] = "error"
+                    group["error"] = "Extraction failed"
+                    return str(file_path)
+                else:
+                    group["status"] = "done"
+                    self.active_downloads.pop(group_name, None)
+                    return str(file_path)
+        
+        # If not RAR or extraction not triggered
+        if group["status"] != "error":
+            if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
+                 from app.services.library_service import library_service
+                 library_service.organize_file(str(file_path), category, title=title, year=year)
+
+            group["files"].pop(filename, None)
+            if not group["files"]:
+                 self.active_downloads.pop(group_name, None)
+            
+        return str(file_path)
 
 
 
