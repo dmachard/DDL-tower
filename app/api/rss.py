@@ -113,10 +113,6 @@ async def get_rss_feed(
         base_url = str(request.base_url).rstrip("/")
         link = f"{base_url}/?q={urllib.parse.quote(title)}"
 
-        guid_base = item.get("imdb_id") or f"local_{title}_{year}"
-        # Include timestamp in GUID so updates (new resolutions/parts) are detected as new by FreshRSS
-        guid = f"{guid_base}_{last_updated_str}"
-        
         # Format pubDate (RSS 2.0 requires RFC 822)
         # Using last_updated if available
         last_updated_str = item.get("last_updated")
@@ -128,6 +124,10 @@ async def get_rss_feed(
                 pub_date = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
         else:
             pub_date = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+        guid_base = item.get("imdb_id") or f"local_{title}_{year}"
+        # Include timestamp in GUID so updates (new resolutions/parts) are detected as new by FreshRSS
+        guid = f"{guid_base}_{last_updated_str}"
 
         rss_items.append(f"""
         <item>
