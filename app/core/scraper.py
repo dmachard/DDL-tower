@@ -159,6 +159,16 @@ class Scraper:
 
                 print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
 
+                # Record that this URL has been scraped
+                if step_scrape_once and results:
+                    async with get_db_ctx() as session:
+                        # Double check to avoid IntegrityError
+                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+                        res = await session.execute(stmt)
+                        if not res.scalar_one_or_none():
+                            session.add(ScrapedURL(url=url, source_name=self.name))
+                            await session.commit()
+
                 import random
                 # Iterate over results
                 for i, item in enumerate(results):
