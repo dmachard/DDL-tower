@@ -23,7 +23,7 @@ async def get_rss_feed(
     """
     # Get grouped releases (similar to the dashboard)
     data = await release_service.get_grouped_releases(
-        db, page=1, limit=limit, q=q, category=category, recent=True
+        db, page=1, limit=limit, q=q, category=category, recent=False
     )
     items = data.get("items", [])
 
@@ -113,7 +113,9 @@ async def get_rss_feed(
         base_url = str(request.base_url).rstrip("/")
         link = f"{base_url}/?q={urllib.parse.quote(title)}"
 
-        guid = item.get("imdb_id") or f"local_{title}_{year}"
+        guid_base = item.get("imdb_id") or f"local_{title}_{year}"
+        # Include timestamp in GUID so updates (new resolutions/parts) are detected as new by FreshRSS
+        guid = f"{guid_base}_{last_updated_str}"
         
         # Format pubDate (RSS 2.0 requires RFC 822)
         # Using last_updated if available
