@@ -104,6 +104,15 @@ class Scraper:
                             # Skip this URL/page and move to next in pagination or next raw_url
                             break
                 
+                # NEW: Pre-check URL for ignored resolutions to avoid opening browser unnecessarily
+                step_ignore = step.get("ignore_resolutions", [])
+                ignore_resolutions = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step_ignore))
+                if ignore_resolutions:
+                    # Use a slightly more flexible regex for URLs as boundaries might be different
+                    if any(re.search(rf'[\.\-\/]{re.escape(res)}[\.\-\/]', url, re.I) or re.search(rf'{re.escape(res)}\b', url, re.I) for res in ignore_resolutions):
+                        print(f"[{self.name}] [{step_name}] ⏭ Skipping URL (Resolution ignored in URL): {url}")
+                        break
+                
                 # Intelligent Throttling: only wait if we are actually going to fetch something
                 # and if the minimum delay hasn't passed since the last request.
                 delay = step.get("item_delay")
