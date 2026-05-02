@@ -34,23 +34,41 @@ async def get_rss_feed(
         title = item.get("official_title") or item.get("title")
         year = item.get("year")
         # Collect all unique tags across all resolutions/cards
-        all_tags = set()
+        raw_tags = []
         resolutions_dict = item.get("resolutions", {})
         for res, cards in resolutions_dict.items():
-            if res and res.lower() not in ["none", "unknown", ""]:
-                all_tags.add(res)
+            if res:
+                # Some res might be "1080p, 2160p" if grouped strangely
+                raw_tags.extend(str(res).split(','))
             for card in cards:
                 for field in ["language", "quality", "codec", "network", "v_quality"]:
                     val = card.get(field)
-                    if val and str(val).lower() not in ["none", "unknown", "", "null"]:
-                        all_tags.add(str(val))
+                    if val:
+                        # Split by comma in case field contains multiple tags (e.g. "French, MULTI")
+                        raw_tags.extend(str(val).split(','))
+        
+        # Clean, unique, and case-insensitive deduplication
+        unique_tags_map = {}
+        for t in raw_tags:
+            clean_t = t.strip()
+            if clean_t and clean_t.lower() not in ["none", "unknown", "null"]:
+                t_lower = clean_t.lower()
+                if t_lower not in unique_tags_map:
+                    unique_tags_map[t_lower] = clean_t
         
         # Sort tags for a cleaner display
-        sorted_tags = sorted(list(all_tags))
+        sorted_tags = sorted(unique_tags_map.values())
         tags_str = f" [{', '.join(sorted_tags)}]" if sorted_tags else ""
         
+        # Category label mapping (User requested: Movies -> Film, Series -> TV)
         cat = item.get("category", "movie") or "movie"
-        display_title = f"[{cat.capitalize()}] {title}"
+        cat_labels = {
+            "movie": "Film",
+            "series": "TV"
+        }
+        display_cat = cat_labels.get(cat.lower(), "Film" if "movie" in cat.lower() else "TV")
+        
+        display_title = f"[{display_cat}] {title}"
         if year: display_title += f" ({year})"
         display_title += tags_str
         
