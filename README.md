@@ -11,6 +11,7 @@ DDLtower is a automation tool for web link extraction, tagging and management.
 - **Ratings**: Visual rating scale (1-10) integrated into the dashboard.
 - **Stats Dashboard**: Complete overview of library volume and health.
 - **Embedded Browser**: Dedicated Chromium instance via **Webtop** for manual navigation and Cloudflare bypass.
+- **RSS**: Generate an **RSS 2.0** feed of the latest releases.
 
 ## Getting Started
 
@@ -106,7 +107,7 @@ sudo docker compose exec ddltower python3 -m app.cli.main tag --limit 300
 sudo docker compose exec ddltower python3 -m app.cli.main tag --title "Inception" --year 2010
 sudo docker compose exec ddltower python3 -m app.cli.main tag --title "Deadpool" --id tt0439572
 
-# Repair missing data (Missing posters or 404s)
+# Repair missing data (Missing posters, 404s, OR incorrectly grouped multi-part releases)
 sudo docker compose exec ddltower python3 -m app.cli.main tag --repair
 ```
 
@@ -156,6 +157,8 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 - **`click_selector: 'selector'`**: Used with `use_browser: true`. Instructs the browser to click the specified CSS element before extracting the page content.
 - **`js_code: |`**: Used with `use_browser: true`. Executes custom Javascript within the page to manually extract complex data. The code must return an array of dictionaries (e.g., `[{url: "...", title: "...", release: "..."}]`).
 - **`scrape_once: true`**: Instructs the scraper to memorize the URL of this step in the database so it is never scraped again during future runs (prevents infinite loops on old articles).
+- **`item_delay: 1.5`**: (Optional) Time in seconds to wait between processing individual items/links in a loop. Adds ±20% jitter for better stealth. (Default: 1s for RSS/Follow steps).
+- **`ignore_resolutions: ["720p", "480p"]`**: (Optional) List of resolutions to ignore. If found in the item title or content, the item will be skipped.
 - **`override_title: "{{ step_name.variable }}"`**: Forces the final media title using a variable extracted during a previous step (via `js_code` or `rss`).
 - **`override_year: "{{ step_name.variable }}"`**: Same as `override_title` but forces the release year.
 - **`debug: true`**: Saves the HTML content and a screenshot of the step in `/app/data/debug/` for troubleshooting.

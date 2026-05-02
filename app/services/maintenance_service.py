@@ -268,7 +268,11 @@ class MaintenanceService:
                     DownloadLink.network == "",
                     DownloadLink.v_quality == None,
                     DownloadLink.v_quality == "",
-                    DownloadLink.title.ilike("%&#%")
+                    DownloadLink.title.ilike("%&#%"),
+                    DownloadLink.title.ilike("% part%"),
+                    DownloadLink.title.ilike("%.part%"),
+                    DownloadLink.title.ilike("% vol%"),
+                    DownloadLink.title.ilike("%.vol%")
                 )
             )
             result = await session.execute(stmt)
@@ -277,6 +281,7 @@ class MaintenanceService:
             if not to_repair: return
             
             for link in to_repair:
+                old_title = link.title
                 if link.title: link.title = html.unescape(link.title)
                 p = parser_service.parse_filename(link.filename)
                 if p:
@@ -287,7 +292,11 @@ class MaintenanceService:
                     if not link.quality: link.quality = p["quality"]
                     if not link.resolution: link.resolution = p["resolution"]
                 
-                if link.imdb_id:
+                # If title changed and we have a local ID, we must reset it so enrichment regenerates it correctly
+                if link.title != old_title and link.imdb_id and link.imdb_id.startswith("local_"):
+                    link.imdb_id = None
+
+                if link.imdb_id and not link.imdb_id.startswith("local_"):
                     stmt_m = select(MediaMetadata).where(MediaMetadata.imdb_id == link.imdb_id)
                     meta = (await session.execute(stmt_m)).scalar()
                     if meta:
@@ -297,7 +306,7 @@ class MaintenanceService:
 
             await session.commit()
             
-            # Retry enrichment for missing IDs
+            # Retry enrichment for missing IDs or those we just reset
             missing = [l for l in to_repair if not l.imdb_id or l.imdb_id == "N/A"]
             if missing:
                 await enrichment_service.process_batch(session, missing)

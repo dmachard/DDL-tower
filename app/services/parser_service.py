@@ -106,8 +106,14 @@ class ParserService:
         
         # Aggressive title cleaning if tags leaked into it
         if title:
+            # Remove Volume/Part markers
+            title = re.sub(r'\b(Vol|Pt|Part|Partie)[\.\s]?\d+\b', ' ', title, flags=re.I)
+            title = re.sub(r'\b\d+(?:e|ème|re|nd|rd|th)?\s+partie\b', ' ', title, flags=re.I)
+            
             title = re.split(r'[\.\[\s\-](?:S\d+|E\d+|S\d+E\d+|MULTI|FRENCH|TRUEFRENCH|1080P|720P|2160P|BLURAY|UHD|VOSTFR|VFF|VFI|VFQ|DV|HDR|REPACK|PROPER|FINAL)\b', title, flags=re.I)[0]
             title = title.replace('.', ' ').strip()
+            # Final cleanup of multiple spaces
+            title = re.sub(r'\s+', ' ', title).strip()
         
         # Category detection
         category = "series" if p.get('season') is not None else "movie"

@@ -6,7 +6,7 @@ from app.db.database import init_db
 from app.core.scheduler import start_scheduler
 from app.core.config import settings
 from app.api import (
-    config, downloads, releases, scan, stats, tmdb
+    config, downloads, releases, scan, stats, tmdb, rss
 )
 
 app = FastAPI(title=settings.APP_NAME)
@@ -30,6 +30,7 @@ app.include_router(releases.router, prefix="/api", tags=["releases"])
 app.include_router(scan.router, prefix="/api", tags=["scan"])
 app.include_router(stats.router, prefix="/api", tags=["stats"])
 app.include_router(tmdb.router, prefix="/api", tags=["tmdb"])
+app.include_router(rss.router, prefix="/api", tags=["rss"])
 
 
 if __name__ == "__main__":

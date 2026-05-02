@@ -23,6 +23,7 @@ class Scraper:
         self._name = config.get("name", "Scraper")
         self.steps = config.get("steps", [])
         self.default_scrape_once = config.get("scrape_once", True)
+        self.global_ignore_resolutions = config.get("ignore_resolutions", [])
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -38,11 +39,22 @@ class Scraper:
         return self._name
 
     async def run(self) -> AsyncGenerator[Dict[str, Any], None]:
+        from playwright.async_api import async_playwright
         try:
+            # Check if any step needs a browser to avoid starting it unnecessarily
+            needs_browser = any(s.get("use_browser") for s in self.steps)
+            
             async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
                 context = {"settings": settings}
-                async for batch in self._execute_step(client, 0, context):
-                    yield batch
+                
+                if needs_browser:
+                    async with async_playwright() as p:
+                        context["playwright"] = p
+                        async for batch in self._execute_step(client, 0, context):
+                            yield batch
+                else:
+                    async for batch in self._execute_step(client, 0, context):
+                        yield batch
         except (GeneratorExit, asyncio.CancelledError):
             pass
         except Exception as e:
@@ -125,17 +137,21 @@ class Scraper:
 
                 print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
 
-                if step_scrape_once and results:
-                    async with get_db_ctx() as session:
-                        # Double check before adding to avoid IntegrityError at commit
-                        # in case of race condition between tasks
-                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
-                        exists = (await session.execute(stmt)).scalar()
-                        if not exists:
-                            session.add(ScrapedURL(url=url, source_name=self.name))
-
+                import random
                 # Iterate over results
-                for item in results:
+                for i, item in enumerate(results):
+                    # 0. Item-level delay to be "gentle"
+                    if i > 0:
+                        delay = step.get("item_delay")
+                        if delay is None and (step_type in ["rss", "json"] or step.get("follow_links") or len(results) > 1):
+                            delay = 1.0 # Default 1s delay for items in lists
+                        
+                        if delay:
+                            # Add some jitter (±20%)
+                            jitter = delay * 0.2
+                            actual_delay = delay + (random.uniform(-jitter, jitter))
+                            await asyncio.sleep(max(0.1, actual_delay))
+
                     new_context = context.copy()
                     
                     if isinstance(item, str):
@@ -152,8 +168,23 @@ class Scraper:
                     
                     new_context[step_name] = item_data
                     
-                    # 1. Keyword filtering
+                    # 1. Keyword & Resolution filtering
                     current_tags = []
+                    
+                    # 1a. Resolution filtering
+                    step_ignore = step.get("ignore_resolutions", [])
+                    ignore_resolutions = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step_ignore))
+                    
+                    if ignore_resolutions:
+                        title_to_check = item_data.get("title") or item_data.get("name") or ""
+                        # If we have a title, check it first as it's more precise, otherwise check full text
+                        check_target = title_to_check if title_to_check else text_to_check
+                        
+                        if any(re.search(rf'\b{re.escape(res)}\b', check_target, re.I) for res in ignore_resolutions):
+                            label = title_to_check or "item"
+                            print(f"[{self.name}] [{step_name}] ⏭ Skipping: {label} (Resolution {ignore_resolutions} ignored)")
+                            continue
+
                     required_keywords = step.get("required_keywords", {})
                     if required_keywords:
                         match_found = False
@@ -277,21 +308,26 @@ class Scraper:
         
         print(f"[{self.name}] [{step_name}] Open page by browser: {url}")
         
-        async with async_playwright() as p:
+        # Reuse existing playwright instance if available in context
+        p_provided = context.get("playwright")
+        
+        async def _run_with_p(p):
             browser = await browser_manager.get_browser(p, url=url)
             if not browser: return None
             
-            context_pw = await browser.new_context()
+            # Use a longer timeout for browser operations if configured
+            context_pw = await browser.new_context(user_agent=self.headers["User-Agent"])
             page = await context_pw.new_page()
             try:
+                response = None
                 try:
-                    await page.goto(url, wait_until=wait_until, timeout=self.timeout * 1000)
+                    response = await page.goto(url, wait_until=wait_until, timeout=self.timeout * 1000)
                 except Exception as e:
                     if "Download is starting" in str(e):
                         # Use request API to get the content if it's a download (RSS/JSON/XML)
                         # This avoids the error and gets the raw data directly
-                        response = await page.request.get(url)
-                        return await response.text()
+                        response_req = await page.request.get(url)
+                        return await response_req.text()
                     raise e
                 
                 if wait_for:
@@ -314,6 +350,15 @@ class Scraper:
                     result = await page.evaluate(rendered_js, context)
                     return json.dumps(result)
                 
+                # For RSS and JSON, we prefer the raw text from the response 
+                # because page.content() often wraps non-HTML content in <html><body>...
+                # or transforms it in ways that break parsers (like feedparser or json.loads).
+                if step.get("type") in ["rss", "json"] and response:
+                    try:
+                        return await response.text()
+                    except:
+                        pass
+
                 # If it's an RSS feed, sometimes content() wraps it in HTML
                 # Better to get the raw body if it's not a standard HTML page
                 content = await page.content()
@@ -329,6 +374,12 @@ class Scraper:
                 return None
             finally:
                 await browser.close()
+
+        if p_provided:
+            return await _run_with_p(p_provided)
+        else:
+            async with async_playwright() as p:
+                return await _run_with_p(p)
 
     def _extract_rss(self, content: str) -> List[Dict[str, Any]]:
         feed = feedparser.parse(content)

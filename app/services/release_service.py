@@ -155,9 +155,8 @@ class ReleaseService:
             release_cards = {}
             for r in releases:
                 sig = r.filename or ""
-                sig = re.sub(r'[._ ]part\s*\d+', '', sig, flags=re.I)
-                sig = re.sub(r'[._ ]pt\s*\d+', '', sig, flags=re.I)
-                sig = re.sub(r'\.(rar|zip|7z|html)$', '', sig, flags=re.I)
+                sig = re.sub(r'[._ ](?:part|pt|vol|volume)[._ ]?\d+', '', sig, flags=re.I)
+                sig = re.sub(r'[._ ](?:rar|zip|7z|html|mkv|mp4|avi)$', '', sig, flags=re.I)
                 sig = re.sub(r'[._\s-]+', '.', sig).lower()
                 
                 card_key = (r.season, r.episode, r.resolution, r.language, r.source_name, r.quality, r.codec, r.network, r.v_quality)
