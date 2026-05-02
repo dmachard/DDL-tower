@@ -40,7 +40,7 @@ async def get_rss_feed(
             if res and res.lower() not in ["none", "unknown", ""]:
                 all_tags.add(res)
             for card in cards:
-                for field in ["language", "quality", "codec", "network", "v_quality", "source"]:
+                for field in ["language", "quality", "codec", "network", "v_quality"]:
                     val = card.get(field)
                     if val and str(val).lower() not in ["none", "unknown", "", "null"]:
                         all_tags.add(str(val))
