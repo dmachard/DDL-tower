@@ -15,8 +15,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (input.type === 'text' || input.type === 'search') input.value = '';
     });
 
-    // ── Search ───────────────────────────────────────────────────────────────
+    // ── Search & Deep Linking ───────────────────────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialQuery = urlParams.get('q');
+    
     const targetSearch = document.getElementById('target-search');
+    if (initialQuery && targetSearch) {
+        state.releases.query = initialQuery;
+        targetSearch.value = initialQuery;
+    }
+
     const handleSearch = debounce((e) => {
         const query = e.target.value.toLowerCase();
         const view = e.target.id === 'target-search' ? 'releases' : e.target.id.replace('search-', '');

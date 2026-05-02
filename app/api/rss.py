@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Response, Query
+from fastapi import APIRouter, Depends, Response, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 import html
+import urllib.parse
 
 from app.db.database import get_db
 from app.services.release_service import release_service
@@ -11,6 +12,7 @@ router = APIRouter()
 
 @router.get("/rss")
 async def get_rss_feed(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=100),
     category: str = Query(None),
@@ -31,30 +33,50 @@ async def get_rss_feed(
         # e.g., "Deadpool (2016) [Movie] [1080p, 2160p]"
         title = item.get("official_title") or item.get("title")
         year = item.get("year")
-        cat = item.get("category", "movie")
+        # Collect all unique tags across all resolutions/cards
+        all_tags = set()
+        resolutions_dict = item.get("resolutions", {})
+        for res, cards in resolutions_dict.items():
+            if res and res.lower() not in ["none", "unknown", ""]:
+                all_tags.add(res)
+            for card in cards:
+                for field in ["language", "quality", "codec", "network", "v_quality", "source"]:
+                    val = card.get(field)
+                    if val and str(val).lower() not in ["none", "unknown", "", "null"]:
+                        all_tags.add(str(val))
         
-        # Get available resolutions from the groups
-        resolutions = list(item.get("resolutions", {}).keys())
-        res_str = f" [{', '.join(resolutions)}]" if resolutions else ""
+        # Sort tags for a cleaner display
+        sorted_tags = sorted(list(all_tags))
+        tags_str = f" [{', '.join(sorted_tags)}]" if sorted_tags else ""
         
-        display_title = f"{title}"
+        cat = item.get("category", "movie") or "movie"
+        display_title = f"[{cat.capitalize()}] {title}"
         if year: display_title += f" ({year})"
-        display_title += f" [{cat.capitalize()}]{res_str}"
+        display_title += tags_str
         
         # Build description
         plot = item.get("plot_fr") or item.get("plot_en") or "Pas de description disponible."
-        description = f"<p>{plot}</p>"
+        
+        # Poster URL handling
+        poster_path = item.get("poster_path")
+        poster_url = None
+        if poster_path:
+            filename = poster_path.split("/")[-1]
+            base_url = str(request.base_url).rstrip("/")
+            poster_url = f"{base_url}/posters/{filename}"
+
+        description = ""
+        if poster_url:
+            description += f'<p><img src="{html.escape(poster_url)}" alt="Poster" style="max-width: 300px; display: block; margin-bottom: 10px;" /></p>'
+        description += f"<p>{plot}</p>"
+
         if item.get("rating"):
             description += f"<p><strong>Note :</strong> {item['rating']}/10</p>"
         
-        # Create a unique link
-        # We use the source_url of the first release found as the item link
-        # or fallback to a local link
-        link = "#"
-        if item.get("resolutions"):
-            first_res = list(item["resolutions"].values())[0]
-            if first_res and len(first_res) > 0:
-                link = first_res[0].get("source_url") or "#"
+        # Link to the DDL Tower dashboard
+        # We use a query parameter 'q' to pre-filter the results
+        base_url = str(request.base_url).rstrip("/")
+        link = f"{base_url}/?q={urllib.parse.quote(title)}"
 
         guid = item.get("imdb_id") or f"local_{title}_{year}"
         
@@ -77,13 +99,15 @@ async def get_rss_feed(
             <description>{html.escape(description)}</description>
             <pubDate>{pub_date}</pubDate>
             <guid isPermaLink="false">{html.escape(guid)}</guid>
+            {f'<enclosure url="{html.escape(poster_url)}" length="0" type="image/jpeg" />' if poster_url else ''}
+            {f'<media:content url="{html.escape(poster_url)}" medium="image" />' if poster_url else ''}
         </item>""")
 
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0">
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
 <channel>
     <title>{html.escape(settings.APP_NAME)} - Latest Releases</title>
-    <link>http://localhost:8001</link>
+    <link>{html.escape(str(request.base_url))}</link>
     <description>Dernières releases indexées par DDL Tower</description>
     <language>fr-fr</language>
     <lastBuildDate>{datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")}</lastBuildDate>
