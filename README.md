@@ -237,7 +237,7 @@ The structure of this dictionary depends on how the links were extracted:
 
 ```mermaid
 graph TD
-    subgraph ""
+    subgraph
         SCH[Scheduler / CLI] --> SCR[Universal Scraper]
         SCR -.-> BRW[Browser Manager]
         SCR -.-> UNL[Unlocker]
@@ -251,7 +251,7 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph ""
+    subgraph
         SCH --> ENR[Enrichment Service]
         ENR -.-> PRS[Parser Service]
         ENR -.-> TMDB[TMDb Service]
@@ -262,7 +262,7 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph ""
+    subgraph
         UI[Dashboard / API] --> DEB[Debrid Unlocking]
         DEB --> DL[Downloader Service]
         DL --> LOCK{Global Queue Lock}
