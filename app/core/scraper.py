@@ -258,10 +258,25 @@ class Scraper:
         final = []
         upats = step.get("unlock_patterns", [])
         for h in raw:
-            if upats and any(re.search(p, h) for p in upats) or step.get("unlock_links"):
+            is_unlockable = (upats and any(re.search(p, h) for p in upats)) or step.get("unlock_links")
+            if is_unlockable:
+                # OPTIMIZATION: Check if this intermediate link was already scraped/unlocked
+                already_unlocked = False
+                async with get_db_ctx() as session:
+                    stmt = select(ScrapedURL).where(ScrapedURL.url == h)
+                    if (await session.execute(stmt)).scalar_one_or_none():
+                        already_unlocked = True
+                
+                if already_unlocked:
+                    # We don't print anything to keep logs clean, or just a small debug
+                    continue
+
                 try:
                     u = await self.unlocker.unlock(h, extra_patterns=step.get("regex_patterns", []))
-                    if u: final.extend(u)
+                    if u: 
+                        final.extend(u)
+                        # Record success to avoid re-unlocking this specific link
+                        await self._record_scraped(h)
                 except: pass
             else: final.append(h)
 
