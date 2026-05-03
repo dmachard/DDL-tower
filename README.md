@@ -233,9 +233,11 @@ The structure of this dictionary depends on how the links were extracted:
 
 ## Architecture
 
+1. Discovery & Scraping
+
 ```mermaid
 graph TD
-    subgraph "1. Discovery & Scraping"
+    subgraph ""
         SCH[Scheduler / CLI] --> SCR[Universal Scraper]
         SCR -.-> BRW[Browser Manager]
         SCR -.-> UNL[Unlocker]
@@ -243,15 +245,24 @@ graph TD
         LNK --> HST[Hoster Check]
         HST --> DB[(SQLite Database)]
     end
+```
 
-    subgraph "2. Metadata Enrichment"
+2. Metadata Enrichment
+
+```mermaid
+graph TD
+    subgraph ""
         SCH --> ENR[Enrichment Service]
         ENR -.-> PRS[Parser Service]
         ENR -.-> TMDB[TMDb Service]
         ENR --> DB
     end
 
-    subgraph "3. Download & Library"
+3. Download & Library
+
+```mermaid
+graph TD
+    subgraph ""
         UI[Dashboard / API] --> DEB[Debrid Unlocking]
         DEB --> DL[Downloader Service]
         DL --> LOCK{Global Queue Lock}
