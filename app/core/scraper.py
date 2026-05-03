@@ -46,7 +46,11 @@ class Scraper:
             needs_browser = any(s.get("use_browser") for s in self.steps)
             
             async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-                context = {"settings": settings}
+                context = {
+                    "settings": settings,
+                    "now": datetime.now,
+                    "today": datetime.now().strftime('%Y-%m-%d')
+                }
                 
                 if needs_browser:
                     async with async_playwright() as p:
@@ -94,6 +98,21 @@ class Scraper:
                 url = self._render_string(raw_url, page_context)
                 if not url or not url.startswith("http"):
                     break
+                
+                # Auto-inject pagination param if missing from rendered URL
+                pag_config = step.get("pagination")
+                if pag_config and pag_config.get("param") and current_page > 1:
+                    p_name = pag_config["param"]
+                    # Check if the parameter is already in the URL (either as template or raw)
+                    if f"{p_name}=" not in url:
+                        url = self._update_url_param(url, p_name, current_page)
+
+                # Prevent making requests with empty crucial parameters (like ?title=) 
+                # which often happen when a previous step failed to provide a value.
+                if any(empty_param in url for empty_param in ["title=", "q=", "query=", "search="]):
+                    if any(url.endswith(p) or f"{p}&" in url for p in ["title=", "q=", "query=", "search="]):
+                        print(f"[{self.name}] [{step_name}] ⏭ Skipping URL with empty search parameter: {url}")
+                        break
 
                 if step_scrape_once:
                     async with get_db_ctx() as session:
@@ -135,40 +154,113 @@ class Scraper:
 
                 # Fetch content
                 content = None
+                step_headers = {**self.headers, **step.get("headers", {})}
+                
                 if use_browser:
-                    content = await self._fetch_with_browser(url, step, context)
+                    content = await self._fetch_with_browser(url, step, context, step_headers)
                     self._last_request_time = time.time()
                 else:
                     try:
+                        print(f"[{self.name}] [{step_name}] Fetching URL: {url}")
                         self._last_request_time = time.time()
-                        resp = await client.get(url, headers=self.headers)
+                        resp = await client.get(url, headers=step_headers)
                         resp.raise_for_status()
                         content = resp.text
                     except Exception as e:
                         print(f"[{self.name}] [{step_name}] Error fetching {url}: {e}")
                         break
 
-                if not content: break
+                if not content: 
+                    break
+
+                if step.get("debug"):
+                    debug_dir = os.path.join("data", "debug")
+                    os.makedirs(debug_dir, exist_ok=True)
+                    ts = int(time.time())
+                    safe_step = step_name.replace(" ", "_")
+                    debug_file = os.path.join(debug_dir, f"debug_{self.name}_{safe_step}_{ts}.txt")
+                    try:
+                        with open(debug_file, "w", encoding="utf-8") as f:
+                            f.write(content)
+                    except Exception as e:
+                        print(f"[{self.name}] [{step_name}] DEBUG: Failed to save debug file: {e}")
 
                 # Process results
                 results = []
+                page_info = f" (Page {current_page})" if step.get("pagination") else ""
+                
                 if step_type == "rss":
                     results = self._extract_rss(content)
                 elif step_type == "json":
-                    results = self._extract_json(content, step.get("items_path"))
-                else:
-                    if step.get("js_code") and use_browser:
+                    # Smart JSON extraction:
+                    # 1. Get the list of items
+                    items_path = step.get("items_path") or "$.results[*]"
+                    if items_path:
+                        items_path = self._render_string(items_path, context)
+                    
+                    try:
+                        results = self._extract_json(content, items_path)
+                    except Exception as e:
+                        print(f"[{self.name}] [{step_name}]{page_info} JSON extraction error: {e}")
+                        results = []
+
+                    # 2. Apply filter if provided (can be JSONPath or a simple key=value)
+                    filter_expr = step.get("filter")
+                    if filter_expr and results:
+                        filter_rendered = self._render_string(filter_expr, context)
+                        # If it's a JSONPath filter like [?(@.key == val)], try to extract the logic
+                        match = re.search(r'\[\?\(@\.(\w+)\s*==\s*(.+)\)\]', filter_rendered)
+                        if match:
+                            key, val = match.groups()
+                            # Clean up quotes if any
+                            val = val.strip("'\"")
+                            # Try to match as int or string
+                            results = [r for r in results if str(r.get(key)) == str(val)]
+                        elif not filter_expr.startswith("$"):
+                            # Simple key=value filter (not a full JSONPath)
+                            if "==" in filter_rendered:
+                                key, val = [p.strip() for p in filter_rendered.split("==", 1)]
+                                results = [r for r in results if str(r.get(key)) == str(val)]
+                        else:
+                            # Fallback: try applying it as a full JSONPath filter if it's not already covered
+                            try:
+                                from jsonpath_ng.ext import parse
+                                matches = parse(filter_rendered).find(results)
+                                results = [m.value for m in matches]
+                            except: pass
+                    
+                    # 3. Apply result_path if provided (e.g. $[0])
+                    res_path = step.get("result_path")
+                    if res_path and results:
                         try:
-                            results = json.loads(content)
-                            if not isinstance(results, list): results = [results]
-                        except:
+                            from jsonpath_ng.ext import parse
+                            # Apply the path to the list of items found
+                            matches = parse(res_path).find(results)
+                            results = [m.value for m in matches]
+                        except Exception as e:
+                            print(f"[{self.name}] [{step_name}]{page_info} result_path error: {e}")
+                
+                if not results: 
+                    # Use filter_expr if it was a search/filter step, otherwise items_path
+                    f_val = step.get("filter") or step.get("items_path")
+                    reason = f" (Filter: {f_val})" if step_type == "json" and f_val else ""
+                    print(f"[{self.name}] [{step_name}]{page_info} No items found{reason}, skipping.")
+                    break
+                else:
+                    # If results is already set by RSS or JSON branch, we don't overwrite it.
+                    # Otherwise, handle generic HTML/text content or JS rendered content.
+                    if not results:
+                        if step.get("js_code") and use_browser:
+                            try:
+                                results = json.loads(content)
+                                if not isinstance(results, list): results = [results]
+                            except:
+                                results = [content]
+                        else:
                             results = [content]
-                    else:
-                        results = [content]
+ 
 
-                print(f"[{self.name}] [{step_name}] Processing {len(results)} item(s)")
-
-
+                print(f"[{self.name}] [{step_name}]{page_info} Processing {len(results)} item(s)")
                 import random
                 # Iterate over results
                 for i, item in enumerate(results):
@@ -327,7 +419,7 @@ class Scraper:
                 if current_page > step.get("pagination", {}).get("max_pages", 999):
                     break
 
-    async def _fetch_with_browser(self, url: str, step: dict, context: dict) -> Optional[str]:
+    async def _fetch_with_browser(self, url: str, step: dict, context: dict, headers: dict = None) -> Optional[str]:
         from playwright.async_api import async_playwright
         from app.services.browser_manager import browser_manager
         
@@ -344,8 +436,12 @@ class Scraper:
             browser = await browser_manager.get_browser(p, url=url)
             if not browser: return None
             
-            # Use a longer timeout for browser operations if configured
-            context_pw = await browser.new_context(user_agent=self.headers["User-Agent"])
+            # Use the provided headers for the browser context
+            fetch_headers = headers or self.headers
+            context_pw = await browser.new_context(
+                user_agent=fetch_headers.get("User-Agent", self.headers["User-Agent"]),
+                extra_http_headers=fetch_headers
+            )
             page = await context_pw.new_page()
             try:
                 response = None

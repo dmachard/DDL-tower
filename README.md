@@ -121,6 +121,9 @@ sudo docker compose exec ddltower python3 -m app.cli.main links view "Deadpool"
 # Re-verify all links currently marked as 'dead'
 sudo docker compose exec ddltower python3 -m app.cli.main links reverify
 
+# Re-tag a specific title
+sudo docker compose exec ddltower python3 -m app.cli.main tag --title "CptinCurgos19770BuayFA20x6PTr%" --rename-to "Captains Courageous"  --year 1937
+
 ### Scraper Management (`scan`)
 Trigger scraping manually:
 
