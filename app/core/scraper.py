@@ -192,8 +192,7 @@ class Scraper:
                 if step_type == "rss":
                     results = self._extract_rss(content)
                 elif step_type == "json":
-                    # Smart JSON extraction:
-                    # 1. Get the list of items
+                    # Smart JSON extraction logic...
                     items_path = step.get("items_path") or "$.results[*]"
                     if items_path:
                         items_path = self._render_string(items_path, context)
@@ -204,52 +203,46 @@ class Scraper:
                         print(f"[{self.name}] [{step_name}]{page_info} JSON extraction error: {e}")
                         results = []
 
-                    # 2. Apply filter if provided (can be JSONPath or a simple key=value)
+                    # Apply filters and result_path to JSON results...
                     filter_expr = step.get("filter")
                     if filter_expr and results:
                         filter_rendered = self._render_string(filter_expr, context)
-                        # If it's a JSONPath filter like [?(@.key == val)], try to extract the logic
                         match = re.search(r'\[\?\(@\.(\w+)\s*==\s*(.+)\)\]', filter_rendered)
                         if match:
                             key, val = match.groups()
-                            # Clean up quotes if any
                             val = val.strip("'\"")
-                            # Try to match as int or string
                             results = [r for r in results if str(r.get(key)) == str(val)]
                         elif not filter_expr.startswith("$"):
-                            # Simple key=value filter (not a full JSONPath)
                             if "==" in filter_rendered:
                                 key, val = [p.strip() for p in filter_rendered.split("==", 1)]
                                 results = [r for r in results if str(r.get(key)) == str(val)]
                         else:
-                            # Fallback: try applying it as a full JSONPath filter if it's not already covered
                             try:
                                 from jsonpath_ng.ext import parse
                                 matches = parse(filter_rendered).find(results)
                                 results = [m.value for m in matches]
                             except: pass
                     
-                    # 3. Apply result_path if provided (e.g. $[0])
                     res_path = step.get("result_path")
                     if res_path and results:
                         try:
                             from jsonpath_ng.ext import parse
-                            # Apply the path to the list of items found
                             matches = parse(res_path).find(results)
                             results = [m.value for m in matches]
                         except Exception as e:
                             print(f"[{self.name}] [{step_name}]{page_info} result_path error: {e}")
-                
-                if not results: 
-                    # Use filter_expr if it was a search/filter step, otherwise items_path
-                    f_val = step.get("filter") or step.get("items_path")
-                    reason = f" (Filter: {f_val})" if step_type == "json" and f_val else ""
-                    print(f"[{self.name}] [{step_name}]{page_info} No items found{reason}, skipping.")
-                    break
-                else:
-                    # If results is already set by RSS or JSON branch, we don't overwrite it.
-                    # Otherwise, handle generic HTML/text content or JS rendered content.
-                    if not results:
+
+                # If no specific extraction was done (HTML/Text) or if JSON/RSS returned nothing,
+                # use the raw content as the single result.
+                if not results:
+                    if step_type in ["rss", "json"]:
+                        # For RSS/JSON, if we still have nothing, it's a real failure
+                        f_val = step.get("filter") or step.get("items_path")
+                        reason = f" (Filter: {f_val})" if step_type == "json" and f_val else ""
+                        print(f"[{self.name}] [{step_name}]{page_info} No items found{reason}, skipping.")
+                        break
+                    else:
+                        # For HTML/Browser steps, the content itself is the result
                         if step.get("js_code") and use_browser:
                             try:
                                 results = json.loads(content)
@@ -258,7 +251,6 @@ class Scraper:
                                 results = [content]
                         else:
                             results = [content]
- 
 
                 print(f"[{self.name}] [{step_name}]{page_info} Processing {len(results)} item(s)")
                 import random
