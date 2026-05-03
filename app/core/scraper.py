@@ -233,12 +233,16 @@ class Scraper:
         ignore = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step.get("ignore_resolutions", [])))
         if ignore:
             target = item_data.get("title") or item_data.get("name") or text
-            if any(re.search(rf'\b{re.escape(res)}\b', target, re.I) for res in ignore): return
+            if any(re.search(rf'\b{re.escape(res)}\b', target, re.I) for res in ignore):
+                print(f"[{self.name}] [{step_name}] Item ignored (Resolution): {target[:50]}...")
+                return
 
         current_tags = []
         if step.get("required_keywords"):
             tags = self._matches_keywords(text, step["required_keywords"], step.get("excluded_keywords", []))
-            if tags is None: return
+            if tags is None:
+                print(f"[{self.name}] [{step_name}] Item skipped (Keywords not matched)")
+                return
             current_tags.extend(tags)
 
         # 2. Extract
@@ -275,10 +279,11 @@ class Scraper:
                             title = new_ctx[pn]["title"]
                             if not year or year == "None": year = new_ctx[pn].get("year")
                             break
-                #title = title or "Untitled"
                 print(f"[{self.name}] [{step_name}] Found {len(valid)} link(s)")
                 acc = list(set(context.get("__accumulated_tags__", []) + current_tags))
                 yield {"links": list(set(valid)), "source_url": url, "override_title": title, "override_year": str(year) if year and str(year).isdigit() else None, "tags": acc}
+            else:
+                print(f"[{self.name}] [{step_name}] No matching links found on this page.")
 
         new_ctx["__accumulated_tags__"] = list(set(context.get("__accumulated_tags__", []) + current_tags))
         if (not is_last and step.get("follow_links") is not False) or step.get("follow_links") is True:
@@ -288,6 +293,7 @@ class Scraper:
                     nctx[step_name] = {**item_data, "url": l, "content": ""}
                     async for b in self._execute_step(client, step_idx + 1, nctx): yield b
             else:
+                print(f"[{self.name}] [{step_name}] No links to follow for next step.")
                 async for b in self._execute_step(client, step_idx + 1, new_ctx): yield b
 
     async def _fetch_with_browser(self, url: str, step: dict, context: dict, headers: dict = None) -> Optional[str]:

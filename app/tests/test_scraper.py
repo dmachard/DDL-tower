@@ -176,6 +176,7 @@ async def test_pagination_infinite_loop_protection():
     # Note: the first page hash is stored, then the second page is fetched and compared.
     assert client.get.call_count == 2
 
+
 @pytest.mark.asyncio
 async def test_dict_item_link_extraction():
     """Test that dictionary items use 'url' or 'href' directly without mangling."""
