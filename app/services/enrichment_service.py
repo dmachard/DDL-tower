@@ -19,16 +19,22 @@ class EnrichmentService:
         Entry point to orchestrate filename parsing and TMDb enrichment for a list of links.
         If no links are provided, it fetches all links that are missing metadata.
         """
-        from sqlalchemy import or_
+        from sqlalchemy import or_, and_
         if links is None:
+            # Fix: Ignore links with empty or null filenames to avoid infinite loops on junk data
             stmt = select(DownloadLink).where(
-                or_(
-                    DownloadLink.title == None, 
-                    DownloadLink.title == "",
-                    DownloadLink.imdb_id == None,
-                    DownloadLink.imdb_id == "N/A"
-                ),
-                DownloadLink.filename != None
+                and_(
+                    DownloadLink.filename != None,
+                    DownloadLink.filename != "",
+                    or_(
+                        DownloadLink.imdb_id == None,
+                        DownloadLink.imdb_id == "N/A"
+                    ),
+                    or_(
+                        DownloadLink.title == None,
+                        DownloadLink.title == ""
+                    )
+                )
             )
             q = await session.execute(stmt)
             processed_links = q.scalars().all()
@@ -92,7 +98,7 @@ class EnrichmentService:
                     plot_fr = await translation_service.translate(plot_en)
                 elif not plot_en and plot_fr:
                     plot_en = plot_fr
-
+                
                 if not existing_meta:
                     p_url = res_data.get("poster_url")
                     local_path = None
@@ -138,11 +144,12 @@ class EnrichmentService:
         """
         print(f"[ENRICHMENT] Processing {len(links)} links for enrichment...")
         # First, ensure all links have technical parsing done
+        count = 0
         for link in links:
-            # Prioritize parsing the 'good name' (link.title from feed) if available, 
-            # as it's more reliable than the obfuscated filename.
             parse_target = link.title if link.title else link.filename
-            print(f"[ENRICHMENT] Parsing target: {parse_target}")
+            if not parse_target or len(parse_target) < 3:
+                continue
+                
             p = parser_service.parse_filename(parse_target)
             
             # If we have both, compare titles. If they are completely different, 
@@ -161,24 +168,15 @@ class EnrichmentService:
                 has_overlap = bool(t1.intersection(filename_words))
                 
                 # Rule: The scraper title is the boss (Override).
-                # We ONLY trust the filename over the scraper if:
-                # 1. The scraper title is empty/weak.
-                # 2. OR it's a Series (has SxxExx), no overlap, and filename title is NOT "junk".
                 if not scraper_title_clean or len(scraper_title_clean) < 3:
                     p["title"] = file_title_clean
                 elif not has_overlap:
-                    # Specific check for Series: trust filename only if it's a clear alternative title
                     if p_file.get("season") or p_file.get("episode"):
-                        # Junk detection: if title has no vowels or too many digits, it's obfuscated
                         has_vowels = any(c in file_title_clean.lower() for c in 'aeiouy')
                         digit_ratio = sum(c.isdigit() for c in file_title_clean) / len(file_title_clean) if file_title_clean else 0
                         is_junk = (not has_vowels and len(file_title_clean) > 4) or (digit_ratio > 0.4 and len(file_title_clean) > 5)
-                        
                         if not is_junk:
                             p["title"] = file_title_clean
-                    else:
-                        # For movies/others, keep the scraper title (it's the override)
-                        pass
                 
                 # Copy technical details from file if missing in scraper title
                 for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages", "year"]:
@@ -189,8 +187,6 @@ class EnrichmentService:
                 if p.get("title"):
                     link.title = p["title"]
                 
-                # Force category to series if season/episode info is found, 
-                # otherwise fallback to existing or default to movie
                 if p.get("season") or p.get("episode"):
                     link.category = "series"
                 elif not link.category:
@@ -223,6 +219,7 @@ class EnrichmentService:
                 if key not in needed: needed[key] = []
                 needed[key].append(link)
         
+        titles_count = 0
         for (title, year, cat), group in needed.items():
             # We just need to enrich ONE link and then copy to others
             base_link = group[0]
@@ -231,5 +228,9 @@ class EnrichmentService:
                 other.imdb_id = base_link.imdb_id
                 other.title = base_link.title
                 other.year = base_link.year
+            
+            titles_count += 1
+            if titles_count % 20 == 0:
+                print(f"[ENRICHMENT] Progress: {titles_count}/{len(needed)} unique titles processed...")
 
 enrichment_service = EnrichmentService()
