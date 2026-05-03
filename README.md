@@ -233,36 +233,31 @@ The structure of this dictionary depends on how the links were extracted:
 
 ## Architecture
 
-1. Discovery & Scraping
+1. Scraping & Enrichment Engine
 
 ```mermaid
 graph TD
     SCH[Scheduler / CLI] --> SCR[Universal Scraper]
     
-    SCR -->|1. fetch HTML| BRW[Browser Manager]
+    SCR -->|1. fetch| BRW[Browser Manager]
     BRW --> SCR
     
     SCR -->|2. unlock| UNL[Unlocker]
     UNL --> SCR
     
     SCR -- "3. yield links" --> LNK[Link Manager]
-    LNK --> HST[Hoster Check]
-    HST --> DB[(SQLite Database)]
-```
+    LNK -->|4. check| HST[Hoster Check]
+    HST -->|5. save| DB[(SQLite Database)]
 
-2. Metadata Enrichment
-
-```mermaid
-graph TD
-    SCH[Scheduler / CLI] --> ENR[Enrichment Service]
-    ENR -->|1. parse filename| PRS[Parser Service]
+    DB -- "6. enrich" --> ENR[Enrichment Service]
+    ENR -->|7. parse| PRS[Parser Service]
     PRS --> ENR
-    ENR -->|2. fetch metadata| TMDB[TMDb Service]
+    ENR -->|8. info| TMDB[TMDb Service]
     TMDB --> ENR
-    ENR -- "3. update" --> DB[(SQLite Database)]
+    ENR -- "9. update" --> DB
 ```
 
-3. Download & Library
+2. Download & Library Workflow
 
 ```mermaid
 graph TD
