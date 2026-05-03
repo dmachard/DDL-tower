@@ -14,6 +14,33 @@ from app.core.config import settings
 
 class EnrichmentService:
     @staticmethod
+    async def enrich_links(session: AsyncSession, links: List[DownloadLink] = None, force_year: int = None, force_type: str = None, force_imdb_id: str = None):
+        """
+        Entry point to orchestrate filename parsing and TMDb enrichment for a list of links.
+        If no links are provided, it fetches all links that are missing metadata.
+        """
+        from sqlalchemy import or_
+        if links is None:
+            stmt = select(DownloadLink).where(
+                or_(
+                    DownloadLink.title == None, 
+                    DownloadLink.title == "",
+                    DownloadLink.imdb_id == None,
+                    DownloadLink.imdb_id == "N/A"
+                ),
+                DownloadLink.filename != None
+            )
+            q = await session.execute(stmt)
+            processed_links = q.scalars().all()
+        else:
+            processed_links = links
+            
+        if not processed_links:
+            return
+
+        await enrichment_service.process_batch(session, processed_links, force_year, force_type, force_imdb_id)
+
+    @staticmethod
     async def enrich_link_metadata(session: AsyncSession, link: DownloadLink, force_year: int = None, force_type: str = None, force_imdb_id: str = None):
         """
         Enriches a single link by fetching metadata from TMDb.

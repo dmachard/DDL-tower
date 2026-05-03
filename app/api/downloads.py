@@ -124,8 +124,8 @@ async def run_download_task(urls: List[str]):
     # 2. Register all files (expects list of (link, filename))
     downloader_service.pre_register_files([(d[1], d[2]) for d in valid_downloads])
 
-    # 3. Start downloads concurrently
-    sem = asyncio.Semaphore(5)
+    # 3. Start downloads sequentially (one by one)
+    sem = asyncio.Semaphore(1)
 
     async def sem_download(link, filename, category, title, year):
         async with sem:

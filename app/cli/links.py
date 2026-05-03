@@ -3,7 +3,7 @@ from sqlalchemy import select, or_
 from app.db.database import AsyncSessionLocal
 from app.db.models import DownloadLink, MediaMetadata
 from app.core.hoster import Hoster
-from app.core.categorization import Categorizer
+from app.services.enrichment_service import enrichment_service
 from app.core.utils import format_size
 
 class LinkCommands:
@@ -11,7 +11,6 @@ class LinkCommands:
     async def reverify():
         print("--- [LINKS] Starting re-verification of dead links ---")
         hoster = Hoster()
-        categorizer = Categorizer()
         
         async with AsyncSessionLocal() as session:
             stmt = select(DownloadLink).where(DownloadLink.status == "dead")
@@ -37,7 +36,7 @@ class LinkCommands:
                         link_obj.size_bytes = info.get("size", 0)
                         link_obj.size = format_size(link_obj.size_bytes)
                         link_obj.last_checked = datetime.now(timezone.utc)
-                        await categorizer.enrich_links(session, links=[link_obj])
+                        await enrichment_service.enrich_links(session, links=[link_obj])
                         recovered_count += 1
                 await session.commit()
                 print(f"[LINKS] Batch finished. {recovered_count} links recovered.")

@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import os
 import re
 from typing import List, Optional
@@ -13,6 +14,7 @@ class DownloaderService:
         # Keys are group names (usually filename without .partX.rar)
         # Value: {"files": {filename: info}, "status": ..., "progress": ...}
         self.active_downloads = {}
+        self.lock = asyncio.Lock()
 
     def _get_group_name(self, filename: str) -> str:
         """Returns the base name for grouping parts."""
@@ -52,7 +54,12 @@ class DownloaderService:
     async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None) -> str:
         """
         Downloads a file from a URL to the download directory with resume support and retries.
+        Uses a global lock to ensure sequential downloads (one by one).
         """
+        async with self.lock:
+            return await self._do_download(url, filename, category, title, year)
+
+    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None) -> str:
         max_retries = 5
         retry_delay = 2
         

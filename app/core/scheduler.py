@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import DownloadLink
 from app.core.scraper import Scraper
 from app.core.link import LinkManager
-from app.core.categorization import Categorizer
+from app.services.enrichment_service import enrichment_service
 from app.core.config import settings
 from app.db.database import get_db_ctx
 
@@ -57,7 +57,7 @@ async def run_scraper(scraper):
                             stmt = select(DownloadLink).where(DownloadLink.id.in_(link_ids))
                             res = await db.execute(stmt)
                             links_to_enrich = res.scalars().all()
-                            await Categorizer.enrich_links(db, links=links_to_enrich)
+                            await enrichment_service.enrich_links(db, links=links_to_enrich)
     except Exception as e:
         print(f"[SCHEDULER] Error running scraper {scraper.name}: {e}")
         traceback.print_exc()
@@ -73,13 +73,13 @@ async def run_scrapers(source_name: str = None):
     
     # Categorization (Enrichment)
     async with get_db_ctx() as db:
-        await Categorizer.enrich_links(db)
+        await enrichment_service.enrich_links(db)
         # commit is handled by get_db_ctx
 
 async def run_categorization():
     """Runs the categorization process only."""
     async with get_db_ctx() as db:
-        await Categorizer.enrich_links(db)
+        await enrichment_service.enrich_links(db)
 
 def is_in_scan_window():
     from datetime import datetime

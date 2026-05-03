@@ -1,15 +1,16 @@
 from sqlalchemy import select, or_
 from app.db.database import AsyncSessionLocal
 from app.db.models import DownloadLink, MediaMetadata
-from app.core.categorization import Categorizer
+from app.services.enrichment_service import enrichment_service
+from app.services.maintenance_service import maintenance_service
 
 class TagCommands:
     @staticmethod
     async def process(title: str = None, rename_to: str = None, year: int = None, media_type: str = None, limit: int = 500, repair: bool = False, imdb_id: str = None):
         async with AsyncSessionLocal() as session:
             if repair:
-                await Categorizer.repair_metadata(session)
-                await Categorizer.repair_links_metadata(session)
+                await maintenance_service.repair_media_metadata()
+                await maintenance_service.repair_links_tech_metadata()
                 return
 
             if title:
@@ -44,7 +45,7 @@ class TagCommands:
                     if year is not None: link.year = year
                     if media_type is not None: link.category = media_type
                         
-                await Categorizer.enrich_links(session, links, force_year=year, force_type=media_type, force_imdb_id=imdb_id)
+                await enrichment_service.enrich_links(session, links, force_year=year, force_type=media_type, force_imdb_id=imdb_id)
                 await session.commit()
                 
                 display_meta = None
@@ -76,5 +77,5 @@ class TagCommands:
                     link_stmt = select(DownloadLink).where(DownloadLink.title == t_title, DownloadLink.year == t_year, DownloadLink.category == t_category, DownloadLink.imdb_id == None)
                     links = (await session.execute(link_stmt)).scalars().all()
                     if links:
-                        await Categorizer.enrich_links(session, links)
+                        await enrichment_service.enrich_links(session, links)
                         await session.commit()

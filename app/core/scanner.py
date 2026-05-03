@@ -10,12 +10,11 @@ from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.models import ScrapedURL, DownloadLink
 from app.core.link import LinkManager
-from app.core.categorization import Categorizer
+from app.services.enrichment_service import enrichment_service
 
 class DirectScanner:
     def __init__(self):
         self.link_manager = LinkManager()
-        self.categorizer = Categorizer()
         # Use explicit patterns from config
         self.target_patterns = settings.DIRECT_SCAN_PATTERNS
 
@@ -82,7 +81,7 @@ class DirectScanner:
                         await session.commit()
                         
                         if new_links:
-                            await self.categorizer.enrich_links(session, links=new_links)
+                            await enrichment_service.enrich_links(session, links=new_links)
                             await session.commit()
                         
                         results.append({"url": url, "total": total_found, "new": new_added})
@@ -123,7 +122,7 @@ class DirectScanner:
             new_added = len(new_links) if new_links else 0
             
             if new_links:
-                await self.categorizer.enrich_links(session, links=new_links)
+                await enrichment_service.enrich_links(session, links=new_links)
                 await session.commit()
             
             return {
