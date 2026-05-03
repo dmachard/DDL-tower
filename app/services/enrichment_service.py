@@ -126,33 +126,33 @@ class EnrichmentService:
                 file_title_clean = p_file.get("title", "").strip()
                 
                 t1 = set(re.findall(r'\w+', scraper_title_clean.lower()))
-                t2 = set(re.findall(r'\w+', file_title_clean.lower()))
                 
-                # IMPORTANT: Also check if any word from scraper title is in the ACTUAL filename string
-                # This helps with cases like "Better Call Saul" vs "Better.Call.Saul.S01E01"
+                # Check if any word from scraper title is in the filename
                 filename_words = set(re.findall(r'\w+', link.filename.lower()))
-                
                 has_overlap = bool(t1.intersection(filename_words))
                 
-                # If no overlap at all, the scraper title is likely wrong (different show/movie)
-                if not has_overlap:
-                    # Normalize for substring check as a secondary safety
-                    norm_scraper = re.sub(r'[^a-z0-9]', '', scraper_title_clean.lower())
-                    norm_filename = re.sub(r'[^a-z0-9]', '', link.filename.lower())
-                    scraper_in_file = norm_scraper in norm_filename if norm_scraper else False
-                    
-                    if not scraper_in_file:
-                        # If filename has season/episode, it's a very strong indicator, trust it
-                        if p_file.get("season") or p_file.get("episode"):
-                            print(f"[ENRICHMENT] ⚠️ Mismatch: Scraper title '{scraper_title_clean}' not found in filename '{link.filename}'. Trusting File Title '{file_title_clean}'.")
+                # Rule: The scraper title is the boss (Override).
+                # We ONLY trust the filename over the scraper if:
+                # 1. The scraper title is empty/weak.
+                # 2. OR it's a Series (has SxxExx), no overlap, and filename title is NOT "junk".
+                if not scraper_title_clean or len(scraper_title_clean) < 3:
+                    p["title"] = file_title_clean
+                elif not has_overlap:
+                    # Specific check for Series: trust filename only if it's a clear alternative title
+                    if p_file.get("season") or p_file.get("episode"):
+                        # Junk detection: if title has no vowels or too many digits, it's obfuscated
+                        has_vowels = any(c in file_title_clean.lower() for c in 'aeiouy')
+                        digit_ratio = sum(c.isdigit() for c in file_title_clean) / len(file_title_clean) if file_title_clean else 0
+                        is_junk = (not has_vowels and len(file_title_clean) > 4) or (digit_ratio > 0.4 and len(file_title_clean) > 5)
+                        
+                        if not is_junk:
+                            print(f"[ENRICHMENT] ⚠️ Series title mismatch: Scraper says '{scraper_title_clean}' but filename is '{link.filename}'. Trusting filename.")
                             p["title"] = file_title_clean
-                        # If scraper title is very short or missing, trust file
-                        elif len(scraper_title_clean) < 4:
-                            p["title"] = file_title_clean
-                        # If movie title from file is long enough and scraper is totally different
-                        elif len(file_title_clean) >= 5:
-                            print(f"[ENRICHMENT] ⚠️ Potential mismatch: Trusting File Title '{file_title_clean}' over Scraper '{scraper_title_clean}'.")
-                            p["title"] = file_title_clean
+                        else:
+                            print(f"[ENRICHMENT] 🛡️ Filename title '{file_title_clean}' looks obfuscated/junk. Keeping scraper title '{scraper_title_clean}'.")
+                    else:
+                        # For movies/others, keep the scraper title (it's the override)
+                        pass
                 
                 # Copy technical details from file if missing in scraper title
                 for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages", "year"]:
