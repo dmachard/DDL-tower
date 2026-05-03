@@ -239,21 +239,25 @@ The structure of this dictionary depends on how the links were extracted:
 graph TD
     SCH[Scheduler / CLI] -->|1. start| SCR[Universal Scraper]
     
-    subgraph "Phase 1: Scraping"
-        SCR -.->|JS/wait/click| BRW[Browser Manager]
-        SCR -.->|bypass| UNL[Unlocker]
-        SCR -- "2. yield" --> LNK[Link Manager]
-        LNK -.->|deduplicate| LNK
-        LNK --> HST[Hoster Check]
-        HST -->|3. save| DB[(SQLite Database)]
+    subgraph "Phase 1: Discovery (Scraper)"
+        SCR -.->|fetch HTML| BRW[Browser Manager]
+        SCR -->|process| UNL[Unlocker]
+        UNL -.->|interactive bypass| BRW
     end
 
-    subgraph "Phase 2: Enrichment"
-        SCH -->|4. trigger| ENR[Enrichment Service]
-        ENR -- "5. query" --> DB
+    subgraph "Phase 2: Storage (Link Manager)"
+        SCR -- "found links" --> LNK[Link Manager]
+        LNK -.->|deduplicate| LNK
+        LNK --> HST[Hoster Check]
+        HST -->|save| DB[(SQLite Database)]
+    end
+
+    subgraph "Phase 3: Enrichment (Metadata)"
+        SCH -->|trigger| ENR[Enrichment Service]
+        ENR -- "fetch missing" --> DB
         ENR -.->|regex| PRS[Parser Service]
-        ENR -.->|metadata| TMDB[TMDb Service]
-        ENR -- "6. update" --> DB
+        ENR -.->|TMDb API| TMDB[TMDb Service]
+        ENR -- "update metadata" --> DB
     end
 ```
 
