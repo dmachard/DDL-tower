@@ -238,9 +238,14 @@ The structure of this dictionary depends on how the links were extracted:
 ```mermaid
 graph TD
     SCH[Scheduler / CLI] --> SCR[Universal Scraper]
-    SCR -.-> BRW[Browser Manager]
-    SCR -.-> UNL[Unlocker]
-    SCR -- "links" --> LNK[Link Manager]
+    
+    SCR -->|1. fetch HTML| BRW[Browser Manager]
+    BRW --> SCR
+    
+    SCR -->|2. unlock| UNL[Unlocker]
+    UNL --> SCR
+    
+    SCR -- "3. yield links" --> LNK[Link Manager]
     LNK --> HST[Hoster Check]
     HST --> DB[(SQLite Database)]
 ```
@@ -250,9 +255,11 @@ graph TD
 ```mermaid
 graph TD
     SCH[Scheduler / CLI] --> ENR[Enrichment Service]
-    ENR -.-> PRS[Parser Service]
-    ENR -.-> TMDB[TMDb Service]
-    ENR --> DB[(SQLite Database)]
+    ENR -->|1. parse filename| PRS[Parser Service]
+    PRS --> ENR
+    ENR -->|2. fetch metadata| TMDB[TMDb Service]
+    TMDB --> ENR
+    ENR -- "3. update" --> DB[(SQLite Database)]
 ```
 
 3. Download & Library
@@ -260,9 +267,9 @@ graph TD
 ```mermaid
 graph TD
     UI[Dashboard / API] --> DEB[Debrid Unlocking]
-    DEB --> DL[Downloader Service]
+    DEB -->|direct links| DL[Downloader Service]
     DL --> LOCK{Global Queue Lock}
-    LOCK -->|One by One| GET[Aiohttp Downloader]
-    GET -.-> ORG[Library Service]
+    LOCK -->|sequential| GET[Aiohttp Downloader]
+    GET -->|finalize| ORG[Library Service]
     ORG --> DISK[[Disk Storage]]
 ```
