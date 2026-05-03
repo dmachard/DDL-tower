@@ -121,28 +121,38 @@ class EnrichmentService:
             if link.title and link.filename:
                 p_file = parser_service.parse_filename(link.filename)
                 
-                # Check for word overlap
-                t1 = set(re.findall(r'\w+', p.get("title", "").lower()))
-                t2 = set(re.findall(r'\w+', p_file.get("title", "").lower()))
-                overlap = t1.intersection(t2)
+                # Check for word overlap between scraper title and filename title
+                scraper_title_clean = p.get("title", "").strip()
+                file_title_clean = p_file.get("title", "").strip()
                 
-                # If no significant overlap, we prefer the scraper title (RSS/Override) 
-                # because filenames are often obfuscated or technical.
-                # We only switch to the file title if the scraper title is missing or too generic.
-                if not overlap:
-                    scraper_title = p.get("title", "")
-                    file_title = p_file.get("title", "")
+                t1 = set(re.findall(r'\w+', scraper_title_clean.lower()))
+                t2 = set(re.findall(r'\w+', file_title_clean.lower()))
+                
+                # IMPORTANT: Also check if any word from scraper title is in the ACTUAL filename string
+                # This helps with cases like "Better Call Saul" vs "Better.Call.Saul.S01E01"
+                filename_words = set(re.findall(r'\w+', link.filename.lower()))
+                
+                has_overlap = bool(t1.intersection(filename_words))
+                
+                # If no overlap at all, the scraper title is likely wrong (different show/movie)
+                if not has_overlap:
+                    # Normalize for substring check as a secondary safety
+                    norm_scraper = re.sub(r'[^a-z0-9]', '', scraper_title_clean.lower())
+                    norm_filename = re.sub(r'[^a-z0-9]', '', link.filename.lower())
+                    scraper_in_file = norm_scraper in norm_filename if norm_scraper else False
                     
-                    # If scraper title looks like a real movie/series title (multi-word), keep it.
-                    if " " in scraper_title.strip() and len(scraper_title) > 2:
-                        pass
-                    # Only fallback to file if scraper title is very weak AND file title looks valid.
-                    elif (not scraper_title or len(scraper_title) < 4) and " " in file_title.strip() and len(t2) >= 2:
-                        print(f"[ENRICHMENT] ⚠️ Title conflict: Scraper='{scraper_title}' vs File='{file_title}'. Trusting File.")
-                        p["title"] = file_title
-                    else:
-                        # Default to scraper title, it's safer
-                        pass
+                    if not scraper_in_file:
+                        # If filename has season/episode, it's a very strong indicator, trust it
+                        if p_file.get("season") or p_file.get("episode"):
+                            print(f"[ENRICHMENT] ⚠️ Mismatch: Scraper title '{scraper_title_clean}' not found in filename '{link.filename}'. Trusting File Title '{file_title_clean}'.")
+                            p["title"] = file_title_clean
+                        # If scraper title is very short or missing, trust file
+                        elif len(scraper_title_clean) < 4:
+                            p["title"] = file_title_clean
+                        # If movie title from file is long enough and scraper is totally different
+                        elif len(file_title_clean) >= 5:
+                            print(f"[ENRICHMENT] ⚠️ Potential mismatch: Trusting File Title '{file_title_clean}' over Scraper '{scraper_title_clean}'.")
+                            p["title"] = file_title_clean
                 
                 # Copy technical details from file if missing in scraper title
                 for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages", "year"]:

@@ -102,13 +102,31 @@ class TMDbService:
                             candidates.append(res)
                     
                     if candidates:
-                        # Sort by: has poster (priority) then popularity
-                        candidates.sort(key=lambda x: (x.get("poster_path") is not None, x.get("popularity", 0)), reverse=True)
+                        # Sort by: exact title match (priority) then has poster then popularity
+                        def sort_key_year(x):
+                            t = (x.get("title") or x.get("name") or "").lower()
+                            ot = (x.get("original_title") or x.get("original_name") or "").lower()
+                            query_low = title.lower()
+                            is_exact = (t == query_low or ot == query_low)
+                            return (is_exact, x.get("poster_path") is not None, x.get("popularity", 0))
+
+                        candidates.sort(key=sort_key_year, reverse=True)
                         best_match = candidates[0]
                         print(f"[TMDB] Selected best candidate among {len(candidates)} year matches: '{best_match.get('title') or best_match.get('name')}'")
                 
                 if not best_match and search_data["results"]:
-                    best_match = search_data["results"][0]
+                    # If no year or no year match, sort all results by exact title match then popularity
+                    def sort_key_general(x):
+                        t = (x.get("title") or x.get("name") or "").lower()
+                        ot = (x.get("original_title") or x.get("original_name") or "").lower()
+                        query_low = title.lower()
+                        is_exact = (t == query_low or ot == query_low)
+                        return (is_exact, x.get("poster_path") is not None, x.get("popularity", 0))
+
+                    results = search_data["results"]
+                    results.sort(key=sort_key_general, reverse=True)
+                    best_match = results[0]
+                    print(f"[TMDB] Selected best candidate by name/popularity: '{best_match.get('title') or best_match.get('name')}'")
                 
                 tmdb_id = best_match["id"]
 
