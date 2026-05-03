@@ -109,11 +109,13 @@ class EnrichmentService:
         """
         Processes a batch of links for enrichment.
         """
+        print(f"[ENRICHMENT] Processing {len(links)} links for enrichment...")
         # First, ensure all links have technical parsing done
         for link in links:
             # Prioritize parsing the 'good name' (link.title from feed) if available, 
             # as it's more reliable than the obfuscated filename.
             parse_target = link.title if link.title else link.filename
+            print(f"[ENRICHMENT] Parsing target: {parse_target}")
             p = parser_service.parse_filename(parse_target)
             
             # If we have both, compare titles. If they are completely different, 
@@ -146,10 +148,7 @@ class EnrichmentService:
                         is_junk = (not has_vowels and len(file_title_clean) > 4) or (digit_ratio > 0.4 and len(file_title_clean) > 5)
                         
                         if not is_junk:
-                            print(f"[ENRICHMENT] ⚠️ Series title mismatch: Scraper says '{scraper_title_clean}' but filename is '{link.filename}'. Trusting filename.")
                             p["title"] = file_title_clean
-                        else:
-                            print(f"[ENRICHMENT] 🛡️ Filename title '{file_title_clean}' looks obfuscated/junk. Keeping scraper title '{scraper_title_clean}'.")
                     else:
                         # For movies/others, keep the scraper title (it's the override)
                         pass

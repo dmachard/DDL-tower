@@ -30,11 +30,6 @@ services:
   ddltower-browser:
     image: lscr.io/linuxserver/webtop:ubuntu-xfce
     container_name: ddltower-browser
-    security_opt:
-      - seccomp:unconfined
-      - apparmor=unconfined
-    cap_add:
-      - SYS_ADMIN
     # to avoid 127.0.0.1 resolution and IPv6 priority
     # extra_hosts:
     #   - "xxxxxx.com:[IP_ADDRESS]"

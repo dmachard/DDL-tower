@@ -62,7 +62,7 @@ class Hoster:
 
         # 2. Execute direct checks with concurrency limit
         if direct_links:
-            print(f"[HOSTER] Checking {len(direct_links)} links with concurrency limit...")
+            print(f"[HOSTER] Checking {len(direct_links)} links...")
             async with aiohttp.ClientSession() as session:
                 async def wrapped_check(link, mapper, session):
                     # We use the semaphore to block if 3 tasks are already running
