@@ -246,18 +246,18 @@ graph TD
     end
 
     subgraph "Phase 2: Storage (Link Manager)"
-        SCR -- "found links" --> LNK[Link Manager]
+        SCR -- "2. found links" --> LNK[Link Manager]
         LNK -.->|deduplicate| LNK
         LNK --> HST[Hoster Check]
-        HST -->|save| DB[(SQLite Database)]
+        HST -->|3. save| DB[(SQLite Database)]
     end
 
     subgraph "Phase 3: Enrichment (Metadata)"
-        SCH -->|trigger| ENR[Enrichment Service]
-        ENR -- "fetch missing" --> DB
+        SCH -->|4. trigger| ENR[Enrichment Service]
+        ENR -- "5. fetch missing" --> DB
         ENR -.->|regex| PRS[Parser Service]
         ENR -.->|TMDb API| TMDB[TMDb Service]
-        ENR -- "update metadata" --> DB
+        ENR -- "6. update metadata" --> DB
     end
 ```
 
@@ -271,8 +271,8 @@ graph TD
     API -->|3. enqueue| DL[Downloader Service]
     
     subgraph "Processing Queue"
-        DL --> LOCK{Global Lock}
-        LOCK -->|4. download| GET[Aiohttp Downloader]
+        DL --> LOCK{4. Global Lock}
+        LOCK -->|download| GET[Aiohttp Downloader]
         GET -.->|resume/retries| GET
         GET -->|5. finalize| EXT[Extraction Service]
         EXT -.->|unrar/7z| EXT
