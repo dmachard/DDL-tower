@@ -239,31 +239,40 @@ The structure of this dictionary depends on how the links were extracted:
 graph TD
     SCH[Scheduler / CLI] -->|1. start| SCR[Universal Scraper]
     
-    SCR -->|fetch| BRW[Browser Manager]
-    BRW --> SCR
-    
-    SCR -->|unlock| UNL[Unlocker]
-    UNL --> SCR
-    
-    SCR -- "2. yield links" --> LNK[Link Manager]
-    LNK --> HST[Hoster Check]
-    HST -->|3. save| DB[(SQLite Database)]
+    subgraph "Phase 1: Scraping"
+        SCR -.->|JS/wait/click| BRW[Browser Manager]
+        SCR -.->|bypass| UNL[Unlocker]
+        SCR -- "2. yield" --> LNK[Link Manager]
+        LNK -.->|deduplicate| LNK
+        LNK --> HST[Hoster Check]
+        HST -->|3. save| DB[(SQLite Database)]
+    end
 
-    SCH -->|4. trigger enrichment| ENR[Enrichment Service]
-    ENR -- "5. fetch unenriched" --> DB
-    ENR -.-> PRS[Parser Service]
-    ENR -.-> TMDB[TMDb Service]
-    ENR -- "6. update info" --> DB
+    subgraph "Phase 2: Enrichment"
+        SCH -->|4. trigger| ENR[Enrichment Service]
+        ENR -- "5. query" --> DB
+        ENR -.->|regex| PRS[Parser Service]
+        ENR -.->|metadata| TMDB[TMDb Service]
+        ENR -- "6. update" --> DB
+    end
 ```
 
 2. Download & Library Workflow
 
 ```mermaid
 graph TD
-    UI[Dashboard / API] --> DEB[Debrid Unlocking]
-    DEB -->|direct links| DL[Downloader Service]
-    DL --> LOCK{Global Queue Lock}
-    LOCK -->|sequential| GET[Aiohttp Downloader]
-    GET -->|finalize| ORG[Library Service]
-    ORG --> DISK[[Disk Storage]]
+    UI[Dashboard / API] -->|trigger| API[Download API]
+    API -->|1. unlock| DEB[Debrid Service]
+    DEB -->|2. direct links| API
+    API -->|3. enqueue| DL[Downloader Service]
+    
+    subgraph "Processing Queue"
+        DL --> LOCK{Global Lock}
+        LOCK -->|4. download| GET[Aiohttp Downloader]
+        GET -.->|resume/retries| GET
+        GET -->|5. finalize| EXT[Extraction Service]
+        EXT -.->|unrar/7z| EXT
+        EXT -->|6. organize| LIB[Library Service]
+        LIB --> DISK[[Disk / Media Library]]
+    end
 ```
