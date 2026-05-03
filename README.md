@@ -237,24 +237,23 @@ The structure of this dictionary depends on how the links were extracted:
 
 ```mermaid
 graph TD
-    SCH[Scheduler / CLI] --> SCR[Universal Scraper]
+    SCH[Scheduler / CLI] -->|1. start| SCR[Universal Scraper]
     
-    SCR -->|1. fetch| BRW[Browser Manager]
+    SCR -->|fetch| BRW[Browser Manager]
     BRW --> SCR
     
-    SCR -->|2. unlock| UNL[Unlocker]
+    SCR -->|unlock| UNL[Unlocker]
     UNL --> SCR
     
-    SCR -- "3. yield links" --> LNK[Link Manager]
-    LNK -->|4. check| HST[Hoster Check]
-    HST -->|5. save| DB[(SQLite Database)]
+    SCR -- "2. yield links" --> LNK[Link Manager]
+    LNK --> HST[Hoster Check]
+    HST -->|3. save| DB[(SQLite Database)]
 
-    DB -- "6. enrich" --> ENR[Enrichment Service]
-    ENR -->|7. parse| PRS[Parser Service]
-    PRS --> ENR
-    ENR -->|8. info| TMDB[TMDb Service]
-    TMDB --> ENR
-    ENR -- "9. update" --> DB
+    SCH -->|4. trigger enrichment| ENR[Enrichment Service]
+    ENR -- "5. fetch unenriched" --> DB
+    ENR -.-> PRS[Parser Service]
+    ENR -.-> TMDB[TMDb Service]
+    ENR -- "6. update info" --> DB
 ```
 
 2. Download & Library Workflow
