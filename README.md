@@ -237,27 +237,28 @@ The structure of this dictionary depends on how the links were extracted:
 
 ```mermaid
 graph TD
-    SCH[Scheduler / CLI] -->|1. start| SCR[Universal Scraper]
+    SCH[Scheduler / CLI]
     
     subgraph "Phase 1: Discovery (Scraper)"
+        SCH -->|1. run| SCR[Universal Scraper]
         SCR -.->|fetch HTML| BRW[Browser Manager]
         SCR -->|process| UNL[Unlocker]
         UNL -.->|interactive bypass| BRW
+        SCR -- "yield batch" --> SCH
     end
 
     subgraph "Phase 2: Storage (Link Manager)"
-        SCR -- "2. found links" --> LNK[Link Manager]
-        LNK -.->|deduplicate| LNK
-        LNK --> HST[Hoster Check]
-        HST -->|3. save| DB[(SQLite Database)]
+        SCH -- "2. check links" --> LNK[Link Manager]
+        LNK -.->|verify status| HST[Hoster Check]
+        LNK -- "save" --> DB[(SQLite Database)]
+        LNK -- "added objects" --> SCH
     end
 
     subgraph "Phase 3: Enrichment (Metadata)"
-        SCH -->|4. trigger| ENR[Enrichment Service]
-        ENR -- "5. fetch missing" --> DB
-        ENR -.->|regex| PRS[Parser Service]
-        ENR -.->|TMDb API| TMDB[TMDb Service]
-        ENR -- "6. update metadata" --> DB
+        SCH -- "3. enrich" --> ENR[Enrichment Service]
+        ENR -.->|parse filename| PRS[Parser Service]
+        ENR -.->|fetch info| TMDB[TMDb Service]
+        ENR -- "update metadata" --> DB
     end
 ```
 
