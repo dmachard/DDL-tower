@@ -229,3 +229,34 @@ The structure of this dictionary depends on how the links were extracted:
 
 - https://github.com/omkarcloud/botasaurus
 - https://github.com/D4Vinci/Scrapling
+
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph "1. Discovery & Scraping"
+        SCH[Scheduler / CLI] --> SCR[Universal Scraper]
+        SCR -.-> BRW[Browser Manager]
+        SCR -.-> UNL[Unlocker]
+        SCR -- "links" --> LNK[Link Manager]
+        LNK --> HST[Hoster Check]
+        HST --> DB[(SQLite Database)]
+    end
+
+    subgraph "2. Metadata Enrichment"
+        SCH --> ENR[Enrichment Service]
+        ENR -.-> PRS[Parser Service]
+        ENR -.-> TMDB[TMDb Service]
+        ENR --> DB
+    end
+
+    subgraph "3. Download & Library"
+        UI[Dashboard / API] --> DEB[Debrid Unlocking]
+        DEB --> DL[Downloader Service]
+        DL --> LOCK{Global Queue Lock}
+        LOCK -->|One by One| GET[Aiohttp Downloader]
+        GET -.-> ORG[Library Service]
+        ORG --> DISK[[Disk Storage]]
+    end
+```
