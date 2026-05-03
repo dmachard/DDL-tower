@@ -242,7 +242,10 @@ class Scraper:
             current_tags.extend(tags)
 
         # 2. Extract
-        raw = self._extract_links(text, list(set((step.get("regex_patterns") or step.get("dig_patterns") or step.get("dig_patterns_url") or []) + step.get("hoster_patterns", []) + step.get("unlock_patterns", []))))
+        if isinstance(item, dict) and (item.get("url") or item.get("href")):
+            raw = [item.get("url") or item.get("href")]
+        else:
+            raw = self._extract_links(text, list(set((step.get("regex_patterns") or step.get("dig_patterns") or step.get("dig_patterns_url") or []) + step.get("hoster_patterns", []) + step.get("unlock_patterns", []))))
 
         if step.get("ignore_patterns"):
             raw = [l for l in raw if not any(re.search(p, l) for p in step["ignore_patterns"])]

@@ -175,3 +175,31 @@ async def test_pagination_infinite_loop_protection():
     # Should have called get twice (Page 1, then Page 2 which is same as Page 1 -> break)
     # Note: the first page hash is stored, then the second page is fetched and compared.
     assert client.get.call_count == 2
+
+@pytest.mark.asyncio
+async def test_dict_item_link_extraction():
+    """Test that dictionary items use 'url' or 'href' directly without mangling."""
+    config = {
+        "name": "TestDict",
+        "steps": [
+            {
+                "name": "step1",
+                "url": "https://site.com",
+                "yield_links": True
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    
+    # Simulate a dictionary item returned by js_code (e.g. from detail step)
+    item = {"href": "https://protect.link/abc", "provider": "xxxx"}
+    
+    results = []
+    # We call _handle_item directly to test the extraction logic
+    async for batch in scraper._handle_item(client, item, config["steps"][0], {}, 0, "https://site.com", ""):
+        results.append(batch)
+        
+    assert len(results) == 1
+    # Check that it extracted ONLY the href, without the rest of the dictionary
+    assert results[0]["links"][0] == "https://protect.link/abc"
