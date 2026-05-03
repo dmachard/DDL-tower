@@ -1,8 +1,10 @@
 import math
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.future import select
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
+from typing import List
 
 from app.db.database import get_db
 from app.db.models import DownloadLink
@@ -88,3 +90,20 @@ async def get_releases(
     return await release_service.get_grouped_releases(
         db, page, limit, q, category, source, resolution, year, network, recent, hours, show_all
     )
+
+class DeleteRequest(BaseModel):
+    ids: List[int]
+
+@router.delete("/releases")
+async def delete_releases(req: DeleteRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Deletes multiple download links by their IDs.
+    """
+    if not req.ids:
+        return {"ok": True, "deleted": 0}
+    
+    stmt = delete(DownloadLink).where(DownloadLink.id.in_(req.ids))
+    result = await db.execute(stmt)
+    await db.commit()
+    
+    return {"ok": True, "deleted": result.rowcount}

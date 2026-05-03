@@ -2,7 +2,8 @@ import { TRANSLATIONS } from './i18n.js';
 import { state } from './state.js';
 import { formatSeasonEp, formatLangs, formatBytes, beautifyHoster, getImdbUrl, renderRatingDots, formatDate } from './helpers.js';
 import { renderPagination } from './pagination.js';
-import { downloadUrls } from './api.js';
+import { downloadUrls, deleteReleases, fetchData } from './api.js';
+import { showConfirm } from './modals.js';
 
 // ─── Release Card ─────────────────────────────────────────────────────────────
 
@@ -181,6 +182,33 @@ export const renderReleases = (groups) => {
             import('./modals.js').then(({ openIdentifyModal }) => openIdentifyModal(allLinks, group.official_title || group.title || ''));
         };
         actionsEl.appendChild(btnIdentify);
+        
+        const btnDelete = document.createElement('div');
+        btnDelete.className = 'btn-action-round btn-danger';
+        btnDelete.title = TRANSLATIONS[state.language].btn_delete;
+        btnDelete.innerHTML = '<i class="fas fa-trash"></i>';
+        btnDelete.onclick = async (e) => {
+            e.stopPropagation();
+            const allLinks = [];
+            Object.values(group.resolutions || {}).forEach(relList => {
+                relList.forEach(rel => rel.sub_releases.forEach(sub => sub.parts.forEach(p => allLinks.push(p.id))));
+            });
+            
+            const title = TRANSLATIONS[state.language].btn_delete;
+            const msg = TRANSLATIONS[state.language].confirm_delete_release;
+            
+            if (await showConfirm(title, msg)) {
+                try {
+                    const res = await deleteReleases(allLinks);
+                    if (res.ok) {
+                        fetchData('releases');
+                    }
+                } catch (err) {
+                    console.error('Failed to delete release:', err);
+                }
+            }
+        };
+        actionsEl.appendChild(btnDelete);
 
 
         if (group.poster_path) {

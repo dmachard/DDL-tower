@@ -136,6 +136,11 @@
     opacity: 1;
 }
 
+.btn-action-round.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+}
+
 .btn-all-toggle {
     font-weight: 900;
     font-size: 10px !important;

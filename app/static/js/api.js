@@ -148,3 +148,11 @@ export const downloadUrls = async (urls) => {
         body: JSON.stringify({ urls })
     });
 };
+
+export const deleteReleases = async (ids) => {
+    return fetch('/api/releases', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+    });
+};

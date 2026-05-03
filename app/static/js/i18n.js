@@ -66,7 +66,9 @@ export const TRANSLATIONS = {
         btn_extract: "Scan",
         btn_clear: "Clear",
         help_scan_enter: "Press Enter to start crawling",
-        modal_view_links_title: "Available Links"
+        modal_view_links_title: "Available Links",
+        btn_delete: "Delete",
+        confirm_delete_release: "Are you sure you want to delete this release and all associated links?"
     },
     fr: {
         nav_releases: "Explorer",
@@ -130,7 +132,9 @@ export const TRANSLATIONS = {
         btn_extract: "Scanner",
         btn_clear: "Effacer",
         help_scan_enter: "Appuyez sur Entrée pour lancer le crawl",
-        modal_view_links_title: "Liens Disponibles"
+        modal_view_links_title: "Liens Disponibles",
+        btn_delete: "Supprimer",
+        confirm_delete_release: "Voulez-vous vraiment supprimer cette release et tous les liens associés ?"
     }
 };
 
