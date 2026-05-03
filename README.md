@@ -237,37 +237,32 @@ The structure of this dictionary depends on how the links were extracted:
 
 ```mermaid
 graph TD
-    subgraph
-        SCH[Scheduler / CLI] --> SCR[Universal Scraper]
-        SCR -.-> BRW[Browser Manager]
-        SCR -.-> UNL[Unlocker]
-        SCR -- "links" --> LNK[Link Manager]
-        LNK --> HST[Hoster Check]
-        HST --> DB[(SQLite Database)]
-    end
+    SCH[Scheduler / CLI] --> SCR[Universal Scraper]
+    SCR -.-> BRW[Browser Manager]
+    SCR -.-> UNL[Unlocker]
+    SCR -- "links" --> LNK[Link Manager]
+    LNK --> HST[Hoster Check]
+    HST --> DB[(SQLite Database)]
 ```
 
 2. Metadata Enrichment
 
 ```mermaid
 graph TD
-    subgraph
-        SCH --> ENR[Enrichment Service]
-        ENR -.-> PRS[Parser Service]
-        ENR -.-> TMDB[TMDb Service]
-        ENR --> DB
-    end
+    SCH[Scheduler / CLI] --> ENR[Enrichment Service]
+    ENR -.-> PRS[Parser Service]
+    ENR -.-> TMDB[TMDb Service]
+    ENR --> DB[(SQLite Database)]
+```
 
 3. Download & Library
 
 ```mermaid
 graph TD
-    subgraph
-        UI[Dashboard / API] --> DEB[Debrid Unlocking]
-        DEB --> DL[Downloader Service]
-        DL --> LOCK{Global Queue Lock}
-        LOCK -->|One by One| GET[Aiohttp Downloader]
-        GET -.-> ORG[Library Service]
-        ORG --> DISK[[Disk Storage]]
-    end
+    UI[Dashboard / API] --> DEB[Debrid Unlocking]
+    DEB --> DL[Downloader Service]
+    DL --> LOCK{Global Queue Lock}
+    LOCK -->|One by One| GET[Aiohttp Downloader]
+    GET -.-> ORG[Library Service]
+    ORG --> DISK[[Disk Storage]]
 ```
