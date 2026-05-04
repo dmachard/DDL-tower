@@ -118,7 +118,11 @@ async def run_cli():
         sys.exit(1)
 
 def main():
-    asyncio.run(run_cli())
+    try:
+        asyncio.run(run_cli())
+    except KeyboardInterrupt:
+        print("\n[CLI] Interrupted by user. Exiting...")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -98,7 +98,7 @@ async def test_execute_step_with_list_url():
 
     # Execute step
     results = []
-    async for batch in scraper._execute_step(client, 0, {}):
+    async for batch in scraper._execute_step(client, 0, [{}]):
         results.append(batch)
     
     # Should have called get twice
@@ -139,7 +139,7 @@ async def test_execute_step_context_inheritance():
     client.get.side_effect = [resp1, resp2]
 
     results = []
-    async for batch in scraper._execute_step(client, 0, {}):
+    async for batch in scraper._execute_step(client, 0, [{}]):
         results.append(batch)
     
     assert len(results) == 1
@@ -169,7 +169,7 @@ async def test_pagination_infinite_loop_protection():
     client.get.return_value = mock_resp
 
     results = []
-    async for batch in scraper._execute_step(client, 0, {}):
+    async for batch in scraper._execute_step(client, 0, [{}]):
         results.append(batch)
     
     # Should have called get twice (Page 1, then Page 2 which is same as Page 1 -> break)

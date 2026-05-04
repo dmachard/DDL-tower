@@ -41,11 +41,11 @@ class Scraper:
             return
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            async for batch in self._execute_step(client, 0, {}):
+            async for batch in self._execute_step(client, 0, [{}]):
                 yield batch
 
-    async def _execute_step(self, client: httpx.AsyncClient, step_idx: int, context: dict) -> AsyncGenerator[Dict[str, Any], None]:
-        if step_idx >= len(self.steps):
+    async def _execute_step(self, client: httpx.AsyncClient, step_idx: int, contexts: List[dict]) -> AsyncGenerator[Dict[str, Any], None]:
+        if step_idx >= len(self.steps) or not contexts:
             return
 
         step = self.steps[step_idx]
@@ -55,83 +55,113 @@ class Scraper:
         if not url_template:
             return
 
-        # Render URL from context
-        try:
-            urls = []
-            # If it's already a list, use it as is, otherwise render it
-            if isinstance(url_template, list):
-                urls = [self._render_string(u, context) for u in url_template]
-            else:
-                rendered = self._render_string(url_template, context)
+        # 1. Prepare all target URLs for this batch
+        to_process = [] # List of (url, context)
+        for ctx in contexts:
+            try:
+                rendered = self._render_string(url_template, ctx)
+                urls = []
                 if isinstance(rendered, str) and rendered.startswith("[") and rendered.endswith("]"):
-                    try:
-                        urls = json.loads(rendered.replace("'", '"'))
+                    try: urls = json.loads(rendered.replace("'", '"'))
                     except: urls = [rendered]
-                else:
-                    urls = [rendered]
-            
-            for url in urls:
-                # Basic validation and filtering
-                if not url or not url.startswith("http"): continue
+                elif isinstance(rendered, list): urls = rendered
+                else: urls = [rendered]
                 
-                # Check if already scraped
-                if step.get("scrape_once"):
-                    async with get_db_ctx() as session:
-                        stmt = select(ScrapedURL).where(ScrapedURL.url == url)
-                        res = await session.execute(stmt)
-                        if res.scalar_one_or_none():
-                            print(f"[{self.name}] [{step_name}] Skipping already scraped URL: {url}")
-                            continue
+                for u in urls:
+                    if u and u.startswith("http"):
+                        to_process.append({"url": u, "ctx": ctx})
+            except: pass
 
-                # Global ignore resolutions check in URL
-                ignore_resolutions = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step.get("ignore_resolutions", [])))
-                if ignore_resolutions:
-                    parsed_url = urlparse(url)
-                    url_slug = parsed_url.path.split('/')[-1] or (parsed_url.path.split('/')[-2] if '/' in parsed_url.path else "")
-                    if any(re.search(rf'[\.\-\_]{re.escape(res)}[\.\-\_]', url_slug, re.I) or re.search(rf'{re.escape(res)}\b', url_slug, re.I) for res in ignore_resolutions):
-                        print(f"[{self.name}] [{step_name}] ⏭ Skipping URL (Resolution ignored in slug): {url}")
-                        continue
+        if not to_process:
+            return
 
+        # 2. Bulk check for scrape_once/scrape_one
+        final_list = []
+        skipped_count = 0
+        if step.get("scrape_once") or step.get("scrape_one"):
+            all_urls = [i["url"] for i in to_process]
+            async with get_db_ctx() as session:
+                stmt = select(ScrapedURL.url).where(ScrapedURL.url.in_(all_urls))
+                res = await session.execute(stmt)
+                already_scraped = set(res.scalars().all())
+                
+                for item in to_process:
+                    if item["url"] in already_scraped:
+                        skipped_count += 1
+                    else:
+                        final_list.append(item)
+        else:
+            final_list = to_process
+
+        if skipped_count > 0:
+            print(f"[{self.name}] [{step_name}] {len(final_list)} new URL(s) to visit ({skipped_count} skipped)")
+        elif step_idx > 0: # Only print for non-root steps to avoid noise
+            print(f"[{self.name}] [{step_name}] Processing {len(final_list)} URL(s)")
+
+        # 3. Process the remaining URLs
+        for item in final_list:
+            url = item["url"]
+            ctx = item["ctx"]
+
+            # Global ignore resolutions check in URL
+            ignore_resolutions = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step.get("ignore_resolutions", [])))
+            if ignore_resolutions:
+                parsed_url = urlparse(url)
+                url_slug = parsed_url.path.split('/')[-1] or (parsed_url.path.split('/')[-2] if '/' in parsed_url.path else "")
+                if any(re.search(rf'[\.\-\_]{re.escape(res)}[\.\-\_]', url_slug, re.I) or re.search(rf'{re.escape(res)}\b', url_slug, re.I) for res in ignore_resolutions):
+                    print(f"[{self.name}] [{step_name}] ⏭ Skipping URL (Resolution ignored in slug): {url}")
+                    continue
+
+            try:
                 # --- PAGINATION LOOP ---
                 current_page = step.get("pagination", {}).get("start_page", 1)
                 prev_content_hash = None
-
+    
                 while True:
                     # 1. Fetch
-                    content = await self._get_content(client, url, step, context, step_idx)
+                    content = await self._get_content(client, url, step, ctx, step_idx)
                     if not content: break
                     
                     # Anti-infinite loop
                     c_hash = hash(content)
                     if c_hash == prev_content_hash: break
                     prev_content_hash = c_hash
-
+    
                     # 2. Parse
-                    results, page_info = self._parse_results(content, step, context, current_page)
+                    results, page_info = self._parse_results(content, step, ctx, current_page)
                     if not results:
                         if step.get("type") in ["rss", "json"]: break
                         results = [content]
-
+    
                     # 3. Handle Items
+                    next_batch_contexts = []
                     scraped_any = False
-                    for item in results:
-                        async for batch in self._handle_item(client, item, step, context, step_idx, url, page_info):
-                            yield batch
+                    for item_res in results:
+                        async for res_or_ctx in self._handle_item(client, item_res, step, ctx, step_idx, url, page_info):
+                            if isinstance(res_or_ctx, dict) and "links" in res_or_ctx:
+                                yield res_or_ctx
+                                scraped_any = True
+                            else:
+                                next_batch_contexts.append(res_or_ctx)
+                    
+                    # Recursion in batch
+                    if next_batch_contexts:
+                        async for b in self._execute_step(client, step_idx + 1, next_batch_contexts):
+                            yield b
                             scraped_any = True
-
+    
                     # Cleanup/Record
-                    if step.get("scrape_once") and scraped_any:
+                    if (step.get("scrape_once") or step.get("scrape_one")) and scraped_any:
                         await self._record_scraped(url)
-
+    
                     # Next page?
                     if not step.get("pagination"): break
                     current_page += 1
                     if current_page > step.get("pagination", {}).get("max_pages", 999): break
                     url = self._update_url_param(url, step["pagination"].get("param", "page"), current_page)
 
-        except Exception as e:
-            print(f"[{self.name}] [{step_name}] Step error: {e}")
-            traceback.print_exc()
+            except Exception as e:
+                print(f"[{self.name}] [{step_name}] URL error ({url}): {e}")
 
     # --- HELPERS ---
 
@@ -297,8 +327,8 @@ class Scraper:
                 print(f"[{self.name}] [{step_name}] Found {len(valid)} link(s)")
                 acc = list(set(context.get("__accumulated_tags__", []) + current_tags))
                 yield {"links": list(set(valid)), "source_url": url, "override_title": title, "override_year": str(year) if year and str(year).isdigit() else None, "tags": acc}
-            else:
-                print(f"[{self.name}] [{step_name}] No matching links found on this page.")
+            elif is_last:
+                print(f"[{self.name}] [{step_name}] No matching links found.")
 
         new_ctx["__accumulated_tags__"] = list(set(context.get("__accumulated_tags__", []) + current_tags))
         if (not is_last and step.get("follow_links") is not False) or step.get("follow_links") is True:
@@ -306,10 +336,9 @@ class Scraper:
                 for l in raw:
                     nctx = new_ctx.copy()
                     nctx[step_name] = {**item_data, "url": l, "content": ""}
-                    async for b in self._execute_step(client, step_idx + 1, nctx): yield b
+                    yield nctx
             else:
-                print(f"[{self.name}] [{step_name}] No links to follow for next step.")
-                async for b in self._execute_step(client, step_idx + 1, new_ctx): yield b
+                yield new_ctx
 
     async def _fetch_with_browser(self, url: str, step: dict, context: dict, headers: dict = None) -> Optional[str]:
         from playwright.async_api import async_playwright
