@@ -31,7 +31,7 @@ async def get_rss_feed(
     for item in items:
         # Construct a descriptive title
         # e.g., "Deadpool (2016) [Movie] [1080p, 2160p]"
-        title = item.get("official_title") or item.get("title")
+        title = item.get("title_fr") or item.get("official_title") or item.get("title")
         year = item.get("year")
         # Collect all unique tags across all resolutions/cards
         raw_tags = []
@@ -68,8 +68,9 @@ async def get_rss_feed(
         }
         display_cat = cat_labels.get(cat.lower(), "Film" if "movie" in cat.lower() else "TV")
         
-        display_title = f"[{display_cat}] {title}"
+        display_title = f"[{display_cat}]"
         if year: display_title += f" ({year})"
+        display_title += f" {title}"
         display_title += tags_str
         
         # Build description
@@ -87,6 +88,11 @@ async def get_rss_feed(
         if poster_url:
             description += f'<p><img src="{html.escape(poster_url)}" alt="Poster" style="max-width: 300px; display: block; margin-bottom: 10px;" /></p>'
         description += f"<p>{plot}</p>"
+        
+        # Add original title if different from display title
+        orig_title = item.get("official_title")
+        if orig_title and orig_title != title:
+            description += f"<p><em>Titre original : {html.escape(orig_title)}</em></p>"
 
         if item.get("rating"):
             description += f"<p><strong>Note :</strong> {item['rating']}/10</p>"
