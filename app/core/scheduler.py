@@ -58,6 +58,13 @@ async def run_scraper(scraper):
                             res = await db.execute(stmt)
                             links_to_enrich = res.scalars().all()
                             await enrichment_service.enrich_links(db, links=links_to_enrich)
+                        
+                        # 3. Auto-download if requested in scraper config
+                        if batch.get("auto_download"):
+                            from app.api.downloads import run_download_task
+                            print(f"[SCHEDULER] Auto-download triggered for {len(links)} links from {scraper.name}")
+                            # We run it in the background as a task to not block the scraper
+                            asyncio.create_task(run_download_task(links))
     except Exception as e:
         print(f"[SCHEDULER] Error running scraper {scraper.name}: {e}")
         traceback.print_exc()

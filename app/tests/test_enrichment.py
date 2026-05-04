@@ -64,3 +64,24 @@ async def test_enrichment_short_scraper_title_preservation():
     # Should KEEP "Hi" because it was the explicit title
     assert link.title == "Hi"
     assert link.season == "1" # Technical info still merged from filename
+
+@pytest.mark.asyncio
+async def test_enrichment_filename_cleaning_with_tags():
+    """Test that enrichment cleans filename correctly even with weird group tags (@@xxx@@)."""
+    session = AsyncMock()
+    
+    link = DownloadLink(
+        id=4,
+        title=None, # No scraper title provided
+        filename="Your Friends and Neighbors S02E04 1080p Web H264 @@xxxx@@.mkv",
+        source_name="Manual"
+    )
+    
+    with patch("app.services.enrichment_service.EnrichmentService.enrich_link_metadata", new_callable=AsyncMock):
+        await EnrichmentService.process_batch(session, [link])
+    
+    # Title should be clean
+    assert link.title == "Your Friends and Neighbors"
+    assert link.season == "2"
+    assert link.episode == "4"
+    print("[TEST] Filename tag cleaning verified.")

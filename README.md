@@ -151,7 +151,6 @@ sudo docker compose exec ddltower sqlite3 ./data/ddl.db "DELETE FROM download_li
 The Universal Scraper allows complex multi-step scraping (chaining) where results from one step serve as input for the next.
 
 ### Key Concepts
-
 - **`follow_links: true`**: Explicitly tells the scraper to use extracted links as URLs for the next step.
 - **`yield_links: true`**: Explicitly tells the scraper that extracted links are final results to be saved in the database.
 - **`use_browser: true`**: Uses the headless Chromium instance (Webtop) to handle Javascript, wait for elements, or bypass protections.
@@ -163,8 +162,9 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 - **`scrape_once: true`**: Instructs the scraper to memorize the URL of this step in the database so it is never scraped again during future runs (prevents infinite loops on old articles).
 - **`item_delay: 1.5`**: (Optional) Time in seconds to wait between processing individual items/links in a loop. Adds ±20% jitter for better stealth. (Default: 1s for RSS/Follow steps).
 - **`ignore_resolutions: ["720p", "480p"]`**: (Optional) List of resolutions to ignore. If found in the item title or content, the item will be skipped.
-- **`override_title: "{{ step_name.variable }}"`**: Forces the final media title using a variable extracted during a previous step (via `js_code` or `rss`).
+- **`override_title: "{{ step_name.variable }}"`**: Forces the final media title using a variable extracted during a previous step (via `js_code` or `rss`). This title is treated as the **source of truth** and will prioritize over obfuscated filenames during metadata enrichment.
 - **`override_year: "{{ step_name.variable }}"`**: Same as `override_title` but forces the release year.
+- **`auto_download: true`**: (New) Automatically triggers the debrid-unlock and download workflow as soon as links are discovered and enriched. Perfect for full automation.
 - **`debug: true`**: Saves the HTML content and a screenshot of the step in `/app/data/debug/` for troubleshooting.
 - **`hoster_patterns`** (or `hoster_patterns_url`): Regex patterns to extract the final hoster links (e.g., 1fichier). If defined, the unlocker will exclusively search for these patterns on the unlocked page.
 - **`dig_patterns`** (or `dig_patterns_url`): Regex patterns to extract intermediate links that must be navigated/dug into during the next step (e.g., rentry, idrix).
@@ -259,6 +259,11 @@ graph TD
         ENR -.->|parse filename| PRS[Parser Service]
         ENR -.->|fetch info| TMDB[TMDb Service]
         ENR -- "update metadata" --> DB
+        ENR -- "4. auto-download (opt)" --> API
+    end
+
+    subgraph "Phase 4: Download Workflow"
+        API[Download API] -->|trigger| DL[Downloader Service]
     end
 ```
 

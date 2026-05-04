@@ -326,7 +326,7 @@ class Scraper:
                             break
                 print(f"[{self.name}] [{step_name}] Found {len(valid)} link(s)")
                 acc = list(set(context.get("__accumulated_tags__", []) + current_tags))
-                yield {"links": list(set(valid)), "source_url": url, "override_title": title, "override_year": str(year) if year and str(year).isdigit() else None, "tags": acc}
+                yield {"links": list(set(valid)), "source_url": url, "override_title": title, "override_year": str(year) if year and str(year).isdigit() else None, "tags": acc, "auto_download": step.get("auto_download", False)}
             elif is_last:
                 print(f"[{self.name}] [{step_name}] No matching links found.")
 

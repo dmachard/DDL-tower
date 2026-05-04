@@ -1,7 +1,7 @@
 import pytest
 import re
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.core.scraper import Scraper
 
 @pytest.fixture
@@ -204,3 +204,39 @@ async def test_dict_item_link_extraction():
     assert len(results) == 1
     # Check that it extracted ONLY the href, without the rest of the dictionary
     assert results[0]["links"][0] == "https://protect.link/abc"
+@pytest.mark.asyncio
+async def test_bulk_scrape_once_skip():
+    """Test that URLs marked as scrape_once are skipped in bulk before navigation."""
+    config = {
+        "name": "TestBulk",
+        "steps": [
+            {
+                "name": "step1",
+                "url": ["https://new.com", "https://already_scraped.com"],
+                "scrape_once": True
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    client.get = AsyncMock()
+    
+    # Mock database to say one URL is already scraped
+    with patch("app.core.scraper.get_db_ctx") as mock_db_ctx:
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        # Mock result for SELECT url FROM scraped_urls WHERE url IN (...)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = ["https://already_scraped.com"]
+        mock_session.execute.return_value = mock_result
+        
+        results = []
+        async for batch in scraper._execute_step(client, 0, [{}]):
+            results.append(batch)
+            
+        # Verify that client.get was only called for the NEW url
+        assert client.get.call_count == 1
+        args, _ = client.get.call_args
+        assert args[0] == "https://new.com"
+        print("[TEST] Bulk scrape_once skip verified.")
