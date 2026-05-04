@@ -113,8 +113,8 @@ class BrowserManager:
             # Thoroughly remove all Singleton locks to prevent "Profile in use" errors
             container.exec_run("rm -rf /config/.config/chromium/Singleton*", user="root")
             # Clear existing Service Workers from the profile to prevent them from waking up
-            container.exec_run("rm -rf /config/.config/chromium/Default/Service\ Worker/*", user="root")
-            container.exec_run("rm -rf /config/.config/chromium/Default/Script\ Guide/*", user="root")
+            container.exec_run(r"rm -rf /config/.config/chromium/Default/Service\ Worker/*", user="root")
+            container.exec_run(r"rm -rf /config/.config/chromium/Default/Script\ Guide/*", user="root")
 
             # 2. Launch Chromium on local port (internal only)
             stealth_flags = (
