@@ -219,7 +219,12 @@ async def test_bulk_scrape_once_skip():
     }
     scraper = Scraper(config)
     client = MagicMock()
-    client.get = AsyncMock()
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock() 
+    mock_resp.text = AsyncMock(return_value="<html></html>")
+    mock_resp.status = 200
+    mock_resp.__aenter__.return_value = mock_resp
+    client.get.return_value = mock_resp
     
     # Mock database to say one URL is already scraped
     with patch("app.core.scraper.get_db_ctx") as mock_db_ctx:

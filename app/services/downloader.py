@@ -10,7 +10,11 @@ from app.services.extraction import extraction_service
 class DownloaderService:
     def __init__(self, download_dir: str = settings.DOWNLOAD_DIR):
         self.download_dir = Path(download_dir)
-        self.download_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.download_dir.mkdir(parents=True, exist_ok=True)
+        except:
+            # Fallback for CI/Read-only environments
+            pass
         # Keys are group names (usually filename without .partX.rar)
         # Value: {"files": {filename: info}, "status": ..., "progress": ...}
         self.active_downloads = {}

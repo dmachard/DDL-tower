@@ -17,8 +17,11 @@ class TMDbService:
             self.poster_dir.mkdir(parents=True, exist_ok=True)
         except (PermissionError, OSError):
             # Fallback for environments where /app is not writable (e.g. tests)
-            self.poster_dir = Path("./data/posters")
-            self.poster_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                self.poster_dir = Path("./data/posters")
+                self.poster_dir.mkdir(parents=True, exist_ok=True)
+            except:
+                pass
 
     async def fetch_metadata(self, title: str, year: Optional[int] = None, media_type: Optional[str] = "movie", language: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
