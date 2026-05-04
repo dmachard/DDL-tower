@@ -146,39 +146,18 @@ class EnrichmentService:
         # First, ensure all links have technical parsing done
         count = 0
         for link in links:
-            parse_target = link.title if link.title else link.filename
-            if not parse_target or len(parse_target) < 3:
+            # 1. Determine title source
+            # If scraper provided a title, it's our primary source.
+            # Otherwise, use filename.
+            source = link.title if link.title else link.filename
+            if not source:
                 continue
                 
-            p = parser_service.parse_filename(parse_target)
+            p = parser_service.parse_filename(source)
             
-            # If we have both, compare titles. If they are completely different, 
-            # the scraper might have assigned a wrong group title.
+            # 2. Merge technical details from filename if primary source was the scraper title
             if link.title and link.filename:
                 p_file = parser_service.parse_filename(link.filename)
-                
-                # Check for word overlap between scraper title and filename title
-                scraper_title_clean = p.get("title", "").strip()
-                file_title_clean = p_file.get("title", "").strip()
-                
-                t1 = set(re.findall(r'\w+', scraper_title_clean.lower()))
-                
-                # Check if any word from scraper title is in the filename
-                filename_words = set(re.findall(r'\w+', link.filename.lower()))
-                has_overlap = bool(t1.intersection(filename_words))
-                
-                # Rule: The scraper title is the boss (Override).
-                if not scraper_title_clean or len(scraper_title_clean) < 3:
-                    p["title"] = file_title_clean
-                elif not has_overlap:
-                    if p_file.get("season") or p_file.get("episode"):
-                        has_vowels = any(c in file_title_clean.lower() for c in 'aeiouy')
-                        digit_ratio = sum(c.isdigit() for c in file_title_clean) / len(file_title_clean) if file_title_clean else 0
-                        is_junk = (not has_vowels and len(file_title_clean) > 4) or (digit_ratio > 0.4 and len(file_title_clean) > 5)
-                        if not is_junk:
-                            p["title"] = file_title_clean
-                
-                # Copy technical details from file if missing in scraper title
                 for key in ["resolution", "quality", "codec", "v_quality", "season", "episode", "languages", "year"]:
                     if not p.get(key) and p_file.get(key):
                         p[key] = p_file[key]
