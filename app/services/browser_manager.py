@@ -112,6 +112,9 @@ class BrowserManager:
             container.exec_run("pkill -9 socat", user="root")
             # Thoroughly remove all Singleton locks to prevent "Profile in use" errors
             container.exec_run("rm -rf /config/.config/chromium/Singleton*", user="root")
+            # Clear existing Service Workers from the profile to prevent them from waking up
+            container.exec_run("rm -rf /config/.config/chromium/Default/Service\ Worker/*", user="root")
+            container.exec_run("rm -rf /config/.config/chromium/Default/Script\ Guide/*", user="root")
 
             # 2. Launch Chromium on local port (internal only)
             stealth_flags = (
@@ -120,8 +123,8 @@ class BrowserManager:
                 "--no-first-run "
                 "--disable-gpu "
                 "--disable-dev-shm-usage "
-                "--disable-service-worker "
-                "--disable-features=ServiceWorker "
+                "--disable-service-workers "
+                "--disable-features=ServiceWorker,ServiceWorkerService,IsolateOrigins,site-per-process "
                 "--disable-async-dns " # Force system DNS (to respect IPv6 priority)
             )
             profile_path = "/config/.config/chromium" 

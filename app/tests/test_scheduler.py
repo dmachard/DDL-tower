@@ -21,14 +21,25 @@ async def test_scheduler_auto_download_trigger():
     scraper.run = mock_run
     
     # We need to mock several things to isolate the scheduler
-    with patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
+    with patch("app.core.scheduler.get_db_ctx") as mock_db_ctx, \
+         patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
          patch("app.services.enrichment_service.EnrichmentService.enrich_links", new_callable=AsyncMock) as mock_enrich, \
          patch("app.api.downloads.run_download_task", new_callable=AsyncMock) as mock_dl_task:
+        
+        # Mock database session
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
         
         # Simulate that check_links returns one added link
         mock_link = MagicMock(spec=DownloadLink)
         mock_link.id = 123
+        mock_link.url = "https://hoster.com/file1" # Important for the assert later
         mock_check.return_value = [mock_link]
+        
+        # Mock the result of the DB query inside run_scraper (SELECT * FROM download_links WHERE id IN ...)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_link]
+        mock_session.execute.return_value = mock_result
         
         # Run the scheduler logic for this scraper
         await run_scraper(scraper)
@@ -51,8 +62,13 @@ async def test_scheduler_duplicate_prevention():
         }
     scraper.run = mock_run
     
-    with patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
+    with patch("app.core.scheduler.get_db_ctx") as mock_db_ctx, \
+         patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
          patch("app.api.downloads.run_download_task", new_callable=AsyncMock) as mock_dl_task:
+        
+        # Mock database session
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
         
         # Simulate that check_links returns EMPTY list (link already exists)
         mock_check.return_value = []
