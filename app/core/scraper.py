@@ -302,7 +302,7 @@ class Scraper:
                     continue
 
                 try:
-                    u = await self.unlocker.unlock(h, extra_patterns=step.get("regex_patterns", []))
+                    u = await self.unlocker.unlock(h, extra_patterns=step.get("hoster_patterns", []))
                     if u: 
                         final.extend(u)
                         # Record success to avoid re-unlocking this specific link
