@@ -135,12 +135,10 @@ class Scraper:
     
                     # 3. Handle Items
                     next_batch_contexts = []
-                    scraped_any = False
                     for item_res in results:
                         async for res_or_ctx in self._handle_item(client, item_res, step, ctx, step_idx, url, page_info):
                             if isinstance(res_or_ctx, dict) and "links" in res_or_ctx:
                                 yield res_or_ctx
-                                scraped_any = True
                             else:
                                 next_batch_contexts.append(res_or_ctx)
                     
@@ -148,11 +146,12 @@ class Scraper:
                     if next_batch_contexts:
                         async for b in self._execute_step(client, step_idx + 1, next_batch_contexts):
                             yield b
-                            scraped_any = True
+
     
                     # Cleanup/Record
-                    if (step.get("scrape_once") or step.get("scrape_one")) and scraped_any:
+                    if step.get("scrape_once"):
                         await self._record_scraped(url)
+
     
                     # Next page?
                     if not step.get("pagination"): break
@@ -291,8 +290,8 @@ class Scraper:
         upats = step.get("unlock_patterns", [])
         for h in raw:
             is_unlockable = (upats and any(re.search(p, h) for p in upats)) or step.get("unlock_links")
-            print(f"[{self.name}] [{step_name}] is_unlockable: {is_unlockable} for {h}")
             if is_unlockable:
+                print(f"[{self.name}] [{step_name}] is_unlockable: {is_unlockable} for {h}")
                 # OPTIMIZATION: Check if this intermediate link was already scraped/unlocked
                 already_unlocked = False
                 async with get_db_ctx() as session:
@@ -301,8 +300,9 @@ class Scraper:
                         already_unlocked = True
                 
                 if already_unlocked:
-                    # We don't print anything to keep logs clean, or just a small debug
+                    print(f"[{self.name}] [{step_name}] Skipping unlock (already in database): {h}")
                     continue
+
 
                 try:
                     u = await self.unlocker.unlock(h, extra_patterns=step.get("hoster_patterns", []))

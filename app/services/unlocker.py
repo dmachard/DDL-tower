@@ -38,11 +38,9 @@ class LinkUnlocker:
   
                 # --- MultiUp Mirror Traversal ---
                 if "multiup.io" in url:
-                    print("[UNLOCKER] MultiUp page detected. Looking for mirror link...")
+                    print(f"[UNLOCKER] MultiUp page detected ({url}). Looking for mirror link...")
                     try:
-                        # Wait a bit for the page to stabilize
                         await asyncio.sleep(3)
-                        # Flexible search for /mirror/ (supports /fr/mirror/, /en/mirror/, etc.)
                         mirror_locator = page.locator('a[href*="/mirror/"], form[action*="/mirror/"]')
                         count = await mirror_locator.count()
                         if count > 0:
@@ -54,9 +52,11 @@ class LinkUnlocker:
                                 print(f"[UNLOCKER] SUCCESS: Found mirror link ({mirror_url}). Navigating...")
                                 await page.goto(mirror_url, wait_until="domcontentloaded", timeout=30000)
                         else:
-                            print("[UNLOCKER] WARNING: No mirror link found on MultiUp page. Staying here.")
+                            print("[UNLOCKER] WARNING: No mirror link found on MultiUp page.")
+                            print(f"[UNLOCKER] Current Page URL: {page.url}")
                     except Exception as me:
                         print(f"[UNLOCKER] MultiUp traversal error: {me}")
+
                 
                 # --- Zoneurs / ZT-Protect Traversal ---
                 if "zoneurs.net" in url:
@@ -169,11 +169,13 @@ class LinkUnlocker:
                 patterns_to_check = extra_patterns if extra_patterns else list(settings.DIRECT_SCAN_PATTERNS)
                 
                 for pattern in patterns_to_check:
+                    print(f"[UNLOCKER] Checking pattern: {pattern}")
                     found = list(set(re.findall(pattern, content, re.IGNORECASE)))
                     if found:
-                        print(f"[UNLOCKER] {len(found)} link(s) extracted from final page using pattern.")
+                        print(f"[UNLOCKER] SUCCESS: {len(found)} link(s) extracted using pattern.")
                         final_links.extend(found)
                         total_extracted += len(found)
+
 
                 if total_extracted == 0:
                     print(f"[UNLOCKER] WARNING: No links extracted from {page.url}")
