@@ -271,7 +271,7 @@ class Scraper:
         if step.get("required_keywords"):
             tags = self._matches_keywords(text, step["required_keywords"], step.get("excluded_keywords", []))
             if tags is None:
-                print(f"[{self.name}] [{step_name}] Item skipped (Keywords not matched)")
+                print(f"[{self.name}] [{step_name}] Item skipped (Keywords not matched) {step['required_keywords']}")
                 return
             current_tags.extend(tags)
 
@@ -284,11 +284,14 @@ class Scraper:
         if step.get("ignore_patterns"):
             raw = [l for l in raw if not any(re.search(p, l) for p in step["ignore_patterns"])]
 
+        print(f"[{self.name}] [{step_name}] All extracted links: {raw}")
+
         # Unlock
         final = []
         upats = step.get("unlock_patterns", [])
         for h in raw:
             is_unlockable = (upats and any(re.search(p, h) for p in upats)) or step.get("unlock_links")
+            print(f"[{self.name}] [{step_name}] is_unlockable: {is_unlockable} for {h}")
             if is_unlockable:
                 # OPTIMIZATION: Check if this intermediate link was already scraped/unlocked
                 already_unlocked = False
