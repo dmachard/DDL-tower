@@ -242,7 +242,11 @@ class Scraper:
         if isinstance(item, str): item_data = {"content": item, "url": url}
         elif isinstance(item, dict):
             item_data = item.copy()
-            if "url" not in item_data: item_data["url"] = url
+            # Normalize common RSS/JSON keys to ensure 'url' and 'title' are available
+            if "url" not in item_data:
+                item_data["url"] = item_data.get("link") or item_data.get("href") or url
+            if "title" not in item_data and "name" in item_data:
+                item_data["title"] = item_data["name"]
             if "content" not in item_data: item_data["content"] = str(item)
         else: item_data = {"content": str(item), "url": url}
         
@@ -275,15 +279,15 @@ class Scraper:
             current_tags.extend(tags)
 
         # 2. Extract
-        if isinstance(item, dict) and (item.get("url") or item.get("href")):
-            raw = [item.get("url") or item.get("href")]
+        if isinstance(item, dict) and item_data.get("url") != url:
+            raw = [item_data["url"]]
         else:
             raw = self._extract_links(text, list(set((step.get("regex_patterns") or step.get("dig_patterns") or step.get("dig_patterns_url") or []) + step.get("hoster_patterns", []) + step.get("unlock_patterns", []))))
 
         if step.get("ignore_patterns"):
             raw = [l for l in raw if not any(re.search(p, l) for p in step["ignore_patterns"])]
 
-        print(f"[{self.name}] [{step_name}] All extracted links: {raw}")
+        print(f"[{self.name}] [{step_name}] Extracted links: {raw} for title: {item_data.get('title')}")
 
         # Unlock
         final = []
@@ -381,7 +385,15 @@ class Scraper:
             finally: await browser.close()
 
     def _extract_rss(self, content: str) -> List[Dict[str, Any]]:
-        return [dict(e) for e in feedparser.parse(content).entries]
+        feed = feedparser.parse(content)
+        results = []
+        for e in feed.entries:
+            item = dict(e)
+            # Ensure title and link are easily accessible in the dict
+            if 'title' not in item and hasattr(e, 'title'): item['title'] = e.title
+            if 'link' not in item and hasattr(e, 'link'): item['link'] = e.link
+            results.append(item)
+        return results
 
     def _extract_json(self, content: str, path: Optional[str]) -> List[Dict[str, Any]]:
         data = json.loads(content)
