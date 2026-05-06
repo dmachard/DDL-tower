@@ -24,10 +24,10 @@ echo -e "UID=$(id -u)\nGID=$(id -g)\nDOCKER_GID=$(getent group docker | cut -d: 
 docker compose up -d
 ```
 
-**Dashboard**: [http://localhost:8001](http://localhost:8001)  
-**Browser (Webtop)**: [http://localhost:8002](http://localhost:8002)
-**RSS Feed (Latest)**: [http://localhost:8001/api/rss](http://localhost:8001/api/rss) (Filters: `?category=movie`, `?category=series`, `?q=search`)  
-**RSS Feed (Downloads)**: [http://localhost:8001/api/rss/downloads](http://localhost:8001/api/rss/downloads) (History of completed downloads with `[Auto]` or `[Manual]` labels)
+- **Dashboard**: [http://localhost:8001](http://localhost:8001)  
+- **Browser (Webtop)**: [http://localhost:8002](http://localhost:8002)
+- **RSS Feed (Latest)**: [http://localhost:8001/api/rss](http://localhost:8001/api/rss) (Filters: `?category=movie`, `?category=series`, `?q=search`)  
+- **RSS Feed (Downloads)**: [http://localhost:8001/api/rss/downloads](http://localhost:8001/api/rss/downloads) (History of completed downloads with `[Auto]` or `[Manual]` labels)
 
 ## Cloudflare Bypass (Turnstile)
 

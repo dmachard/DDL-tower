@@ -109,4 +109,13 @@ async def init_db():
                 print("[DB] Migration: Adding 'raw_title' column to 'download_links' table")
                 sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN raw_title TEXT")
         
+            # Add columns to download_history
+            inspector.execute("PRAGMA table_info(download_history)")
+            dh_columns = [col[1] for col in inspector.fetchall()]
+            if dh_columns:
+                for col in ["season", "episode", "resolution", "quality"]:
+                    if col not in dh_columns:
+                        print(f"[DB] Migration: Adding '{col}' column to 'download_history' table")
+                        sync_conn.connection.execute(f"ALTER TABLE download_history ADD COLUMN {col} TEXT")
+
         await conn.run_sync(migrate)

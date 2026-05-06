@@ -93,7 +93,15 @@ async def download_file_to_pc(filename: str):
     except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return FileResponse(path, filename=filename)
+def get_resolution_rank(res: str) -> int:
+    """Returns a numeric rank for quality comparison."""
+    if not res: return 0
+    res = res.lower()
+    if "2160" in res or "4k" in res: return 4
+    if "1080" in res: return 3
+    if "720" in res: return 2
+    if "480" in res: return 1
+    return 0
 
 async def run_download_task(urls: List[str], is_auto: bool = False):
     """
@@ -127,9 +135,13 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
     # 3. Start downloads sequentially (one by one)
     sem = asyncio.Semaphore(1)
 
-    async def sem_download(link, filename, category, title, year, imdb_id):
+    async def sem_download(link, filename, category, title, year, imdb_id, season, episode, resolution, quality):
         async with sem:
-            await downloader_service.download_file(link, filename, category=category, title=title, year=year, is_auto=is_auto, imdb_id=imdb_id)
+            await downloader_service.download_file(
+                link, filename, category=category, title=title, 
+                year=year, is_auto=is_auto, imdb_id=imdb_id,
+                season=season, episode=episode, resolution=resolution, quality=quality
+            )
 
     # 4. Fetch metadata from DB for these URLs - Prioritize Official Metadata
     url_to_meta = {}
@@ -143,7 +155,6 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
         else:
             title_priority = [MediaMetadata.official_title, MediaMetadata.title_fr, DownloadLink.title, DownloadLink.filename]
         
-        # Use a join to get the metadata if enriched
         stmt = select(
             DownloadLink.url, 
             DownloadLink.category, 
@@ -153,7 +164,11 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
             DownloadLink.filename,
             MediaMetadata.year,
             DownloadLink.year,
-            DownloadLink.imdb_id
+            DownloadLink.imdb_id,
+            DownloadLink.season,
+            DownloadLink.episode,
+            DownloadLink.resolution,
+            DownloadLink.quality
         ).outerjoin(
             MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id
         ).where(DownloadLink.url.in_(urls))
@@ -174,14 +189,72 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 "category": row.category or "movie",
                 "title": final_title,
                 "year": final_year,
-                "imdb_id": row.imdb_id
+                "imdb_id": row.imdb_id,
+                "season": row.season,
+                "episode": row.episode,
+                "resolution": row.resolution,
+                "quality": row.quality
             }
 
-    print(f"[API] Starting {len(valid_downloads)} downloads concurrently...")
+    # 5. Filter for Auto-download: Skip if already downloaded with same or better quality
+    filtered_downloads = []
+    if is_auto:
+        from app.db.models import DownloadHistory
+        from sqlalchemy import and_
+        async with AsyncSessionLocal() as session:
+            for orig_url, link, filename in valid_downloads:
+                meta = url_to_meta.get(orig_url.strip(), {})
+                title = meta.get("title")
+                imdb_id = meta.get("imdb_id")
+                
+                # Check history
+                h_stmt = select(DownloadHistory).where(
+                    or_(
+                        DownloadHistory.imdb_id == imdb_id if imdb_id else False,
+                        and_(
+                            DownloadHistory.title == title,
+                            DownloadHistory.year == meta.get("year"),
+                            DownloadHistory.category == meta.get("category")
+                        )
+                    )
+                )
+                
+                # For series, also match season/episode
+                if meta.get("category") == "series":
+                    h_stmt = h_stmt.where(
+                        DownloadHistory.season == meta.get("season"),
+                        DownloadHistory.episode == meta.get("episode")
+                    )
+
+                h_res = await session.execute(h_stmt)
+                existing = h_res.scalars().all()
+                
+                if existing:
+                    # Check if any existing version is better or equal
+                    new_rank = get_resolution_rank(meta.get("resolution"))
+                    is_upgrade = True
+                    for ex in existing:
+                        if get_resolution_rank(ex.resolution) >= new_rank:
+                            is_upgrade = False
+                            break
+                    
+                    if not is_upgrade:
+                        print(f"[API] Skipping auto-download for {title}: Already have same or better quality.")
+                        continue
+                    else:
+                        print(f"[API] Upgrade detected for {title}: {meta.get('resolution')} is better than existing.")
+
+                filtered_downloads.append((orig_url, link, filename))
+    else:
+        filtered_downloads = valid_downloads
+
+    if not filtered_downloads:
+        return
+
+    print(f"[API] Starting {len(filtered_downloads)} downloads concurrently...")
     
     download_tasks = []
-    # Use the explicit (orig_url, unlocked_link, filename) mapping
-    for orig_url, link, filename in valid_downloads:
+    for orig_url, link, filename in filtered_downloads:
         meta = url_to_meta.get(orig_url.strip(), {})
         
         download_tasks.append(sem_download(
@@ -190,7 +263,11 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
             meta.get("category", "movie"),
             meta.get("title"), 
             meta.get("year"),
-            meta.get("imdb_id")
+            meta.get("imdb_id"),
+            meta.get("season"),
+            meta.get("episode"),
+            meta.get("resolution"),
+            meta.get("quality")
         ))
 
     await asyncio.gather(*download_tasks)

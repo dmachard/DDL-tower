@@ -66,6 +66,10 @@ class DownloadHistory(Base):
     filename = Column(String)
     category = Column(String) # movie/series
     year = Column(Integer, nullable=True)
+    season = Column(String, nullable=True)
+    episode = Column(String, nullable=True)
+    resolution = Column(String, nullable=True)
+    quality = Column(String, nullable=True)
     download_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_auto = Column(Boolean, default=False)
     

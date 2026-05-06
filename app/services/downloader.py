@@ -55,15 +55,15 @@ class DownloaderService:
                     "status": "waiting"
                 }
 
-    async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None) -> str:
+    async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None) -> str:
         """
         Downloads a file from a URL to the download directory with resume support and retries.
         Uses a global lock to ensure sequential downloads (one by one).
         """
         async with self.lock:
-            return await self._do_download(url, filename, category, title, year, is_auto, imdb_id)
+            return await self._do_download(url, filename, category, title, year, is_auto, imdb_id, season, episode, resolution, quality)
 
-    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None) -> str:
+    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None) -> str:
         max_retries = 5
         retry_delay = 2
         
@@ -163,7 +163,7 @@ class DownloaderService:
                         group["files"][filename]["status"] = "done"
                         
                         # Trigger extraction or organization
-                        return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id)
+                        return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality)
 
             except (aiohttp.ClientPayloadError, aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
                 print(f"[DOWNLOADER] Connection error during {filename} (attempt {attempt+1}): {str(e)}")
@@ -180,7 +180,7 @@ class DownloaderService:
         
         return None
 
-    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int, is_auto: bool = False, imdb_id: str = None) -> str:
+    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None) -> str:
         group = self.active_downloads.get(group_name)
         if not group: return str(file_path)
 
@@ -216,6 +216,10 @@ class DownloaderService:
                         filename=filename,
                         category=category,
                         year=year,
+                        season=season,
+                        episode=episode,
+                        resolution=resolution,
+                        quality=quality,
                         is_auto=is_auto,
                         imdb_id=imdb_id
                     )
