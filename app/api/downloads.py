@@ -197,7 +197,7 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
     filtered_downloads = []
     if is_auto:
         from app.db.models import DownloadHistory
-        from sqlalchemy import and_
+        from sqlalchemy import and_, or_, func
         async with AsyncSessionLocal() as session:
             for orig_url, link, filename in valid_downloads:
                 meta = url_to_meta.get(orig_url.strip(), {})
