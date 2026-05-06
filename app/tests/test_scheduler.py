@@ -45,7 +45,7 @@ async def test_scheduler_auto_download_trigger():
         await run_scraper(scraper)
         
         # Verify that auto-download was triggered
-        mock_dl_task.assert_called_once_with(["https://hoster.com/file1"])
+        mock_dl_task.assert_called_once_with(["https://hoster.com/file1"], is_auto=True)
         print("[TEST] Auto-download trigger verified.")
 
 @pytest.mark.asyncio
