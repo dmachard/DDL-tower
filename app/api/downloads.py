@@ -129,9 +129,6 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
     if not valid_downloads:
         return
 
-    # 2. Register all files (expects list of (link, filename))
-    downloader_service.pre_register_files([(d[1], d[2]) for d in valid_downloads])
-
     # 3. Start downloads sequentially (one by one)
     sem = asyncio.Semaphore(1)
 
@@ -212,7 +209,7 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                     or_(
                         DownloadHistory.imdb_id == imdb_id if imdb_id else False,
                         and_(
-                            DownloadHistory.title == title,
+                            func.lower(DownloadHistory.title) == title.lower(),
                             DownloadHistory.year == meta.get("year"),
                             DownloadHistory.category == meta.get("category")
                         )
@@ -250,6 +247,9 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
 
     if not filtered_downloads:
         return
+
+    # 2. Register only the files we are actually going to download
+    downloader_service.pre_register_files([(d[1], d[2]) for d in filtered_downloads])
 
     print(f"[API] Starting {len(filtered_downloads)} downloads concurrently...")
     
