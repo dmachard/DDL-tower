@@ -177,3 +177,82 @@ async def get_rss_feed(
 </rss>"""
 
     return Response(content=rss_xml, media_type="application/rss+xml")
+
+@router.get("/rss/downloads")
+async def get_downloads_rss_feed(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100)
+):
+    """
+    Generates an RSS 2.0 feed of the download history.
+    """
+    from app.db.models import DownloadHistory, MediaMetadata
+    from sqlalchemy import select
+    
+    stmt = select(DownloadHistory).outerjoin(
+        MediaMetadata, DownloadHistory.imdb_id == MediaMetadata.imdb_id
+    ).order_by(DownloadHistory.download_date.desc()).limit(limit)
+    
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+
+    rss_items = []
+    for item in items:
+        # Title construction
+        meta = item.metadata_rel
+        title = meta.title_fr if meta and meta.title_fr else (meta.official_title if meta else item.title)
+        year = meta.year if meta and meta.year else item.year
+        
+        display_cat = "Film" if item.category == "movie" else "TV"
+        auto_label = " [Auto]" if item.is_auto else " [Manual]"
+        
+        display_title = f"[{display_cat}]{auto_label}"
+        if year: display_title += f" ({year})"
+        display_title += f" {title}"
+        
+        # Build description
+        plot = meta.plot_fr if meta and meta.plot_fr else (meta.plot_en if meta else "Téléchargement terminé.")
+        
+        # Poster URL
+        poster_url = None
+        if meta and meta.poster_path:
+            filename = meta.poster_path.split("/")[-1]
+            base_url = str(request.base_url).rstrip("/")
+            poster_url = f"{base_url}/posters/{filename}"
+
+        description = f"<p>Le fichier <strong>{html.escape(item.filename)}</strong> a été téléchargé avec succès.</p>"
+        if poster_url:
+            description += f'<p><img src="{html.escape(poster_url)}" alt="Poster" style="max-width: 200px; display: block; margin-bottom: 10px;" /></p>'
+        description += f"<p>{plot}</p>"
+        
+        # Link to the file (if reachable or just to dashboard)
+        base_url = str(request.base_url).rstrip("/")
+        link = f"{base_url}/?q={urllib.parse.quote(title)}"
+
+        pub_date = item.download_date.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        guid = f"history_{item.id}"
+
+        rss_items.append(f"""
+        <item>
+            <title>{html.escape(display_title)}</title>
+            <link>{html.escape(link)}</link>
+            <description>{html.escape(description)}</description>
+            <pubDate>{pub_date}</pubDate>
+            <guid isPermaLink="false">{html.escape(guid)}</guid>
+            {f'<enclosure url="{html.escape(poster_url)}" length="0" type="image/jpeg" />' if poster_url else ''}
+        </item>""")
+
+    rss_xml = f"""<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+    <title>{html.escape(settings.APP_NAME)} - Historique des Téléchargements</title>
+    <link>{html.escape(str(request.base_url))}</link>
+    <description>Liste des derniers films et séries téléchargés</description>
+    <language>fr-fr</language>
+    <lastBuildDate>{datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")}</lastBuildDate>
+    {"".join(rss_items)}
+</channel>
+</rss>"""
+
+    return Response(content=rss_xml, media_type="application/rss+xml")

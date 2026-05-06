@@ -58,3 +58,17 @@ class ScrapedURL(Base):
     status = Column(String, default="success") # 'success' or 'failed'
     scrape_once = Column(Boolean, default=False)
     duration_ms = Column(Integer, nullable=True)
+class DownloadHistory(Base):
+    __tablename__ = "download_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    filename = Column(String)
+    category = Column(String) # movie/series
+    year = Column(Integer, nullable=True)
+    download_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    is_auto = Column(Boolean, default=False)
+    
+    # Reference to centralized metadata for poster/plot in RSS
+    imdb_id = Column(String, ForeignKey("media_metadata.imdb_id"), nullable=True)
+    metadata_rel = relationship("MediaMetadata")

@@ -95,7 +95,7 @@ async def download_file_to_pc(filename: str):
 
     return FileResponse(path, filename=filename)
 
-async def run_download_task(urls: List[str]):
+async def run_download_task(urls: List[str], is_auto: bool = False):
     """
     Background task to unlock and download files.
     """
@@ -127,9 +127,9 @@ async def run_download_task(urls: List[str]):
     # 3. Start downloads sequentially (one by one)
     sem = asyncio.Semaphore(1)
 
-    async def sem_download(link, filename, category, title, year):
+    async def sem_download(link, filename, category, title, year, imdb_id):
         async with sem:
-            await downloader_service.download_file(link, filename, category=category, title=title, year=year)
+            await downloader_service.download_file(link, filename, category=category, title=title, year=year, is_auto=is_auto, imdb_id=imdb_id)
 
     # 4. Fetch metadata from DB for these URLs - Prioritize Official Metadata
     url_to_meta = {}
@@ -152,7 +152,8 @@ async def run_download_task(urls: List[str]):
             DownloadLink.title,
             DownloadLink.filename,
             MediaMetadata.year,
-            DownloadLink.year
+            DownloadLink.year,
+            DownloadLink.imdb_id
         ).outerjoin(
             MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id
         ).where(DownloadLink.url.in_(urls))
@@ -172,7 +173,8 @@ async def run_download_task(urls: List[str]):
             url_to_meta[row.url.strip()] = {
                 "category": row.category or "movie",
                 "title": final_title,
-                "year": final_year
+                "year": final_year,
+                "imdb_id": row.imdb_id
             }
 
     print(f"[API] Starting {len(valid_downloads)} downloads concurrently...")
@@ -187,7 +189,8 @@ async def run_download_task(urls: List[str]):
             filename, 
             meta.get("category", "movie"),
             meta.get("title"), 
-            meta.get("year")
+            meta.get("year"),
+            meta.get("imdb_id")
         ))
 
     await asyncio.gather(*download_tasks)
@@ -197,7 +200,7 @@ async def trigger_download(request: DownloadRequest, background_tasks: Backgroun
     """
     Triggers download of one or more URLs via AllDebrid.
     """
-    background_tasks.add_task(run_download_task, request.urls)
+    background_tasks.add_task(run_download_task, request.urls, is_auto=False)
     return {"message": f"Started download of {len(request.urls)} links in background."}
 
 @router.get("/download-link")
@@ -211,5 +214,5 @@ async def trigger_download_get(url: str, background_tasks: BackgroundTasks):
     if not urls:
         return RedirectResponse(url="/?error=no_urls")
     
-    background_tasks.add_task(run_download_task, urls)
+    background_tasks.add_task(run_download_task, urls, is_auto=False)
     return RedirectResponse(url="/?msg=download_started")

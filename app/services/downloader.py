@@ -55,15 +55,15 @@ class DownloaderService:
                     "status": "waiting"
                 }
 
-    async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None) -> str:
+    async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None) -> str:
         """
         Downloads a file from a URL to the download directory with resume support and retries.
         Uses a global lock to ensure sequential downloads (one by one).
         """
         async with self.lock:
-            return await self._do_download(url, filename, category, title, year)
+            return await self._do_download(url, filename, category, title, year, is_auto, imdb_id)
 
-    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None) -> str:
+    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None) -> str:
         max_retries = 5
         retry_delay = 2
         
@@ -163,7 +163,7 @@ class DownloaderService:
                         group["files"][filename]["status"] = "done"
                         
                         # Trigger extraction or organization
-                        return await self._finalize_download(file_path, filename, group_name, category, title, year)
+                        return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id)
 
             except (aiohttp.ClientPayloadError, aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
                 print(f"[DOWNLOADER] Connection error during {filename} (attempt {attempt+1}): {str(e)}")
@@ -180,7 +180,7 @@ class DownloaderService:
         
         return None
 
-    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int) -> str:
+    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int, is_auto: bool = False, imdb_id: str = None) -> str:
         group = self.active_downloads.get(group_name)
         if not group: return str(file_path)
 
@@ -205,6 +205,24 @@ class DownloaderService:
             if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
                  from app.services.library_service import library_service
                  library_service.organize_file(str(file_path), category, title=title, year=year)
+
+            # Record in history
+            try:
+                from app.db.database import AsyncSessionLocal
+                from app.db.models import DownloadHistory
+                async with AsyncSessionLocal() as session:
+                    history = DownloadHistory(
+                        title=title or filename,
+                        filename=filename,
+                        category=category,
+                        year=year,
+                        is_auto=is_auto,
+                        imdb_id=imdb_id
+                    )
+                    session.add(history)
+                    await session.commit()
+            except Exception as he:
+                print(f"[DOWNLOADER] Error saving history: {he}")
 
             group["files"].pop(filename, None)
             if not group["files"]:
