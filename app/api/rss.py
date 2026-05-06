@@ -33,19 +33,22 @@ async def get_rss_feed(
         # e.g., "Deadpool (2016) [Movie] [1080p, 2160p]"
         title = item.get("title_fr") or item.get("official_title") or item.get("title")
         year = item.get("year")
-        # Collect all unique tags across all resolutions/cards
+        # Collect only the tags from the LATEST added versions (to avoid noise from old versions)
         raw_tags = []
         resolutions_dict = item.get("resolutions", {})
+        latest_ts = item.get("last_updated")
+        
         for res, cards in resolutions_dict.items():
-            if res:
-                # Some res might be "1080p, 2160p" if grouped strangely
-                raw_tags.extend(str(res).split(','))
             for card in cards:
-                for field in ["language", "quality", "codec", "network", "v_quality"]:
-                    val = card.get(field)
-                    if val:
-                        # Split by comma in case field contains multiple tags (e.g. "French, MULTI")
-                        raw_tags.extend(str(val).split(','))
+                # Compare card's last_checked with group's last_updated
+                card_ts = card.get("last_checked")
+                card_ts_str = card_ts.isoformat() if hasattr(card_ts, "isoformat") else str(card_ts)
+                
+                if card_ts_str == latest_ts:
+                    if res: raw_tags.extend(str(res).split(','))
+                    for field in ["language", "quality", "codec", "network", "v_quality"]:
+                        val = card.get(field)
+                        if val: raw_tags.extend(str(val).split(','))
         
         # Clean, unique, and case-insensitive deduplication
         unique_tags_map = {}

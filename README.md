@@ -11,7 +11,7 @@ DDLtower is a automation tool for web link extraction, tagging and management.
 - **Ratings**: Visual rating scale (1-10) integrated into the dashboard.
 - **Stats Dashboard**: Complete overview of library volume and health.
 - **Embedded Browser**: Dedicated Chromium instance via **Webtop** for manual navigation and Cloudflare bypass.
-- **RSS**: Generate an **RSS 2.0** feed of the latest releases.
+- **RSS**: Generate **RSS 2.0** feeds for both latest discovered releases and completed download history.
 
 ## Getting Started
 
@@ -26,7 +26,8 @@ docker compose up -d
 
 **Dashboard**: [http://localhost:8001](http://localhost:8001)  
 **Browser (Webtop)**: [http://localhost:8002](http://localhost:8002)
-**RSS Feed**: [http://localhost:8001/api/rss](http://localhost:8001/api/rss) (Filters: `?category=movie`, `?category=series`, `?q=search`)
+**RSS Feed (Latest)**: [http://localhost:8001/api/rss](http://localhost:8001/api/rss) (Filters: `?category=movie`, `?category=series`, `?q=search`)  
+**RSS Feed (Downloads)**: [http://localhost:8001/api/rss/downloads](http://localhost:8001/api/rss/downloads) (History of completed downloads with `[Auto]` or `[Manual]` labels)
 
 ## Cloudflare Bypass (Turnstile)
 
@@ -128,8 +129,14 @@ sudo docker compose exec ddltower python3 -m app.cli.main tag --title "CptinCurg
 Trigger scraping manually:
 
 ```bash
-# Manually trigger a full scan of all configured sources 
 sudo docker compose exec ddltower python3 -m app.cli.main scan
+```
+
+### Browser Management (`browser`)
+Control the headless browser instance:
+```bash
+# Force a clean restart of the Chromium instance (useful if Cloudflare/Playwright hangs)
+sudo docker compose exec ddltower curl -X POST http://localhost:8001/api/browser/restart
 ```
 
 ```bash
