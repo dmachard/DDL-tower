@@ -192,9 +192,10 @@ async def get_downloads_rss_feed(
     """
     from app.db.models import DownloadHistory, MediaMetadata
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
     
-    stmt = select(DownloadHistory).outerjoin(
-        MediaMetadata, DownloadHistory.imdb_id == MediaMetadata.imdb_id
+    stmt = select(DownloadHistory).options(
+        selectinload(DownloadHistory.metadata_rel)
     ).order_by(DownloadHistory.download_date.desc()).limit(limit)
     
     result = await db.execute(stmt)
