@@ -209,9 +209,8 @@ async def get_downloads_rss_feed(
         year = meta.year if meta and meta.year else item.year
         
         display_cat = "Film" if item.category == "movie" else "TV"
-        auto_label = " [Auto]" if item.is_auto else " [Manual]"
-        
-        display_title = f"[{display_cat}]{auto_label}"
+
+        display_title = f"[{display_cat}]"
         if year: display_title += f" ({year})"
         display_title += f" {title}"
         

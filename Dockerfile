@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     sqlite3 \
     unrar \
+    tzdata \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
