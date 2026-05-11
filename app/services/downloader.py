@@ -55,15 +55,15 @@ class DownloaderService:
                     "status": "waiting"
                 }
 
-    async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None) -> str:
+    async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None, language: str = None, v_quality: str = None, codec: str = None, network: str = None, audio: str = None, channels: str = None) -> str:
         """
         Downloads a file from a URL to the download directory with resume support and retries.
         Uses a global lock to ensure sequential downloads (one by one).
         """
         async with self.lock:
-            return await self._do_download(url, filename, category, title, year, is_auto, imdb_id, season, episode, resolution, quality)
+            return await self._do_download(url, filename, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
 
-    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None) -> str:
+    async def _do_download(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None, language: str = None, v_quality: str = None, codec: str = None, network: str = None, audio: str = None, channels: str = None) -> str:
         max_retries = 5
         retry_delay = 2
         
@@ -163,7 +163,7 @@ class DownloaderService:
                         group["files"][filename]["status"] = "done"
                         
                         # Trigger extraction or organization
-                        return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality)
+                        return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
 
             except (aiohttp.ClientPayloadError, aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
                 print(f"[DOWNLOADER] Connection error during {filename} (attempt {attempt+1}): {str(e)}")
@@ -180,7 +180,7 @@ class DownloaderService:
         
         return None
 
-    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None) -> str:
+    async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None, language: str = None, v_quality: str = None, codec: str = None, network: str = None, audio: str = None, channels: str = None) -> str:
         group = self.active_downloads.get(group_name)
         if not group: return str(file_path)
 
@@ -190,7 +190,7 @@ class DownloaderService:
                 group["status"] = "extracting"
                 group["progress"] = 100
                 
-                success = extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year)
+                success = extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
                 if not success:
                     group["status"] = "error"
                     group["error"] = "Extraction failed"
@@ -204,7 +204,7 @@ class DownloaderService:
         if group["status"] != "error":
             if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
                  from app.services.library_service import library_service
-                 library_service.organize_file(str(file_path), category, title=title, year=year)
+                 library_service.organize_file(str(file_path), category, title=title, year=year, season=season, episode=episode)
 
             # Record in history
             try:
@@ -220,6 +220,12 @@ class DownloaderService:
                         episode=episode,
                         resolution=resolution,
                         quality=quality,
+                        language=language,
+                        v_quality=v_quality,
+                        codec=codec,
+                        network=network,
+                        audio=audio,
+                        channels=channels,
                         is_auto=is_auto,
                         imdb_id=imdb_id
                     )

@@ -94,26 +94,21 @@ async def init_db():
                 print("[DB] Migration: Adding 'title_fr' column to 'media_metadata' table")
                 sync_conn.connection.execute("ALTER TABLE media_metadata ADD COLUMN title_fr TEXT")
 
-            # Add network column to download_links
+            # Add columns to download_links
             inspector.execute("PRAGMA table_info(download_links)")
             dl_columns = [col[1] for col in inspector.fetchall()]
-            if dl_columns and "network" not in dl_columns:
-                print("[DB] Migration: Adding 'network' column to 'download_links' table")
-                sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN network TEXT")
-            
-            if dl_columns and "v_quality" not in dl_columns:
-                print("[DB] Migration: Adding 'v_quality' column to 'download_links' table")
-                sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN v_quality TEXT")
-            
-            if dl_columns and "raw_title" not in dl_columns:
-                print("[DB] Migration: Adding 'raw_title' column to 'download_links' table")
-                sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN raw_title TEXT")
+            new_dl_cols = ["network", "v_quality", "raw_title", "language", "audio", "channels"]
+            for col in new_dl_cols:
+                if dl_columns and col not in dl_columns:
+                    print(f"[DB] Migration: Adding '{col}' column to 'download_links' table")
+                    sync_conn.connection.execute(f"ALTER TABLE download_links ADD COLUMN {col} TEXT")
         
             # Add columns to download_history
             inspector.execute("PRAGMA table_info(download_history)")
             dh_columns = [col[1] for col in inspector.fetchall()]
+            new_dh_cols = ["season", "episode", "resolution", "quality", "language", "v_quality", "codec", "network", "audio", "channels"]
             if dh_columns:
-                for col in ["season", "episode", "resolution", "quality"]:
+                for col in new_dh_cols:
                     if col not in dh_columns:
                         print(f"[DB] Migration: Adding '{col}' column to 'download_history' table")
                         sync_conn.connection.execute(f"ALTER TABLE download_history ADD COLUMN {col} TEXT")

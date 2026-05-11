@@ -154,6 +154,8 @@ class ParserService:
             "resolution": str(res) if res else None,
             "quality": p.get('quality'),
             "codec": p.get('codec'),
+            "audio": p.get('audio'),
+            "channels": p.get('channels'),
             "network": ParserService.clean_network_name(p.get('network')) or "",
             "v_quality": ParserService.extract_v_quality(filename) or "",
             "languages": langs

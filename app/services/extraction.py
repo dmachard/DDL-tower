@@ -68,7 +68,7 @@ class ExtractionService:
         parts.sort()
         return parts[0]
 
-    def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None) -> bool:
+    def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> bool:
         """
         Extracts a RAR archive using the system unrar command.
         Ensures extraction starts from the first volume.
@@ -153,7 +153,7 @@ class ExtractionService:
                                 
                                 # Library Organization (Movies & Series)
                                 if category in ["movie", "series"]:
-                                    library_service.organize_file(str(new_path), category, title=title, year=year)
+                                    library_service.organize_file(str(new_path), category, title=title, year=year, season=season, episode=episode)
                             else:
                                 print(f"[EXTRACTION] {video_p.name} already exists in destination, skipping move.")
                         except Exception as e:

@@ -179,6 +179,8 @@ class EnrichmentService:
                 link.resolution = p["resolution"]
                 link.quality = p["quality"]
                 link.codec = p["codec"]
+                link.audio = p["audio"]
+                link.channels = p["channels"]
                 link.network = p["network"]
                 link.v_quality = p["v_quality"]
                 

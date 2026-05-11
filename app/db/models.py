@@ -30,6 +30,8 @@ class DownloadLink(Base):
     language = Column(String, nullable=True)
     network = Column(String, nullable=True)
     v_quality = Column(String, nullable=True)
+    audio = Column(String, nullable=True)
+    channels = Column(String, nullable=True)
 
     # Reference to centralized metadata
     imdb_id = Column(String, ForeignKey("media_metadata.imdb_id"), nullable=True)
@@ -70,6 +72,12 @@ class DownloadHistory(Base):
     episode = Column(String, nullable=True)
     resolution = Column(String, nullable=True)
     quality = Column(String, nullable=True)
+    language = Column(String, nullable=True)
+    v_quality = Column(String, nullable=True)
+    codec = Column(String, nullable=True)
+    network = Column(String, nullable=True)
+    audio = Column(String, nullable=True)
+    channels = Column(String, nullable=True)
     download_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_auto = Column(Boolean, default=False)
     

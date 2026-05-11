@@ -20,11 +20,11 @@ class LibraryService:
         s = re.sub(r'[<>|?*"]', '', s)
         return s.strip()
 
-    def organize_file(self, file_path: str, category: str = "movie", title: str = None, year: int = None) -> bool:
+    def organize_file(self, file_path: str, category: str = "movie", title: str = None, year: int = None, season: str = None, episode: str = None) -> bool:
         """
-        Organizes a file based on its category.
-        - Movies: Moves to movies_dir, creates symlink in downloads.
-        - Series: Moves to series_dir/(Title (Year))/, creates symlink in downloads.
+        Organizes a file based on its category and removes older versions if they exist.
+        - Movies: Moves to movies_dir, deletes other files with same title/year.
+        - Series: Moves to series_dir/(Title (Year))/, deletes other files with same SxxExx.
         """
         if category not in ["movie", "series"]:
             return False
@@ -35,20 +35,41 @@ class LibraryService:
                 print(f"[LIBRARY] Error: Source file {file_path} does not exist.")
                 return False
 
-            # Determine destination folder
+            # Determine destination folder and Cleanup old versions
             if category == "movie":
                 target_base_dir = self.movies_dir
+                if title:
+                    s_title = self._sanitize_path(title)
+                    clean_title = s_title.replace(' ', '.')
+                    for item in target_base_dir.iterdir():
+                        if item.is_file() and item.name != src.name:
+                            # Basic match: title in filename + year in filename
+                            if clean_title.lower() in item.name.lower().replace(' ', '.'):
+                                if not year or str(year) in item.name:
+                                    print(f"[LIBRARY] Deleting old movie version: {item.name}")
+                                    try: item.unlink()
+                                    except: pass
             else: # series
                 s_title = self._sanitize_path(title or "Unknown-Series")
                 folder_name = f"{s_title} ({year})" if year else s_title
                 target_base_dir = self.series_dir / folder_name
-            
-            # Ensure destination directory exists
-            target_base_dir.mkdir(parents=True, exist_ok=True)
+                target_base_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Cleanup old episode versions
+                if season and episode:
+                    s_num = str(season).zfill(2)
+                    e_num = str(episode).zfill(2)
+                    patterns = [f"S{s_num}E{e_num}", f"S{s_num} E{e_num}"]
+                    for item in target_base_dir.iterdir():
+                        if item.is_file() and item.name != src.name:
+                            if any(p in item.name.upper() for p in patterns):
+                                print(f"[LIBRARY] Deleting old episode version: {item.name}")
+                                try: item.unlink()
+                                except: pass
             
             dest = target_base_dir / src.name
             
-            # If the destination already exists, we don't overwrite
+            # If the destination already exists (exact same filename), we don't overwrite
             if dest.exists():
                 print(f"[LIBRARY] Skipping: {src.name} already exists in library ({dest})")
                 return False

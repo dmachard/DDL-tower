@@ -293,3 +293,9 @@ graph TD
         LIB --> DISK[[Disk / Media Library]]
     end
 ```
+
+## Tests
+
+```bash
+sudo docker compose exec -T ddltower python3 -m pytest -v app/tests/test*
+```
