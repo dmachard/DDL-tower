@@ -70,6 +70,18 @@ class Settings(BaseSettings):
     MYMEMORY_EMAIL: str = _yaml_mymemory.get("email", "dmachard@gmail.com")
     
     @property
+    def ALLDEBRID_ENABLED(self) -> bool:
+        return bool(self.ALLDEBRID_API_KEY and self.ALLDEBRID_API_KEY != "[YOUR_KEY]" and self.ALLDEBRID_API_KEY != "")
+
+    @property
+    def REALDEBRID_ENABLED(self) -> bool:
+        return bool(self.REALDEBRID_API_KEY and self.REALDEBRID_API_KEY != "[YOUR_KEY]" and self.REALDEBRID_API_KEY != "")
+
+    @property
+    def BESTDEBRID_ENABLED(self) -> bool:
+        return bool(self.BESTDEBRID_API_KEY and self.BESTDEBRID_API_KEY != "[YOUR_KEY]" and self.BESTDEBRID_API_KEY != "")
+    
+    @property
     def SCRAPER_SOURCES(self) -> List[dict]:
         # Directly read the 'sources' block from the main YAML
         return _yaml_config.get("sources") or []
