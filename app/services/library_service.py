@@ -24,7 +24,7 @@ class LibraryService:
         """
         Organizes a file based on its category.
         - Movies: Moves to movies_dir, creates symlink in downloads.
-        - Series: Moves to series_dir/(Year - Title)/, creates symlink in downloads.
+        - Series: Moves to series_dir/(Title (Year))/, creates symlink in downloads.
         """
         if category not in ["movie", "series"]:
             return False
@@ -40,7 +40,7 @@ class LibraryService:
                 target_base_dir = self.movies_dir
             else: # series
                 s_title = self._sanitize_path(title or "Unknown-Series")
-                folder_name = f"{year} - {s_title}" if year else s_title
+                folder_name = f"{s_title} ({year})" if year else s_title
                 target_base_dir = self.series_dir / folder_name
             
             # Ensure destination directory exists
