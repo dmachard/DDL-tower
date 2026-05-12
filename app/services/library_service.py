@@ -89,4 +89,24 @@ class LibraryService:
             print(f"[LIBRARY] Error organizing {category} {file_path}: {e}")
             return False
 
+    def find_in_library(self, filename: str) -> Optional[Path]:
+        """
+        Checks if a file with the same name exists anywhere in the library.
+        Returns the Path if found, None otherwise.
+        """
+        # Check movies (direct child of movies_dir)
+        movie_path = self.movies_dir / filename
+        if movie_path.exists():
+            return movie_path
+        
+        # Check series (one level deep: series_dir / Series Folder / filename)
+        if self.series_dir.exists():
+            for folder in self.series_dir.iterdir():
+                if folder.is_dir():
+                    p = folder / filename
+                    if p.exists():
+                        return p
+        
+        return None
+
 library_service = LibraryService()

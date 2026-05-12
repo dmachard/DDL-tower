@@ -1,5 +1,5 @@
 import pytest
-from app.api.downloads import get_quality_score
+from app.core.utils import get_quality_score
 
 def test_resolution_ranking():
     # 4Klight > 4K > 1080p > 720p

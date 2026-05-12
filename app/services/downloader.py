@@ -67,23 +67,90 @@ class DownloaderService:
         max_retries = 5
         retry_delay = 2
         
-        # Initial filename resolution
+        # 1. Resolve filename and get total size via HEAD request
+        total_size = 0
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.head(url, allow_redirects=True, timeout=10) as resp:
+                    if resp.status == 200:
+                        total_size = int(resp.headers.get('Content-Length', 0))
+                        if not filename:
+                            cd = resp.headers.get("Content-Disposition")
+                            if cd and "filename=" in cd:
+                                filename = cd.split("filename=")[1].strip('"')
+                            else:
+                                filename = os.path.basename(url.split('?')[0])
+            except Exception as e:
+                print(f"[DOWNLOADER] HEAD request failed for {url}: {e}")
+
         if not filename:
-             async with aiohttp.ClientSession() as session:
-                 async with session.head(url, allow_redirects=True) as resp:
-                     cd = resp.headers.get("Content-Disposition")
-                     if cd and "filename=" in cd:
-                         filename = cd.split("filename=")[1].strip('"')
-                     else:
-                         filename = os.path.basename(url.split('?')[0])
-        
-        if not filename:
-            filename = "unknown_file"
+            filename = os.path.basename(url.split('?')[0]) or "unknown_file"
 
         file_path = self.download_dir / filename
         group_name = self._get_group_name(filename)
+
+        # 2. Check if file already exists in download folder or library
+        exists_complete = False
         
-        # Ensure group entry exists
+        # A. Check by exact filename (Download folder or Library)
+        if file_path.exists():
+            on_disk_size = file_path.stat().st_size
+            if total_size > 0 and on_disk_size == total_size:
+                print(f"[DOWNLOADER] {filename} already exists and is complete in download directory. Skipping.")
+                exists_complete = True
+        
+        from app.services.library_service import library_service
+        if not exists_complete:
+            lib_path = library_service.find_in_library(filename)
+            if lib_path and lib_path.exists():
+                on_disk_size = lib_path.stat().st_size
+                if total_size > 0 and on_disk_size == total_size:
+                    print(f"[DOWNLOADER] {filename} found in library ({lib_path}). Skipping download.")
+                    # Re-create symlink if missing in download dir to keep it visible
+                    if not file_path.exists():
+                        try: os.symlink(str(lib_path), str(file_path))
+                        except: pass
+                    exists_complete = True
+
+        # B. Check by metadata (Same content, different filename)
+        if not exists_complete and (title or imdb_id):
+            from app.db.database import AsyncSessionLocal
+            from app.db.models import DownloadHistory
+            from sqlalchemy import select, or_, and_, func
+            from app.core.utils import get_quality_score
+            
+            async with AsyncSessionLocal() as session:
+                h_stmt = select(DownloadHistory).where(
+                    or_(
+                        DownloadHistory.imdb_id == imdb_id if imdb_id else False,
+                        and_(
+                            func.lower(DownloadHistory.title) == title.lower(),
+                            DownloadHistory.year == year,
+                            DownloadHistory.category == category
+                        )
+                    )
+                )
+                if category == "series":
+                    h_stmt = h_stmt.where(DownloadHistory.season == season, DownloadHistory.episode == episode)
+                
+                h_res = await session.execute(h_stmt)
+                existing_entries = h_res.scalars().all()
+                
+                if existing_entries:
+                    new_score = get_quality_score(resolution, language, v_quality, quality, audio)
+                    for ex in existing_entries:
+                        ex_score = get_quality_score(ex.resolution, ex.language, ex.v_quality, ex.quality, ex.audio)
+                        if ex_score >= new_score:
+                            # We found a version that is same or better quality
+                            # Check if it actually exists in library
+                            lib_path = library_service.find_in_library(ex.filename)
+                            if lib_path and lib_path.exists():
+                                print(f"[DOWNLOADER] Content '{title}' already exists in library with same/better quality ({ex.filename}). skipping.")
+                                # Mark as complete for the UI but don't create a new file/link to avoid redundant entries
+                                exists_complete = True
+                                break
+
+        # Ensure group entry exists for UI reporting
         if group_name not in self.active_downloads:
             self.active_downloads[group_name] = {
                 "name": group_name,
@@ -96,6 +163,23 @@ class DownloaderService:
             }
         
         group = self.active_downloads[group_name]
+
+        if exists_complete:
+            # Update group stats for the UI
+            if filename not in group["files"]:
+                group["files"][filename] = {"progress": 100, "total": total_size, "downloaded": total_size, "status": "done"}
+                group["total"] += total_size
+                group["downloaded"] += total_size
+            else:
+                group["files"][filename]["progress"] = 100
+                group["files"][filename]["status"] = "done"
+            
+            if group["total"] > 0:
+                group["progress"] = round((group["downloaded"] / group["total"]) * 100, 1)
+            
+            return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
+
+        # Standard download flow
         if group["status"] not in ["extracting", "error"]:
             group["status"] = "downloading"
 
