@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     WEBTOP_CONTAINER_NAME: str = _yaml_config.get("webtop_container_name", "ddltower-browser")
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
     IGNORE_RESOLUTIONS: List[str] = _yaml_config.get("ignore_resolutions", [])
+    AUTO_DOWNLOAD_SERIES_PACKS: bool = _yaml_config.get("auto_download_series_packs", False)
     
     # Scheduler window (Hours when scanning is allowed, e.g. 6 to 0 for 06:00-00:00)
     SCAN_START_HOUR: int = _yaml_config.get("scan_start_hour", 6)

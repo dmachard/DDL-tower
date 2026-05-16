@@ -259,6 +259,13 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                     else:
                         print(f"[API] Upgrade detected for {title}: {meta.get('resolution')} is better than existing.")
 
+                # Series Pack filtering
+                if not settings.AUTO_DOWNLOAD_SERIES_PACKS and meta.get("category") == "series":
+                    # A pack is usually S01, S02, etc. with no specific episode
+                    if meta.get("season") and not meta.get("episode"):
+                        print(f"[API] Skipping auto-download for {title}: Series packs are disabled in settings.")
+                        continue
+
                 filtered_downloads.append((orig_url, link, filename))
     else:
         filtered_downloads = valid_downloads

@@ -172,6 +172,8 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 - **`override_title: "{{ step_name.variable }}"`**: Forces the final media title using a variable extracted during a previous step (via `js_code` or `rss`). This title is treated as the **source of truth** and will prioritize over obfuscated filenames during metadata enrichment.
 - **`override_year: "{{ step_name.variable }}"`**: Same as `override_title` but forces the release year.
 - **`auto_download: true`**: (New) Automatically triggers the debrid-unlock and download workflow as soon as links are discovered and enriched. Perfect for full automation.
+- **Global Settings** (in `config/config.yaml`):
+  - **`auto_download_series_packs: false`**: (New) If set to `false`, prevents automatic download of series packs (full seasons). Default is `true`.
 - **`debug: true`**: Saves the HTML content and a screenshot of the step in `/app/data/debug/` for troubleshooting.
 - **`hoster_patterns`** (or `hoster_patterns_url`): Regex patterns to extract the final hoster links (e.g., 1fichier). If defined, the unlocker will exclusively search for these patterns on the unlocked page.
 - **`dig_patterns`** (or `dig_patterns_url`): Regex patterns to extract intermediate links that must be navigated/dug into during the next step (e.g., rentry, idrix).

@@ -46,6 +46,9 @@ scan_end_hour: 0
 # Resolution filter (global)
 ignore_resolutions: ["720p", "480p", "DVD", "SD"]
 
+# Automatic download settings
+auto_download_series_packs: true
+
 # Browser connection for Webtop/Cloudflare bypass
 browser_url: "http://ddltower-browser:9222"
 webtop_container_name: "ddltower-browser"
@@ -59,7 +62,6 @@ direct_scan_patterns:
 # --- Automated Discovery Sources (Scrapers) ---
 sources:
   - name: "MyComplexSource"
-    is_chain: true
     steps:
       - name: "index"
         url: "https://example.com/index"
