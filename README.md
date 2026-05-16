@@ -299,5 +299,5 @@ graph TD
 ## Tests
 
 ```bash
-sudo docker compose exec -T ddltower python3 -m pytest -v app/tests/test*
+docker compose exec -T ddltower python3 -m pytest -p no:cacheprovider -v app/tests/test*
 ```

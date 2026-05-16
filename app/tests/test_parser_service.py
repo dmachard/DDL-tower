@@ -83,4 +83,23 @@ def test_parse_filename_multi_vostfr():
     res = parser_service.parse_filename(filename)
     langs = [l.upper() for l in res["languages"]]
     assert "MULTI" in langs
+    assert "MULTI" in langs
     assert "VOSTFR" in langs
+
+def test_parse_filename_punisher_issue():
+    """Test that both messy Punisher filenames result in the same title."""
+    f1 = "The punisher one last kill 2026 Fr stfi 4K HDR WebLight AC3 5.1c.mkv"
+    f2 = "The.Punisher.One.Last.Kill.2026.MULTi.4KLight.DV.HDR10 .WEBRip.DDP5.1.Atmos.HEVC-[PSA]-BATGirl.mkv"
+    
+    res1 = parser_service.parse_filename(f1)
+    res2 = parser_service.parse_filename(f2)
+    
+    # Both should have the same clean title
+    assert res1["title"].lower() == "the punisher one last kill"
+    assert res2["title"].lower() == "the punisher one last kill"
+    
+    # Year should be extracted but NOT in the title
+    assert res1["year"] == 2026
+    assert res2["year"] == 2026
+    assert "2026" not in res1["title"]
+    assert "2026" not in res2["title"]

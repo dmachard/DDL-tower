@@ -68,9 +68,9 @@ class ParserService:
         # 5. Remove common technical noise
         noise = [
             r'\d{3,4}p', r'\d{1}k', r'H[\.\s]?26[45]', r'x[\.\s]?26[45]', 
-            'WEB-DL', 'WEBRip', 'BluRay', 'BDRip', 'DVDRip', 'REPACK', 'PROPER', 'FINAL',
-            'MULTI', 'FRENCH', 'TRUEFRENCH', 'VOSTFR', 'SUBFRENCH', 'VFF', 'VFI', 'VFQ',
-            'UHD', 'DV', 'HDR', 'HEVC', r'DDP\d[\.\s]?\d', 'Atmos', 'AC3', 'DTS', 'INTERNAL', 'CUSTOM'
+            'WEB-DL', 'WEBRip', 'WEBLIGHT', 'WEB', 'BluRay', 'BDRip', 'DVDRip', 'REPACK', 'PROPER', 'FINAL',
+            'MULTI', 'FRENCH', 'TRUEFRENCH', 'VOSTFR', 'SUBFRENCH', 'VFF', 'VFI', 'VFQ', 'VOST', 'STFI',
+            'UHD', 'DV', 'HDR', 'HDR10', 'HEVC', r'DDP\d[\.\s]?\d', 'Atmos', 'AC3', 'DTS', 'INTERNAL', 'CUSTOM'
         ]
         for n in noise:
             t = re.sub(rf'\b{n}\b', ' ', t, flags=re.I)
@@ -110,7 +110,20 @@ class ParserService:
             title = re.sub(r'\b(Vol|Pt|Part|Partie)[\.\s]?\d+\b', ' ', title, flags=re.I)
             title = re.sub(r'\b\d+(?:e|ème|re|nd|rd|th)?\s+partie\b', ' ', title, flags=re.I)
             
-            title = re.split(r'[\.\[\s\-](?:S\d+|E\d+|S\d+E\d+|MULTI|FRENCH|TRUEFRENCH|1080P|720P|2160P|BLURAY|UHD|VOSTFR|VFF|VFI|VFQ|DV|HDR|REPACK|PROPER|FINAL)\b', title, flags=re.I)[0]
+            # Expand tags to split on (more aggressive cleaning)
+            tags_to_split = [
+                r'S\d+', r'E\d+', r'S\d+E\d+', 'MULTI', 'FRENCH', 'TRUEFRENCH', 'VOSTFR', 'SUBFRENCH', 'VFF', 'VFI', 'VFQ', 'VOST', 'STFI',
+                '1080P', '720P', '2160P', '4K', '4KLIGHT', 'UHD', 'BLURAY', 'BDRIP', 'DVDRIP', 'WEBRIP', 'WEB-DL', 'WEBLIGHT', 'WEB',
+                'HDR', 'DV', 'HEVC', 'X264', 'X265', 'H264', 'H265', 'REPACK', 'PROPER', 'FINAL', 'INTERNAL', 'CUSTOM', 'AC3', 'DDP', 'DTS', 'ATMOS'
+            ]
+            pattern = r'[\.\[\s\-\_](?:' + '|'.join(tags_to_split) + r')\b'
+            title = re.split(pattern, title, flags=re.I)[0]
+            
+            # Remove year from title if present
+            year = p.get('year')
+            if year:
+                title = re.sub(rf'\b{year}\b', ' ', title)
+
             title = title.replace('.', ' ').strip()
             # Final cleanup of multiple spaces
             title = re.sub(r'\s+', ' ', title).strip()
