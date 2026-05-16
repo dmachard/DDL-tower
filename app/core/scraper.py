@@ -284,6 +284,9 @@ class Scraper:
         else:
             raw = self._extract_links(text, list(set((step.get("regex_patterns") or step.get("dig_patterns") or step.get("dig_patterns_url") or []) + step.get("hoster_patterns", []) + step.get("unlock_patterns", []))))
 
+        # Deduplicate links (e.g. .rar vs .rar.html)
+        raw = self._deduplicate_links(raw)
+
         if step.get("ignore_patterns"):
             raw = [l for l in raw if not any(re.search(p, l) for p in step["ignore_patterns"])]
 
@@ -426,6 +429,46 @@ class Scraper:
                 if link.startswith("http") and link not in links:
                     links.append(link)
         return links
+
+    def _deduplicate_links(self, links: List[str]) -> List[str]:
+        """
+        Generic deduplication: cleans URLs by removing query parameters 
+        and truncating anything after known media/archive extensions.
+        """
+        if not links: return []
+        
+        # Known "good" extensions to stop at
+        valid_exts = ['.rar', '.zip', '.7z', '.mkv', '.mp4', '.avi', '.ts', '.iso']
+        unique_by_base = {}
+        
+        for url in links:
+            # 1. Handle base URL and Query params
+            if '1fichier.com' in url and '?' in url:
+                # For 1fichier, the ID is in the query, keep only the first part of it
+                base = url.split('?')[0] + '?' + url.split('?')[1].split('&')[0]
+            else:
+                # For others, remove query parameters entirely
+                base = url.split('?')[0]
+            
+            base = base.rstrip('/')
+            
+            # 2. Truncate after the first "valid" extension found
+            # (e.g. file.rar.html -> file.rar)
+            low_base = base.lower()
+            for ext in valid_exts:
+                idx = low_base.rfind(ext)
+                if idx != -1:
+                    base = base[:idx + len(ext)]
+                    break
+            
+            if base not in unique_by_base:
+                unique_by_base[base] = url
+            else:
+                # Priority: keep the shortest URL
+                if len(url) < len(unique_by_base[base]):
+                    unique_by_base[base] = url
+                    
+        return list(unique_by_base.values())
 
     def _matches_keywords(self, text: str, required: Dict[str, str] = None, excluded: List[str] = None) -> Optional[List[str]]:
         if not text: return None

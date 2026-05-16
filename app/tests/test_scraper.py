@@ -245,3 +245,17 @@ async def test_bulk_scrape_once_skip():
         args, _ = client.get.call_args
         assert args[0] == "https://new.com"
         print("[TEST] Bulk scrape_once skip verified.")
+
+def test_deduplicate_links(scraper):
+    """Test that scraper deduplicates URLs by ID and extension."""
+    links = [
+        "https://rapidgator.net/file/4bc1a631/file.part1.rar.html",
+        "https://rapidgator.net/file/4bc1a631/file.part1.rar",
+        "https://1fichier.com/?abc123def&html=1",
+        "https://1fichier.com/?abc123def"
+    ]
+    cleaned = scraper._deduplicate_links(links)
+    assert len(cleaned) == 2
+    assert "https://rapidgator.net/file/4bc1a631/file.part1.rar" in cleaned
+    assert "https://1fichier.com/?abc123def" in cleaned
+    assert not any(l.endswith(".html") for l in cleaned)
