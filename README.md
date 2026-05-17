@@ -27,6 +27,8 @@ docker compose up -d
 - **Dashboard**: [http://localhost:8001](http://localhost:8001)  
 - **Browser (Webtop)**: [http://localhost:8002](http://localhost:8002)
 - **RSS Feed (Latest)**: [http://localhost:8001/api/rss](http://localhost:8001/api/rss) (Filters: `?category=movie`, `?category=series`, `?q=search`)  
+- **RSS Feed (Movies Only)**: [http://localhost:8001/api/rss/movies](http://localhost:8001/api/rss/movies)  
+- **RSS Feed (Series Only)**: [http://localhost:8001/api/rss/series](http://localhost:8001/api/rss/series)  
 - **RSS Feed (Downloads)**: [http://localhost:8001/api/rss/downloads](http://localhost:8001/api/rss/downloads)
 
 ## Cloudflare Bypass (Turnstile)

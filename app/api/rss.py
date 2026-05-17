@@ -10,17 +10,15 @@ from app.core.config import settings
 
 router = APIRouter()
 
-@router.get("/rss")
-async def get_rss_feed(
+async def _generate_rss_xml(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    limit: int = Query(50, ge=1, le=100),
-    category: str = Query(None),
-    q: str = Query(None)
+    db: AsyncSession,
+    limit: int,
+    category: str,
+    q: str,
+    include_cat_tag: bool,
+    feed_title: str
 ):
-    """
-    Generates an RSS 2.0 feed of the latest releases.
-    """
     # Get grouped releases (similar to the dashboard)
     data = await release_service.get_grouped_releases(
         db, page=1, limit=limit, q=q, category=category, recent=False
@@ -71,9 +69,16 @@ async def get_rss_feed(
         }
         display_cat = cat_labels.get(cat.lower(), "Film" if "movie" in cat.lower() else "TV")
         
-        display_title = f"[{display_cat}]"
-        if year: display_title += f" ({year})"
-        display_title += f" {title}"
+        if include_cat_tag:
+            display_title = f"[{display_cat}]"
+            if year: display_title += f" ({year})"
+            display_title += f" {title}"
+        else:
+            if year:
+                display_title = f"({year}) {title}"
+            else:
+                display_title = f"{title}"
+                
         display_title += tags_str
         
         # Build description
@@ -170,7 +175,7 @@ async def get_rss_feed(
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
 <channel>
-    <title>{html.escape(settings.APP_NAME)} - Latest Releases</title>
+    <title>{html.escape(settings.APP_NAME)} - {html.escape(feed_title)}</title>
     <link>{html.escape(str(request.base_url))}</link>
     <description>Dernières releases indexées par DDL Tower</description>
     <language>fr-fr</language>
@@ -180,6 +185,67 @@ async def get_rss_feed(
 </rss>"""
 
     return Response(content=rss_xml, media_type="application/rss+xml")
+
+@router.get("/rss")
+async def get_rss_feed(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100),
+    category: str = Query(None),
+    q: str = Query(None)
+):
+    """
+    Generates an RSS 2.0 feed of the latest releases.
+    """
+    return await _generate_rss_xml(
+        request=request,
+        db=db,
+        limit=limit,
+        category=category,
+        q=q,
+        include_cat_tag=True,
+        feed_title="Latest Releases"
+    )
+
+@router.get("/rss/movies")
+async def get_rss_movies_feed(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100),
+    q: str = Query(None)
+):
+    """
+    Generates an RSS 2.0 feed of the latest movies only.
+    """
+    return await _generate_rss_xml(
+        request=request,
+        db=db,
+        limit=limit,
+        category="movie",
+        q=q,
+        include_cat_tag=False,
+        feed_title="Nouveautés Films"
+    )
+
+@router.get("/rss/series")
+async def get_rss_series_feed(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=100),
+    q: str = Query(None)
+):
+    """
+    Generates an RSS 2.0 feed of the latest series only.
+    """
+    return await _generate_rss_xml(
+        request=request,
+        db=db,
+        limit=limit,
+        category="series",
+        q=q,
+        include_cat_tag=False,
+        feed_title="Nouvelles Séries"
+    )
 
 @router.get("/rss/downloads")
 async def get_downloads_rss_feed(
