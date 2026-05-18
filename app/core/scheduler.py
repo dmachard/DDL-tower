@@ -60,10 +60,51 @@ async def run_scraper(scraper):
                             await enrichment_service.enrich_links(db, links=links_to_enrich)
                         
                         # 3. Auto-download if requested in scraper config
-                        if batch.get("auto_download"):
-                            from app.api.downloads import run_download_task
-                            # We run it in the background as a task to not block the scraper
-                            asyncio.create_task(run_download_task(links, is_auto=True))
+                        auto_download = batch.get("auto_download")
+                        if auto_download:
+                            # Determine if there is any year restriction
+                            allowed_years = []
+                            if isinstance(auto_download, list):
+                                allowed_years = auto_download
+                            elif isinstance(batch.get("auto_download_years"), list):
+                                allowed_years = batch.get("auto_download_years")
+                            
+                            should_download = True
+                            if allowed_years:
+                                # Find parsed/enriched year from the links in this batch
+                                year_found = None
+                                for link in (links_to_enrich or []):
+                                    if link.year:
+                                        year_found = link.year
+                                        break
+                                
+                                if year_found:
+                                    # Type-safe check for matching year
+                                    def matches_allowed_years(y, allowed):
+                                        try:
+                                            y_int = int(y)
+                                        except (ValueError, TypeError):
+                                            return False
+                                        for ay in allowed:
+                                            try:
+                                                if int(ay) == y_int:
+                                                    return True
+                                            except (ValueError, TypeError):
+                                                if str(ay).strip() == str(y).strip():
+                                                    return True
+                                        return False
+                                    
+                                    if not matches_allowed_years(year_found, allowed_years):
+                                        print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: Year {year_found} not in allowed years {allowed_years}")
+                                        should_download = False
+                                else:
+                                    print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: No year found for release and year filters {allowed_years} are active")
+                                    should_download = False
+                            
+                            if should_download:
+                                from app.api.downloads import run_download_task
+                                # We run it in the background as a task to not block the scraper
+                                asyncio.create_task(run_download_task(links, is_auto=True))
     except Exception as e:
         print(f"[SCHEDULER] Error running scraper {scraper.name}: {e}")
         traceback.print_exc()

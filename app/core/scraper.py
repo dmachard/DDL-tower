@@ -22,6 +22,7 @@ from app.core.config import settings
 
 class Scraper:
     def __init__(self, config: dict):
+        self.config = config
         self.name = config.get("name", "Unknown")
         self.steps = config.get("steps", [])
         self.headers = config.get("headers", {
@@ -336,7 +337,15 @@ class Scraper:
                             break
                 print(f"[{self.name}] [{step_name}] Found {len(valid)} link(s)")
                 acc = list(set(context.get("__accumulated_tags__", []) + current_tags))
-                yield {"links": list(set(valid)), "source_url": url, "override_title": title, "override_year": str(year) if year and str(year).isdigit() else None, "tags": acc, "auto_download": step.get("auto_download", False)}
+                yield {
+                    "links": list(set(valid)), 
+                    "source_url": url, 
+                    "override_title": title, 
+                    "override_year": str(year) if year and str(year).isdigit() else None, 
+                    "tags": acc, 
+                    "auto_download": step.get("auto_download", False),
+                    "auto_download_years": step.get("auto_download_years")
+                }
             elif is_last:
                 print(f"[{self.name}] [{step_name}] No matching links found.")
 
