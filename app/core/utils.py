@@ -1,5 +1,22 @@
 import math
 import re
+import unicodedata
+
+def normalize_title(title: str) -> str:
+    """
+    Normalizes a title for robust duplicate matching.
+    Strips accents, converts to lowercase, removes punctuation and extra spaces.
+    """
+    if not title:
+        return ""
+    title_str = str(title)
+    # Strip accents
+    normalized = unicodedata.normalize('NFKD', title_str)
+    ascii_title = normalized.encode('ASCII', 'ignore').decode('utf-8')
+    # Lowercase and keep only alphanumeric characters and spaces
+    cleaned = re.sub(r'[^a-z0-9\s]', '', ascii_title.lower())
+    # Collapse multiple spaces and strip
+    return re.sub(r'\s+', ' ', cleaned).strip()
 
 def format_size(size_bytes: int) -> str:
     """Formats bytes to human readable string."""

@@ -120,21 +120,26 @@ class DownloaderService:
             from app.core.utils import get_quality_score
             
             async with AsyncSessionLocal() as session:
-                h_stmt = select(DownloadHistory).where(
-                    or_(
-                        DownloadHistory.imdb_id == imdb_id if imdb_id else False,
+                if imdb_id:
+                    h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
+                else:
+                    h_stmt = select(DownloadHistory).where(
                         and_(
-                            func.lower(DownloadHistory.title) == title.lower(),
                             DownloadHistory.year == year,
                             DownloadHistory.category == category
                         )
                     )
-                )
                 if category == "series":
                     h_stmt = h_stmt.where(DownloadHistory.season == season, DownloadHistory.episode == episode)
                 
                 h_res = await session.execute(h_stmt)
                 existing_entries = h_res.scalars().all()
+                
+                # If no imdb_id was matched, filter by normalized title in Python
+                if not imdb_id and existing_entries:
+                    from app.core.utils import normalize_title
+                    target_norm = normalize_title(title)
+                    existing_entries = [ex for ex in existing_entries if normalize_title(ex.title) == target_norm]
                 
                 if existing_entries:
                     new_score = get_quality_score(resolution, language, v_quality, quality, audio)

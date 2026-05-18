@@ -210,16 +210,15 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 imdb_id = meta.get("imdb_id")
                 
                 # Check history
-                h_stmt = select(DownloadHistory).where(
-                    or_(
-                        DownloadHistory.imdb_id == imdb_id if imdb_id else False,
+                if imdb_id:
+                    h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
+                else:
+                    h_stmt = select(DownloadHistory).where(
                         and_(
-                            func.lower(DownloadHistory.title) == title.lower(),
                             DownloadHistory.year == meta.get("year"),
                             DownloadHistory.category == meta.get("category")
                         )
                     )
-                )
                 
                 # For series, also match season/episode
                 if meta.get("category") == "series":
@@ -230,6 +229,12 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
 
                 h_res = await session.execute(h_stmt)
                 existing = h_res.scalars().all()
+                
+                # If no imdb_id was matched, filter by normalized title in Python
+                if not imdb_id and existing:
+                    from app.core.utils import normalize_title
+                    target_norm = normalize_title(title)
+                    existing = [ex for ex in existing if normalize_title(ex.title) == target_norm]
                 
                 if existing:
                     # Check if any existing version is better or equal

@@ -99,6 +99,7 @@ class ParserService:
             return {}
             
         p = PTN.parse(filename)
+        year = p.get('year')
         
         # Title handling
         raw_title = p.get('title', filename)
@@ -106,6 +107,9 @@ class ParserService:
         
         # Aggressive title cleaning if tags leaked into it
         if title:
+            import unicodedata
+            title = unicodedata.normalize('NFKD', title).encode('ASCII', 'ignore').decode('utf-8')
+            
             # Remove Volume/Part markers
             title = re.sub(r'\b(Vol|Pt|Part|Partie)[\.\s]?\d+\b', ' ', title, flags=re.I)
             title = re.sub(r'\b\d+(?:e|ème|re|nd|rd|th)?\s+partie\b', ' ', title, flags=re.I)
@@ -120,7 +124,10 @@ class ParserService:
             title = re.split(pattern, title, flags=re.I)[0]
             
             # Remove year from title if present
-            year = p.get('year')
+            if not year:
+                year_match = re.search(r'\b([12]\d{3})\b', filename)
+                if year_match:
+                    year = int(year_match.group(1))
             if year:
                 title = re.sub(rf'\b{year}\b', ' ', title)
 
@@ -161,7 +168,7 @@ class ParserService:
         return {
             "title": title,
             "category": category,
-            "year": p.get('year'),
+            "year": year,
             "season": format_seq(p.get('season')),
             "episode": format_seq(p.get('episode')),
             "resolution": str(res) if res else None,

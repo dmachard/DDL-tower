@@ -156,3 +156,70 @@ async def test_scheduler_auto_download_year_unmatched():
         
         mock_dl_task.assert_not_called()
         print("[TEST] Year-unmatched auto-download skipping verified.")
+
+@pytest.mark.asyncio
+async def test_download_duplicate_prevention_accent_insensitive():
+    """Test that run_download_task skips auto-download if the movie (even with different accent/case) is already in history."""
+    from app.api.downloads import run_download_task
+    from app.db.models import DownloadHistory
+    
+    url = "https://hoster.com/file_chasse"
+    
+    mock_row = MagicMock()
+    mock_row.url = url
+    mock_row.category = "movie"
+    mock_row.title_fr = "Gardee 2"
+    mock_row.official_title = "Gardee 2"
+    mock_row.title = "Gardee 2"
+    mock_row.filename = "Gardee.2.2025.FRENCH.1080p.WEB.H264.mkv"
+    mock_row.year = 2025
+    mock_row.year_1 = 2025
+    mock_row.imdb_id = None
+    mock_row.season = None
+    mock_row.episode = None
+    mock_row.resolution = "1080p"
+    mock_row.quality = "WEB"
+    mock_row.language = "FRENCH"
+    mock_row.v_quality = ""
+    mock_row.codec = "H264"
+    mock_row.network = ""
+    mock_row.audio = ""
+    mock_row.channels = ""
+
+    existing_history = MagicMock(spec=DownloadHistory)
+    existing_history.title = "gardée 2"
+    existing_history.year = 2025
+    existing_history.category = "movie"
+    existing_history.resolution = "1080p"
+    existing_history.quality = "WEB"
+    existing_history.language = "VFF"
+    existing_history.v_quality = ""
+    existing_history.audio = ""
+
+    with patch("app.api.downloads.debrid_service.unlock_link", new_callable=AsyncMock) as mock_unlock, \
+         patch("app.api.downloads.AsyncSessionLocal") as mock_db, \
+         patch("app.services.downloader.downloader_service.download_file", new_callable=AsyncMock) as mock_download:
+        
+        mock_unlock.return_value = {
+            "status": "success",
+            "data": {
+                "link": "https://debrid.com/unlocked",
+                "filename": "Gardee.2.2025.FRENCH.1080p.WEB.H264.mkv"
+            }
+        }
+        
+        mock_session = AsyncMock()
+        mock_db.return_value.__aenter__.return_value = mock_session
+        
+        mock_res_meta = MagicMock()
+        mock_res_meta.__iter__.return_value = [mock_row]
+        
+        mock_res_hist = MagicMock()
+        mock_res_hist.scalars.return_value.all.return_value = [existing_history]
+        
+        mock_session.execute.side_effect = [mock_res_meta, mock_res_hist]
+        
+        await run_download_task([url], is_auto=True)
+        
+        mock_download.assert_not_called()
+        print("[TEST] Accent-insensitive duplicate prevention verified successfully!")

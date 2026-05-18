@@ -103,3 +103,17 @@ def test_parse_filename_punisher_issue():
     assert res2["year"] == 2026
     assert "2026" not in res1["title"]
     assert "2026" not in res2["title"]
+
+def test_parse_filename_accent_issue():
+    """Test that both 2 filenames result in the same title and year."""
+    f1 = "gardée 2 2000 VFF 1080p Web x264 @@@@.mkv"
+    f2 = "Gardee.2.2000.FRENCH.1080p.WEB.H264.mkv"
+    
+    res1 = parser_service.parse_filename(f1)
+    res2 = parser_service.parse_filename(f2)
+    
+    # Both should have the same title (without accents) and the same year
+    assert res1["title"].lower() == "gardee 2"
+    assert res2["title"].lower() == "gardee 2"
+    assert res1["year"] == 2000
+    assert res2["year"] == 2000
