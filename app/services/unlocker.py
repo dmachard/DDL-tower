@@ -62,7 +62,7 @@ class LinkUnlocker:
                 if "zoneurs.net" in url:
                     print("[UNLOCKER] Zoneurs.net detected. Waiting for unlock button...")
                     try:
-                        unlock_btn = page.locator("#continueBtn")
+                        unlock_btn = page.locator("#unlockBtn")
                         await unlock_btn.wait_for(state="visible", timeout=15000)
                         print("[UNLOCKER] Clicking 'Déverrouiller le lien'...")
                         await unlock_btn.click()
