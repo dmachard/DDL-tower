@@ -197,9 +197,9 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 ```yaml
 # --- Global Unlockers ---
 unlockers:
-  - name: "Zoneurs"
+  - name: "unlock"
     patterns:
-      - 'https?://zoneurs\.net/.*'
+      - 'https?://unlock\.net/.*'
     wait_for: "#unlockBtn"
     click: "#unlockBtn"
     wait_result: ".result-input"
