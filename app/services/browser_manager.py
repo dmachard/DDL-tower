@@ -155,7 +155,7 @@ class BrowserManager:
                     f"env DISPLAY=:1 chromium --no-sandbox {stealth_flags} "
                     f"--remote-debugging-port={self.local_cdp_port} "
                     f"--remote-allow-origins=* "
-                    f"--user-data-dir={profile_path} '{url}'"
+                    f"--user-data-dir={profile_path} about:blank"
                 ),
                 detach=True,
                 user="root"
