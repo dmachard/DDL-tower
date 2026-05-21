@@ -71,3 +71,32 @@ def test_movies_folder_cleanup(tmp_path, monkeypatch):
     assert success is True
     assert not old_version.exists(), "Old version of the movie should be deleted"
     assert (tmp_path / "My.Movie.2023.1080p.mkv").exists(), "New version should be moved to movies_dir"
+
+def test_movie_kaamelott_duplicate(tmp_path, monkeypatch):
+    """
+    Test the duplication issue for movies with long names.
+    """
+    monkeypatch.setattr(library_service, "movies_dir", tmp_path)
+    
+    # Existing older file
+    old_version = tmp_path / "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p Web x264 @@UnPourTous@@.mkv"
+    old_version.write_text("old version")
+    
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+    
+    # New file arriving
+    source_file = download_dir / "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@UnPourTous@@.mkv"
+    source_file.write_text("new version")
+    
+    success = library_service.organize_file(
+        file_path=str(source_file),
+        category="movie",
+        title="Kaamelott Deuxième volet Partie 1",  # TMDB returns the accent
+        year=2026
+    )
+    
+    assert success is True
+    assert not old_version.exists(), "The older Web x264 version should have been deleted"
+    expected_new = tmp_path / "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@UnPourTous@@.mkv"
+    assert expected_new.exists(), "The new HDLight version should be in the library"

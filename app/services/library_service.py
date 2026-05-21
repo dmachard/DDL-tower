@@ -8,8 +8,15 @@ class LibraryService:
     def __init__(self):
         self.movies_dir = Path(settings.LIBRARY_MOVIES_DIR)
         self.series_dir = Path(settings.LIBRARY_SERIES_DIR)
-        self.movies_dir.mkdir(parents=True, exist_ok=True)
-        self.series_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.movies_dir.mkdir(parents=True, exist_ok=True)
+            self.series_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            # Fallback to /tmp in CI or restricted environments where /app is not writable
+            self.movies_dir = Path("/tmp/ddltower/movies")
+            self.series_dir = Path("/tmp/ddltower/series")
+            self.movies_dir.mkdir(parents=True, exist_ok=True)
+            self.series_dir.mkdir(parents=True, exist_ok=True)
 
     def _sanitize_path(self, name: str) -> str:
         """Removes or replaces characters that are invalid for file paths."""
@@ -44,7 +51,14 @@ class LibraryService:
                     for item in target_base_dir.iterdir():
                         if item.is_file() and item.name != src.name:
                             # Basic match: title in filename + year in filename
-                            if clean_title.lower() in item.name.lower().replace(' ', '.'):
+                            import unicodedata
+                            def normalize_str(s):
+                                return unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8').lower()
+                            
+                            norm_clean_title = normalize_str(clean_title)
+                            norm_item_name = normalize_str(item.name.replace(' ', '.'))
+                            
+                            if norm_clean_title in norm_item_name:
                                 if not year or str(year) in item.name:
                                     print(f"[LIBRARY] Deleting old movie version: {item.name}")
                                     try: item.unlink()

@@ -117,3 +117,15 @@ def test_parse_filename_accent_issue():
     assert res2["title"].lower() == "gardee 2"
     assert res1["year"] == 2000
     assert res2["year"] == 2000
+
+def test_parse_filename_kaamelott_issue():
+    """Test that both Kaamelott filenames result in the exact same title."""
+    f1 = "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p Web x264 @@---@@.mkv"
+    f2 = "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@----@@.mkv"
+    
+    res1 = parser_service.parse_filename(f1)
+    res2 = parser_service.parse_filename(f2)
+    
+    assert res1["title"] == res2["title"]
+    assert res1["year"] == 2026
+    assert res2["year"] == 2026
