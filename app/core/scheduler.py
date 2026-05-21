@@ -101,6 +101,25 @@ async def run_scraper(scraper):
                                     print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: No year found for release and year filters {allowed_years} are active")
                                     should_download = False
                             
+                            allowed_keywords = batch.get("auto_download_keywords", [])
+                            if isinstance(allowed_keywords, str):
+                                allowed_keywords = [allowed_keywords]
+                            
+                            if should_download and allowed_keywords:
+                                keyword_found = False
+                                for link in (links_to_enrich or []):
+                                    link_text = f"{link.title or ''} {link.filename or ''}".lower()
+                                    for kw in allowed_keywords:
+                                        if str(kw).lower() in link_text:
+                                            keyword_found = True
+                                            break
+                                    if keyword_found:
+                                        break
+                                
+                                if not keyword_found:
+                                    print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: No keyword from {allowed_keywords} found in release")
+                                    should_download = False
+                            
                             if should_download:
                                 from app.api.downloads import run_download_task
                                 # We run it in the background as a task to not block the scraper

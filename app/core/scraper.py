@@ -357,7 +357,8 @@ class Scraper:
                     "override_year": str(year) if year and str(year).isdigit() else None, 
                     "tags": acc, 
                     "auto_download": step.get("auto_download", False),
-                    "auto_download_years": step.get("auto_download_years")
+                    "auto_download_years": step.get("auto_download_years"),
+                    "auto_download_keywords": step.get("auto_download_keywords")
                 }
             elif is_last:
                 print(f"[{self.name}] [{step_name}] No matching links found.")

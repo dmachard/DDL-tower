@@ -176,6 +176,7 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 - **`auto_download: true`**: (New) Automatically triggers the debrid-unlock and download workflow as soon as links are discovered and enriched. Perfect for full automation.
   - Can also accept a list of years, e.g., `auto_download: [2025, 2026]` to only download releases from specific years.
   - Alternatively, you can specify `auto_download_years: [2025, 2026]` at the same level as `auto_download: true` to restrict downloads by year for that specific step.
+  - You can also specify `auto_download_keywords: ["multi", "truefrench"]` to only download releases where the title or filename contains at least one of these keywords (case-insensitive).
 - **Global Settings** (in `config/config.yaml`):
   - **`auto_download_series_packs: false`**: (New) If set to `false`, prevents automatic download of series packs (full seasons). Default is `true`.
 - **`debug: true`**: Saves the HTML content and a screenshot of the step in `/app/data/debug/` for troubleshooting.
