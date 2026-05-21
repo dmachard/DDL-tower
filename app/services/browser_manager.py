@@ -112,12 +112,12 @@ class BrowserManager:
             container.exec_run("pkill -9 socat", user="root")
             
             # Thorough cleanup of locks and service workers
-            container.exec_run("rm -rf /config/.config/chromium/Singleton*", user="root")
+            container.exec_run("sh -c 'rm -rf /config/.config/chromium/Singleton*'", user="root")
             # Aggressive cleanup of Service Workers and Cache across all profiles
-            container.exec_run("find /config/.config/chromium -name 'Service Worker' -exec rm -rf {} +", user="root")
-            container.exec_run("find /config/.config/chromium -name 'Cache' -exec rm -rf {} +", user="root")
-            container.exec_run("find /config/.config/chromium -name 'Code Cache' -exec rm -rf {} +", user="root")
-            container.exec_run("find /config/.config/chromium -name 'Script Guide' -exec rm -rf {} +", user="root")
+            container.exec_run("sh -c \"find /config/.config/chromium -name 'Service Worker' -exec rm -rf {} +\"", user="root")
+            container.exec_run("sh -c \"find /config/.config/chromium -name 'Cache' -exec rm -rf {} +\"", user="root")
+            container.exec_run("sh -c \"find /config/.config/chromium -name 'Code Cache' -exec rm -rf {} +\"", user="root")
+            container.exec_run("sh -c \"find /config/.config/chromium -name 'Script Guide' -exec rm -rf {} +\"", user="root")
 
             # 2. Launch Chromium on local port (internal only)
             # Added more flags to disable background activities and service workers
@@ -163,7 +163,7 @@ class BrowserManager:
 
             # 3. Bridge the CDP port with socat (to allow external connections)
             container.exec_run(
-                cmd=f"socat TCP-LISTEN:{self.cdp_port},fork,reuseaddr TCP:127.0.0.1:{self.local_cdp_port}",
+                cmd=f"/usr/bin/socat TCP-LISTEN:{self.cdp_port},fork,reuseaddr TCP:127.0.0.1:{self.local_cdp_port}",
                 detach=True,
                 user="root"
             )
