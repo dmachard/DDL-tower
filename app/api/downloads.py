@@ -25,6 +25,16 @@ async def get_active_downloads():
     """
     return downloader_service.active_downloads
 
+@router.delete("/active-downloads/{group_name}")
+async def delete_active_download(group_name: str):
+    """
+    Removes an active download from the active list (usually to clear errors).
+    """
+    if group_name in downloader_service.active_downloads:
+        downloader_service.active_downloads.pop(group_name, None)
+        return {"status": "success"}
+    return {"status": "error", "message": "Not found"}
+
 @router.get("/downloads")
 async def get_downloads():
     """

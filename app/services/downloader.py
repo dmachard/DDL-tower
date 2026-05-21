@@ -323,9 +323,13 @@ class DownloaderService:
             except Exception as he:
                 print(f"[DOWNLOADER] Error saving history: {he}")
 
-            group["files"].pop(filename, None)
-            if not group["files"]:
-                 self.active_downloads.pop(group_name, None)
+            # Only pop the file if it's NOT a rar file.
+            # If it IS a rar file, we must keep it in the active_downloads group
+            # so that when the FINAL part finishes, should_extract knows all parts exist.
+            if not extraction_service.is_rar(str(file_path)):
+                group["files"].pop(filename, None)
+                if not group["files"]:
+                     self.active_downloads.pop(group_name, None)
             
         return str(file_path)
 

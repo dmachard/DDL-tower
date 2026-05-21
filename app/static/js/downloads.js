@@ -66,7 +66,13 @@ export const renderActiveDownloads = () => {
         const downloadBtn = clone.querySelector('.btn-download-local');
 
         if (group.status === 'error') {
-            deleteBtn.onclick = () => { delete state.downloads.active[groupName]; renderDownloads(state.downloads.items); };
+            deleteBtn.onclick = async () => { 
+                try {
+                    await fetch(`/api/active-downloads/${encodeURIComponent(groupName)}`, { method: 'DELETE' });
+                } catch (e) { console.error('Failed to delete active download:', e); }
+                delete state.downloads.active[groupName]; 
+                renderDownloads(state.downloads.items); 
+            };
         } else {
             deleteBtn.disabled = true;
             deleteBtn.style.opacity = 0.3;
