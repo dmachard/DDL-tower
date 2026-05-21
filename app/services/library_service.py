@@ -51,8 +51,19 @@ class LibraryService:
                                     except: pass
             else: # series
                 s_title = self._sanitize_path(title or "Unknown-Series")
+                # Capitalize each word for cleaner default names (e.g., "FROM" -> "From")
+                s_title = s_title.title()
                 folder_name = f"{s_title} ({year})" if year else s_title
+                
                 target_base_dir = self.series_dir / folder_name
+                
+                # Check for existing folder with different case to avoid duplicates
+                if self.series_dir.exists():
+                    for existing in self.series_dir.iterdir():
+                        if existing.is_dir() and existing.name.lower() == folder_name.lower():
+                            target_base_dir = existing
+                            break
+                            
                 target_base_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Cleanup old episode versions
