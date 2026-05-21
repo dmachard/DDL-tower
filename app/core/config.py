@@ -87,6 +87,10 @@ class Settings(BaseSettings):
         # Directly read the 'sources' block from the main YAML
         return _yaml_config.get("sources") or []
 
+    @property
+    def UNLOCKERS(self) -> List[dict]:
+        return _yaml_config.get("unlockers") or []
+
     model_config = ConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

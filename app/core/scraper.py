@@ -283,7 +283,14 @@ class Scraper:
         if isinstance(item, dict) and item_data.get("url") != url:
             raw = [item_data["url"]]
         else:
-            raw = self._extract_links(text, list(set((step.get("regex_patterns") or step.get("dig_patterns") or step.get("dig_patterns_url") or []) + step.get("hoster_patterns", []) + step.get("unlock_patterns", []))))
+            patterns = list(set((step.get("regex_patterns") or step.get("dig_patterns") or step.get("dig_patterns_url") or []) + step.get("hoster_patterns", []) + step.get("unlock_patterns", [])))
+            for u in settings.UNLOCKERS:
+                patterns.extend(u.get("patterns", []))
+            
+            if not patterns and text.strip().startswith("http"):
+                raw = [text.strip()]
+            else:
+                raw = self._extract_links(text, patterns)
 
         # Deduplicate links (e.g. .rar vs .rar.html)
         raw = self._deduplicate_links(raw)
@@ -296,8 +303,14 @@ class Scraper:
         # Unlock
         final = []
         upats = step.get("unlock_patterns", [])
+        global_upats = []
+        for u in settings.UNLOCKERS:
+            global_upats.extend(u.get("patterns", []))
+            
         for h in raw:
-            is_unlockable = (upats and any(re.search(p, h) for p in upats)) or step.get("unlock_links")
+            is_unlockable = (upats and any(re.search(p, h) for p in upats)) or \
+                            (global_upats and any(re.search(p, h) for p in global_upats)) or \
+                            step.get("unlock_links")
             if is_unlockable:
                 print(f"[{self.name}] [{step_name}] is_unlockable: {is_unlockable} for {h}")
                 # OPTIMIZATION: Check if this intermediate link was already scraped/unlocked

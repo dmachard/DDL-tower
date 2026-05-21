@@ -182,7 +182,8 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 - **`hoster_patterns`** (or `hoster_patterns_url`): Regex patterns to extract the final hoster links (e.g., 1fichier). If defined, the unlocker will exclusively search for these patterns on the unlocked page.
 - **`dig_patterns`** (or `dig_patterns_url`): Regex patterns to extract intermediate links that must be navigated/dug into during the next step (e.g., rentry, idrix).
 - **`ignore_patterns`**: List of regex patterns to explicitly ignore. If an extracted link matches one of these, it will be discarded (useful for filtering out tags, comments, or help pages).
-- **`unlock_patterns`**: Defines specific patterns that should be automatically sent to the LinkUnlocker (e.g., MultiUp). Any links matching these patterns are sent to the unlocker; all others are saved directly.
+- **`unlockers`** (Global config): Defines global rules for unlocking specific link protectors. Links matching any unlocker `patterns` are sent to the unlocker. You can configure `wait_for`, `click`, `extract_input`, and other actions to automate the unlocking process globally without writing code.
+- **`unlock_patterns`**: (Optional) You can still define step-specific patterns that should be automatically sent to the LinkUnlocker. Any links matching these patterns (or the global unlocker patterns) are sent to the unlocker.
 - **`type: "json"`**: Tells the scraper to parse the response as JSON (perfect for APIs).
 - **`headers`**: Dictionary of custom HTTP headers to send with the request (e.g., `Accept`, `Origin`, `Authorization`).
 - **`items_path: "$.path"`**: JSONPath expression to extract an array of items from the JSON response.
@@ -194,6 +195,16 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
 ### Configuration Example
 
 ```yaml
+# --- Global Unlockers ---
+unlockers:
+  - name: "Zoneurs"
+    patterns:
+      - 'https?://zoneurs\.net/.*'
+    wait_for: "#unlockBtn"
+    click: "#unlockBtn"
+    wait_result: ".result-input"
+    extract_input: true
+
 sources:
   - name: "MyComplexSource"
     is_chain: true
@@ -213,8 +224,6 @@ sources:
         yield_links: true
         hoster_patterns_url:
           - 'href=["''](https?://(?:www\.)?1fichier\.com/\?[\w-]+)[^"'']*["'']'
-        unlock_patterns:
-          - pattern: 'https?://(?:www\.)?multiup\.(?:org|io)/[^\s"''<>]+'
 ```
 
 ### Context Variables (Templating)

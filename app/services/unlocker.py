@@ -29,6 +29,15 @@ class LinkUnlocker:
             try:
                 # Always use a NEW page for isolation
                 page = await browser.new_page()
+                
+                # --- Auto-close all popups at Chromium level ---
+                async def handle_popup(popup):
+                    try:
+                        print(f"[UNLOCKER] Blocked popup window at Chromium level.")
+                        await popup.close()
+                    except:
+                        pass
+                page.on("popup", handle_popup)
 
                 # IMPORTANT: Force navigation to the target URL
                 print(f"[UNLOCKER] Navigating to target URL: {url}")
@@ -36,12 +45,26 @@ class LinkUnlocker:
 
                 print(f"[UNLOCKER] Page title: '{await page.title()}'")
   
-                # --- MultiUp Mirror Traversal ---
-                if "multiup.io" in url:
-                    print(f"[UNLOCKER] MultiUp page detected ({url}). Looking for mirror link...")
+                # --- Find Matching Unlocker Config ---
+                matched_unlocker = {}
+                for unl in settings.UNLOCKERS:
+                    patterns = unl.get("patterns", [])
+                    if any(re.search(p, url) for p in patterns):
+                        matched_unlocker = unl
+                        break
+                
+                if matched_unlocker:
+                    print(f"[UNLOCKER] Using config for: {matched_unlocker.get('name', 'Unknown')}")
+
+                # --- Configurable Mirror Traversal ---
+                mirror_selector = matched_unlocker.get("mirror_selector")
+                if mirror_selector:
+                    print(f"[UNLOCKER] Looking for mirror link with selector: {mirror_selector}")
                     try:
-                        await asyncio.sleep(3)
-                        mirror_locator = page.locator('a[href*="/mirror/"], form[action*="/mirror/"]')
+                        delay = matched_unlocker.get("wait_delay", 0)
+                        if delay:
+                            await asyncio.sleep(delay)
+                        mirror_locator = page.locator(mirror_selector)
                         count = await mirror_locator.count()
                         if count > 0:
                             mirror_url = await mirror_locator.first.get_attribute("href") or await mirror_locator.first.get_attribute("action")
@@ -52,40 +75,49 @@ class LinkUnlocker:
                                 print(f"[UNLOCKER] SUCCESS: Found mirror link ({mirror_url}). Navigating...")
                                 await page.goto(mirror_url, wait_until="domcontentloaded", timeout=30000)
                         else:
-                            print("[UNLOCKER] WARNING: No mirror link found on MultiUp page.")
-                            print(f"[UNLOCKER] Current Page URL: {page.url}")
+                            print("[UNLOCKER] WARNING: No mirror link found.")
                     except Exception as me:
-                        print(f"[UNLOCKER] MultiUp traversal error: {me}")
+                        print(f"[UNLOCKER] Mirror traversal error: {me}")
 
-                
-                # --- Zoneurs / ZT-Protect Traversal ---
-                if "zoneurs.net" in url:
-                    print("[UNLOCKER] Zoneurs.net detected. Waiting for unlock button...")
+                # --- Configurable Button Traversal ---
+                wait_btn = matched_unlocker.get("wait_for")
+                click_btn = matched_unlocker.get("click")
+                if wait_btn and click_btn:
+                    print(f"[UNLOCKER] Waiting for unlock button: {wait_btn}")
                     try:
-                        unlock_btn = page.locator("#unlockBtn")
-                        await unlock_btn.wait_for(state="visible", timeout=15000)
-                        print("[UNLOCKER] Clicking 'Déverrouiller le lien'...")
-                        await unlock_btn.click()
+                        btn = page.locator(wait_btn)
+                        await btn.wait_for(state="visible", timeout=15000)
                         
-                        # Wait for the result input to appear and have a value
-                        result_input = page.locator(".result-input")
-                        await result_input.wait_for(state="visible", timeout=15000)
-                        await asyncio.sleep(2) # Stability
+                        print(f"[UNLOCKER] Clicking {click_btn}...")
+                        await page.locator(click_btn).click()
                         
-                        final_url = await result_input.get_attribute("value")
-                        if final_url:
-                            print(f"[UNLOCKER] SUCCESS: Link found in input: {final_url}")
-                            # We can directly add it to final_links and skip the rest of the generic extraction if we want,
-                            # but let's keep the flow standard by navigating to it or just adding it.
-                            final_links.append(final_url)
-                            await page.close()
-                            return [final_url]
-                    except Exception as ze:
-                        print(f"[UNLOCKER] Zoneurs traversal error: {ze}")
+                        wait_res = matched_unlocker.get("wait_result")
+                        if wait_res:
+                            res_loc = page.locator(wait_res)
+                            # Wait for attached because the input might be hidden in the DOM
+                            await res_loc.wait_for(state="attached", timeout=15000)
+                            await asyncio.sleep(2) # Stability
+                            
+                            attr = matched_unlocker.get("extract_attribute")
+                            if attr:
+                                if attr == "text":
+                                    final_url = await res_loc.inner_text()
+                                else:
+                                    final_url = await res_loc.get_attribute(attr)
+                            else:
+                                final_url = None
 
-                # Wait for the validation button (Turnstile success) - Skips if on MultiUp
-                if "multiup.io" in page.url:
-                    print("[UNLOCKER] MultiUp detected, skipping Turnstile check.")
+                            if final_url:
+                                    print(f"[UNLOCKER] SUCCESS: Link found in input: {final_url}")
+                                    final_links.append(final_url)
+                                    await page.close()
+                                    return [final_url]
+                    except Exception as ze:
+                        print(f"[UNLOCKER] Button traversal error: {ze}")
+
+                # Wait for the validation button (Turnstile success) - Skips if configured
+                if matched_unlocker.get("skip_turnstile"):
+                    print("[UNLOCKER] Config says skip Turnstile check.")
                     solved = True
                 else:
                     btn = page.locator("#subButton")
@@ -152,12 +184,12 @@ class LinkUnlocker:
                 # --- Final extraction (Common for all flows) ---
                 print(f"[UNLOCKER] Reached final page: {page.url}")
                 
-                # MultiUp specific: wait for the mirror list to appear
-                if "multiup.io" in page.url:
-                    print("[UNLOCKER] MultiUp mirror page detected. Waiting for hoster links to load...")
+                # Specific wait for final hoster links to load
+                wait_final = matched_unlocker.get("wait_for_final")
+                if wait_final:
+                    print(f"[UNLOCKER] Waiting for final hoster links to load: {wait_final}")
                     try:
-                        # Wait for a known hoster or the table
-                        await page.wait_for_selector("a[href*='1fichier.com'], a[href*='rapidgator'], table", timeout=15000)
+                        await page.wait_for_selector(wait_final, timeout=15000)
                         await asyncio.sleep(3) # Extra stability for dynamic elements
                     except Exception as e:
                         print(f"[UNLOCKER] Note: Timeout waiting for specific selectors ({e}). Proceeding with current content.")

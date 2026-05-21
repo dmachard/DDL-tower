@@ -59,6 +59,17 @@ direct_scan_patterns:
   - 'https?://(?:www\.)?rapidgator\.net/file/[^\s"''<>]+'
   - 'https?://(?:www\.)?nitroflare\.com/view/[^\s"''<>]+'
 
+# --- Global Unlockers ---
+unlockers:
+  - name: "Example-Input-Unlocker"
+    patterns:
+      - 'https?://example-input-unlocker\.com/[^\s"''<>]+'
+    wait_for: "#unlockBtn"
+    click: "#unlockBtn"
+    wait_result: ".result-input"
+    extract_attribute: "value"
+    skip_turnstile: true
+
 # --- Automated Discovery Sources (Scrapers) ---
 sources:
   - name: "MyComplexSource"
@@ -80,5 +91,3 @@ sources:
         yield_links: true
         hoster_patterns_url:
           - 'href=["''](https?://(?:www\.)?file\.com/\?[\w-]+)[^"'']*["'']'
-        unlock_patterns:
-          - pattern: 'https?://(?:www\.)?mul\.(?:org|io)/[^\s"''<>]+'
