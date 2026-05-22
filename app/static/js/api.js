@@ -156,3 +156,11 @@ export const deleteReleases = async (ids) => {
         body: JSON.stringify({ ids })
     });
 };
+
+export const checkUrls = async (urls) => {
+    return fetch('/api/check-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls })
+    });
+};

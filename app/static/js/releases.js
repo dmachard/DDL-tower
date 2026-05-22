@@ -36,6 +36,9 @@ export const createReleaseCard = (rel) => {
                     <button class="rel-p-identify" data-ids="${p.ids.join(',')}" data-title="${sub.title || sub.filename}" title="${TRANSLATIONS[state.language].modal_identify_title}">
                         <i class="fas fa-edit"></i>
                     </button>
+                    <button class="rel-p-check" data-urls="${p.urls.join('\n')}" title="Check links">
+                        <i class="fas fa-heartbeat"></i>
+                    </button>
                     <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].copy_links}">
                         <i class="fas fa-copy"></i>
                     </button>
@@ -93,6 +96,55 @@ export const createReleaseCard = (rel) => {
                 btn.classList.add('success');
                 setTimeout(() => { icon.className = originalClass; btn.classList.remove('success'); }, 1000);
             } catch (err) { console.error('Failed to copy!', err); }
+        };
+    });
+
+    card.querySelectorAll('.rel-p-check').forEach(btn => {
+        btn.onclick = async (e) => {
+            e.stopPropagation();
+            const urls = btn.getAttribute('data-urls').split('\n');
+            const icon = btn.querySelector('i');
+            const originalClass = icon.className;
+            icon.className = 'fas fa-spinner fa-spin';
+            btn.disabled = true;
+            try {
+                const res = await import('./api.js').then(m => m.checkUrls(urls));
+                if (res.ok) {
+                    const data = await res.json();
+                    let isDead = false;
+                    let hasError = false;
+                    for (const url of urls) {
+                        const s = data[url] ? data[url].status : 'unknown';
+                        if (s === 'dead') isDead = true;
+                        if (s === 'error' || s === 'unknown') hasError = true;
+                    }
+                    if (isDead) {
+                        icon.className = 'fas fa-heart-broken';
+                        btn.style.color = 'var(--accent-red)';
+                        btn.closest('.rel-provider-row').style.opacity = '0.5';
+                        btn.closest('.rel-provider-row').style.borderLeft = '3px solid var(--accent-red)';
+                    } else if (hasError) {
+                        icon.className = 'fas fa-exclamation-triangle';
+                        btn.style.color = 'var(--warning)';
+                        setTimeout(() => { icon.className = originalClass; btn.style.color = ''; }, 3000);
+                    } else {
+                        icon.className = 'fas fa-check';
+                        btn.classList.add('success');
+                        setTimeout(() => { icon.className = originalClass; btn.classList.remove('success'); }, 2000);
+                    }
+                } else {
+                    icon.className = 'fas fa-times';
+                    btn.classList.add('error');
+                    setTimeout(() => { icon.className = originalClass; btn.classList.remove('error'); }, 2000);
+                }
+            } catch (err) {
+                console.error('Check error:', err);
+                icon.className = 'fas fa-times';
+                btn.classList.add('error');
+                setTimeout(() => { icon.className = originalClass; btn.classList.remove('error'); }, 2000);
+            } finally {
+                btn.disabled = false;
+            }
         };
     });
 

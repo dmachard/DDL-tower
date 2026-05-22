@@ -339,3 +339,16 @@ async def trigger_download_get(url: str, background_tasks: BackgroundTasks):
     
     background_tasks.add_task(run_download_task, urls, is_auto=False)
     return RedirectResponse(url="/?msg=download_started")
+
+class CheckLinksRequest(BaseModel):
+    urls: List[str]
+
+@router.post("/check-links")
+async def check_links(request: CheckLinksRequest):
+    """
+    Checks if a list of links is alive using the direct Hoster service.
+    """
+    from app.core.hoster import Hoster
+    hoster = Hoster()
+    result = await hoster.check_links(request.urls)
+    return result

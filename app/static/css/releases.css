@@ -262,7 +262,8 @@
 
 .rel-p-copy,
 .rel-p-download,
-.rel-p-identify {
+.rel-p-identify,
+.rel-p-check {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     color: var(--text-secondary);
@@ -299,17 +300,26 @@
 
 .rel-p-copy.success,
 .rel-p-download.success,
-.rel-p-identify.success {
+.rel-p-identify.success,
+.rel-p-check.success {
     background: var(--success) !important;
     color: white !important;
     border-color: transparent !important;
 }
 
 .rel-p-download.error,
-.rel-p-identify.error {
+.rel-p-identify.error,
+.rel-p-check.error {
     background: var(--error) !important;
     color: white !important;
     border-color: transparent !important;
+}
+
+.rel-p-check:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--error);
+    color: var(--error);
+    transform: scale(1.1);
 }
 
 @keyframes slideDown {
