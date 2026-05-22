@@ -96,6 +96,24 @@ class LinkManager:
             status = info.get('status', 'dead')
             
             final_filename = override_filename if override_filename else h_filename
+            
+            if status == "error":
+                err_msg = info.get("error", "Unknown hoster error").strip() or "Hoster check failed"
+                try:
+                    from app.db.models import ScrapedURL
+                    async with session.begin_nested():
+                        # We don't overwrite if it already exists, just insert/update
+                        q_scraped = await session.execute(select(ScrapedURL).where(ScrapedURL.url == link))
+                        scraped_existing = q_scraped.scalar_one_or_none()
+                        if scraped_existing:
+                            scraped_existing.status = f"failed: {err_msg[:100]}"
+                            scraped_existing.last_scraped = datetime.now(timezone.utc)
+                            scraped_existing.source_name = "Hoster-Check"
+                        else:
+                            session.add(ScrapedURL(url=link, source_name="Hoster-Check", status=f"failed: {err_msg[:100]}"))
+                        await session.flush()
+                except Exception as e:
+                    print(f"[LINK] Failed to record hoster error for {link}: {e}")
 
             try:
                 # Use a nested transaction (savepoint) so we can gracefully recover from IntegrityError

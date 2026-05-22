@@ -7,6 +7,7 @@ import { initModals } from './js/modals.js';
 import { initNavigation } from './js/navigation.js';
 import { initScanner } from './js/scanner.js';
 import { initQuickScan } from './js/quick-scan.js';
+import { initErrors } from './js/errors.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initScanner();
     initQuickScan();
+    initErrors();
 
     // ── Filter Tags ───────────────────────────────────────────────────────────
     document.getElementById('filter-tags-releases')?.addEventListener('click', (e) => handleTagClick(e, 'releases'));

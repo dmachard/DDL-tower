@@ -125,7 +125,22 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
             if link:
                 valid_downloads.append((orig_url, link, filename))
         else:
-            print(f"[API] Failed to unlock {orig_url}: {res.get('error')}")
+            err_msg = res.get('error', 'Unknown error').strip() or "Debrid unlock failed"
+            print(f"[API] Failed to unlock {orig_url}: {err_msg}")
+            try:
+                from app.db.models import ScrapedURL
+                async with AsyncSessionLocal() as session:
+                    q = await session.execute(select(ScrapedURL).where(ScrapedURL.url == orig_url))
+                    existing = q.scalar_one_or_none()
+                    if existing:
+                        existing.status = f"failed: {err_msg[:100]}"
+                        existing.last_scraped = datetime.now(timezone.utc)
+                        existing.source_name = "Debrid"
+                    else:
+                        session.add(ScrapedURL(url=orig_url, source_name="Debrid", status=f"failed: {err_msg[:100]}"))
+                    await session.commit()
+            except Exception as e:
+                print(f"[API] Error saving debrid error: {e}")
 
     if not valid_downloads:
         return

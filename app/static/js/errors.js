@@ -41,3 +41,24 @@ export const renderErrors = (errors) => {
         container.appendChild(row);
     });
 };
+
+export const initErrors = () => {
+    const clearBtn = document.getElementById('clear-errors-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to clear all errors?')) {
+                try {
+                    await fetch('/api/errors', { method: 'DELETE' });
+                    // Trigger a re-fetch of errors by calling fetchErrors from api.js
+                    // Since we have circular dependencies if we import api.js directly here,
+                    // we'll dispatch a custom event that api.js or main app.js can listen to,
+                    // or just reload the view by modifying state and calling render.
+                    // An easier way is to just clear the DOM immediately and let the next poll fetch it.
+                    renderErrors([]);
+                } catch (e) {
+                    console.error('Failed to clear errors', e);
+                }
+            }
+        });
+    }
+};

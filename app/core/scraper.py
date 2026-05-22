@@ -161,8 +161,9 @@ class Scraper:
                     url = self._update_url_param(url, step["pagination"].get("param", "page"), current_page)
 
             except Exception as e:
-                print(f"[{self.name}] [{step_name}] URL error ({url}): {e}")
-                await self._record_scraped(url, status=f"failed: {str(e)[:100]}")
+                err_msg = str(e).strip() or type(e).__name__
+                print(f"[{self.name}] [{step_name}] URL error ({url}): {err_msg}")
+                await self._record_scraped(url, status=f"failed: {err_msg[:100]}")
 
     # --- HELPERS ---
 

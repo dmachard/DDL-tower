@@ -175,3 +175,11 @@ async def get_errors(db: AsyncSession = Depends(get_db)):
         "date": e.last_scraped.isoformat(),
         "error": e.status.replace("failed: ", "") if e.status.startswith("failed: ") else e.status
     } for e in errors]
+
+@router.delete("/errors")
+async def clear_errors(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import update
+    stmt = update(ScrapedURL).where(ScrapedURL.status.like("failed%")).values(status="ignored")
+    await db.execute(stmt)
+    await db.commit()
+    return {"message": "Errors cleared"}
