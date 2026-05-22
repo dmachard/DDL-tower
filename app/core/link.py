@@ -49,7 +49,16 @@ class LinkManager:
         if not raw_links: return []
         
         # 1. Clean and deduplicate incoming list
-        raw_links = list(set([l.strip() for l in raw_links if l]))
+        cleaned_links = set()
+        for l in raw_links:
+            if not l: continue
+            url = l.strip()
+            # Clean 1fichier affiliate links
+            if "1fichier.com" in url:
+                url = re.sub(r'&af=\d+', '', url)
+            cleaned_links.add(url)
+            
+        raw_links = list(cleaned_links)
 
         # 2. Identify links that are truly new (not in DB AND not in current session)
         # We flush current changes to make sure the SELECT can see them if they were just added
