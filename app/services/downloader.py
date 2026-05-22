@@ -279,7 +279,7 @@ class DownloaderService:
                 group["status"] = "extracting"
                 group["progress"] = 100
                 
-                success = extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
+                success = await extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
                 if not success:
                     group["status"] = "error"
                     group["error"] = "Extraction failed"

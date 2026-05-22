@@ -68,7 +68,7 @@ class ExtractionService:
         parts.sort()
         return parts[0]
 
-    def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> bool:
+    async def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> bool:
         """
         Extracts a RAR archive using the system unrar command.
         Ensures extraction starts from the first volume.
@@ -96,14 +96,15 @@ class ExtractionService:
             # -o+ : overwrite existing files
             # -y : assume yes on all queries
             # x : eXtract with full paths
-            result = subprocess.run(
-                ["unrar", "x", "-o+", "-y", str(first_part_path), str(dest_dir)],
-                capture_output=True,
-                text=True,
-                errors='replace'
+            import asyncio
+            proc = await asyncio.create_subprocess_exec(
+                "unrar", "x", "-o+", "-y", str(first_part_path), str(dest_dir),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
+            stdout, stderr = await proc.communicate()
             
-            if result.returncode == 0:
+            if proc.returncode == 0:
                 print(f"[EXTRACTION] Successfully extracted {path.name}")
                 
                 # 1. Cleanup: Delete RAR parts
@@ -169,7 +170,8 @@ class ExtractionService:
 
                 return True
             else:
-                print(f"[EXTRACTION] Failed to extract {path.name}: {result.stderr}")
+                stderr_dec = stderr.decode('utf-8', errors='replace')
+                print(f"[EXTRACTION] Failed to extract {path.name}: {stderr_dec}")
                 return False
                 
         except Exception as e:
