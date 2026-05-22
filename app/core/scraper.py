@@ -162,6 +162,7 @@ class Scraper:
 
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] URL error ({url}): {e}")
+                await self._record_scraped(url, status=f"failed: {str(e)[:100]}")
 
     # --- HELPERS ---
 
@@ -510,10 +511,14 @@ class Scraper:
     def _is_hoster_link(self, link: str, patterns: List[str]) -> bool:
         return any(re.search(p, link) for p in patterns) if link and patterns else False
 
-    async def _record_scraped(self, url: str):
+    async def _record_scraped(self, url: str, status: str = "success"):
         async with get_db_ctx() as session:
             stmt = select(ScrapedURL).where(ScrapedURL.url == url)
             res = await session.execute(stmt)
-            if not res.scalar_one_or_none():
-                session.add(ScrapedURL(url=url, source_name=self.name))
-                await session.commit()
+            existing = res.scalar_one_or_none()
+            if existing:
+                existing.status = status
+                existing.last_scraped = datetime.now(timezone.utc)
+            else:
+                session.add(ScrapedURL(url=url, source_name=self.name, status=status))
+            await session.commit()

@@ -3,6 +3,7 @@ import { renderReleases } from './releases.js';
 import { renderDownloads } from './downloads.js';
 import { renderStats, renderSourcesDashboard } from './sources.js';
 import { renderPagination } from './pagination.js';
+import { renderErrors } from './errors.js';
 
 export const fetchData = async (view) => {
     const viewState = state[view];
@@ -84,6 +85,16 @@ export const fetchSourcesDashboard = async () => {
         renderSourcesDashboard(data);
     } catch (err) {
         console.error('Error fetching sources dashboard:', err);
+    }
+};
+
+export const fetchErrors = async () => {
+    try {
+        const res = await fetch('/api/errors');
+        const data = await res.json();
+        renderErrors(data);
+    } catch (err) {
+        console.error('Error fetching errors:', err);
     }
 };
 

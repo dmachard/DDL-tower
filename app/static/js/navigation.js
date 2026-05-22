@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { fetchData, fetchDownloads, fetchStats, fetchSourcesDashboard } from './api.js';
+import { fetchData, fetchDownloads, fetchStats, fetchSourcesDashboard, fetchErrors } from './api.js';
 
 export const initNavigation = () => {
     const navItems = document.querySelectorAll('.nav-item');
@@ -20,6 +20,7 @@ export const initNavigation = () => {
 
             state.currentView = view;
             if (view === 'sources') { fetchStats(); fetchSourcesDashboard(); }
+            else if (view === 'errors') { fetchErrors(); }
             else if (view === 'downloads') fetchDownloads();
             else if (view === 'quick-scan') { /* No data to fetch */ }
             else fetchData(view);

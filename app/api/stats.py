@@ -159,3 +159,19 @@ async def get_networks(db: AsyncSession = Depends(get_db)):
     result = await db.execute(stmt)
     networks = result.scalars().all()
     return sorted([n for n in networks if n])
+
+@router.get("/errors")
+async def get_errors(db: AsyncSession = Depends(get_db)):
+    """
+    Returns the list of scraping errors.
+    """
+    stmt = select(ScrapedURL).where(ScrapedURL.status.like("failed%")).order_by(ScrapedURL.last_scraped.desc()).limit(100)
+    result = await db.execute(stmt)
+    errors = result.scalars().all()
+    
+    return [{
+        "url": e.url,
+        "source": e.source_name,
+        "date": e.last_scraped.isoformat(),
+        "error": e.status.replace("failed: ", "") if e.status.startswith("failed: ") else e.status
+    } for e in errors]

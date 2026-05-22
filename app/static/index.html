@@ -71,6 +71,10 @@
                     <i class="fas fa-satellite-dish"></i>
                     <span data-i18n="nav_sources">Sources</span>
                 </button>
+                <button class="nav-item" data-view="errors">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span data-i18n="nav_errors">Errors</span>
+                </button>
 
                 <!-- Removed Global Search from Nav -->
                 <div id="live-toggle" class="live-status">
@@ -136,6 +140,13 @@
                     </div>
                 </div>
                 <div class="sources-dashboard-grid" id="sources-dashboard-container"></div>
+            </div>
+
+            <!-- Errors View -->
+            <div id="errors-view" class="view-section hidden">
+                <div class="list-container">
+                    <div id="errors-container" class="link-list"></div>
+                </div>
             </div>
 
             <!-- Quick Scan View -->
