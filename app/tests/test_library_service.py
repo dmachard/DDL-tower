@@ -72,31 +72,70 @@ def test_movies_folder_cleanup(tmp_path, monkeypatch):
     assert not old_version.exists(), "Old version of the movie should be deleted"
     assert (tmp_path / "My.Movie.2023.1080p.mkv").exists(), "New version should be moved to movies_dir"
 
-def test_movie_kaamelott_duplicate(tmp_path, monkeypatch):
+def test_movie_duplicate(tmp_path, monkeypatch):
     """
     Test the duplication issue for movies with long names.
     """
     monkeypatch.setattr(library_service, "movies_dir", tmp_path)
     
     # Existing older file
-    old_version = tmp_path / "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p Web x264 @@UnPourTous@@.mkv"
+    old_version = tmp_path / "Kaam Deuxieme volet Partie 1 2026 VFF 1080p Web x264 @@x@@.mkv"
     old_version.write_text("old version")
     
     download_dir = tmp_path / "downloads"
     download_dir.mkdir()
     
     # New file arriving
-    source_file = download_dir / "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@UnPourTous@@.mkv"
+    source_file = download_dir / "Kaam Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@x@@.mkv"
     source_file.write_text("new version")
     
     success = library_service.organize_file(
         file_path=str(source_file),
         category="movie",
-        title="Kaamelott Deuxième volet Partie 1",  # TMDB returns the accent
+        title="Kaam Deuxième volet Partie 1",  # TMDB returns the accent
         year=2026
     )
     
     assert success is True
     assert not old_version.exists(), "The older Web x264 version should have been deleted"
-    expected_new = tmp_path / "Kaamelott Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@UnPourTous@@.mkv"
+    expected_new = tmp_path / "Kaam Deuxieme volet Partie 1 2026 VFF 1080p HDLight x264 @@x@@.mkv"
     assert expected_new.exists(), "The new HDLight version should be in the library"
+
+def test_movie_translated_cleanup(tmp_path, monkeypatch):
+    """
+    Test that older versions of a movie are deleted even if the title is translated or has extra words like 'le film'
+    but the filename has english words like 'Movie' and extra tags.
+    """
+    monkeypatch.setattr(library_service, "movies_dir", tmp_path)
+    
+    # Existing older files (different filenames but same movie)
+    old_version1 = tmp_path / "The super x galaxy movie 2026 Frc stfci 4K HDR WebLight AC3 5.1c.mkv"
+    old_version1.write_text("old version 1")
+    
+    old_version2 = tmp_path / "The.Super.x.Galaxy.Movie.2026.MULTi.VF2.4KLight.DV.HDR10 .WEBRip.HEVC-[PSA]-x.mkv"
+    old_version2.write_text("old version 2")
+    
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+    
+    # New file arriving
+    source_file = download_dir / "The.Super.x.Galaxy.Movie.2026.MULTI.VF2.2160p.WEBRip.iT.DV.HDR10 .x265.EAC3.5.1.z-z.mkv"
+    source_file.write_text("new version 3")
+    
+    # Title from database/scraper might be translated
+    success = library_service.organize_file(
+        file_path=str(source_file),
+        category="movie",
+        title="Super x Galaxy, le film",
+        year=2026,
+        old_filenames=[
+            "The super x galaxy movie 2026 Frc stfci 4K HDR WebLight AC3 5.1c.mkv",
+            "The.Super.x.Galaxy.Movie.2026.MULTi.VF2.4KLight.DV.HDR10 .WEBRip.HEVC-[PSA]-x.mkv"
+        ]
+    )
+    
+    assert success is True
+    assert not old_version1.exists(), "Old version 1 should have been deleted"
+    assert not old_version2.exists(), "Old version 2 should have been deleted"
+    expected_new = tmp_path / "The.Super.x.Galaxy.Movie.2026.MULTI.VF2.2160p.WEBRip.iT.DV.HDR10 .x265.EAC3.5.1.z-z.mkv"
+    assert expected_new.exists(), "The new version should be in the library"

@@ -27,7 +27,7 @@ class LibraryService:
         s = re.sub(r'[<>|?*"]', '', s)
         return s.strip()
 
-    def organize_file(self, file_path: str, category: str = "movie", title: str = None, year: int = None, season: str = None, episode: str = None) -> bool:
+    def organize_file(self, file_path: str, category: str = "movie", title: str = None, year: int = None, season: str = None, episode: str = None, old_filenames: list = None) -> bool:
         """
         Organizes a file based on its category and removes older versions if they exist.
         - Movies: Moves to movies_dir, deletes other files with same title/year.
@@ -50,7 +50,14 @@ class LibraryService:
                     clean_title = s_title.replace(' ', '.')
                     for item in target_base_dir.iterdir():
                         if item.is_file() and item.name != src.name:
-                            # Basic match: title in filename + year in filename
+                            # 1. Match from explicit old_filenames
+                            if old_filenames and item.name in old_filenames:
+                                print(f"[LIBRARY] Deleting old movie version (from history): {item.name}")
+                                try: item.unlink()
+                                except: pass
+                                continue
+
+                            # 2. Basic match: title in filename + year in filename
                             import unicodedata
                             def normalize_str(s):
                                 return unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8').lower()

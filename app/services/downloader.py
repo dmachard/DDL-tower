@@ -292,8 +292,35 @@ class DownloaderService:
         # If not RAR or extraction not triggered
         if group["status"] != "error":
             if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
-                 from app.services.library_service import library_service
-                 library_service.organize_file(str(file_path), category, title=title, year=year, season=season, episode=episode)
+                 if file_path.exists():
+                     old_filenames = []
+                     try:
+                         from app.db.database import AsyncSessionLocal
+                         from app.db.models import DownloadHistory
+                         from sqlalchemy import select, and_
+                         from app.core.utils import normalize_title
+                         async with AsyncSessionLocal() as session:
+                             if imdb_id:
+                                 h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
+                             else:
+                                 h_stmt = select(DownloadHistory).where(
+                                     and_(
+                                         DownloadHistory.year == year,
+                                         DownloadHistory.category == category
+                                     )
+                                 )
+                             h_res = await session.execute(h_stmt)
+                             entries = h_res.scalars().all()
+                             if title:
+                                 target_norm = normalize_title(title)
+                                 old_filenames = [ex.filename for ex in entries if normalize_title(ex.title) == target_norm]
+                             else:
+                                 old_filenames = [ex.filename for ex in entries]
+                     except Exception as e:
+                         print(f"[DOWNLOADER] Error fetching old versions: {e}")
+                         
+                     from app.services.library_service import library_service
+                     library_service.organize_file(str(file_path), category, title=title, year=year, season=season, episode=episode, old_filenames=old_filenames)
 
             # Record in history
             try:
