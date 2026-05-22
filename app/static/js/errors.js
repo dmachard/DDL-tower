@@ -20,23 +20,23 @@ export const renderErrors = (errors) => {
     
     errors.forEach((err, index) => {
         const row = document.createElement('div');
-        row.className = 'link-row downloads-grid';
+        row.className = 'error-row';
         row.style.animationDelay = `${index * 0.05}s`;
         
         row.innerHTML = `
             <div class="col-status">
-                <i class="fas fa-exclamation-triangle" style="color: var(--accent-red)"></i>
+                <i class="fas fa-exclamation-triangle" style="font-size: 1.2rem; color: var(--accent-red)"></i>
             </div>
             <div class="col-content">
-                <span class="download-name" style="font-size: 13px;">${err.source || 'Unknown'}</span>
-                <div style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">
+                <span class="download-name" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${err.source || 'Unknown'}</span>
+                <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; word-break: break-all;">
                     <a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>
                 </div>
-                <div style="font-size: 11px; color: var(--accent-red); margin-top: 4px; font-family: monospace;">
-                    ${err.error}
+                <div style="font-size: 12px; color: var(--error); margin-top: 6px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
+                    ${err.error === "failed" ? "Unknown error (legacy log)" : err.error}
                 </div>
             </div>
-            <div class="col-date">${formatDate(err.date)}</div>
+            <div class="col-date" style="text-align: right; white-space: nowrap;">${formatDate(err.date)}</div>
         `;
         container.appendChild(row);
     });

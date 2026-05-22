@@ -573,3 +573,31 @@
 .hidden {
     display: none !important;
 }
+
+/* Error Row */
+.error-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    transition: var(--transition);
+}
+
+.error-row:hover {
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.error-row .col-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.error-row .col-date {
+    flex-shrink: 0;
+    color: var(--text-dim);
+    font-size: 12px;
+}
