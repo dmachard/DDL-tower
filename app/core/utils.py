@@ -13,8 +13,8 @@ def normalize_title(title: str) -> str:
     # Strip accents
     normalized = unicodedata.normalize('NFKD', title_str)
     ascii_title = normalized.encode('ASCII', 'ignore').decode('utf-8')
-    # Lowercase and keep only alphanumeric characters and spaces
-    cleaned = re.sub(r'[^a-z0-9\s]', '', ascii_title.lower())
+    # Replace non-alphanumeric characters with spaces to avoid joining words
+    cleaned = re.sub(r'[^a-z0-9]', ' ', ascii_title.lower())
     # Collapse multiple spaces and strip
     return re.sub(r'\s+', ' ', cleaned).strip()
 

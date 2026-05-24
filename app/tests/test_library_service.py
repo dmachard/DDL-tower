@@ -170,3 +170,21 @@ def test_movie_duplicate_apostrophe(tmp_path, monkeypatch):
     expected_new = tmp_path / "Si.J.En.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA.WIN.mkv"
     assert expected_new.exists(), "The new version should be in the library"
 
+def test_normalize_title_underscores_vs_spaces():
+    """
+    Test that normalize_title handles underscores and spaces equivalently
+    by replacing all non-alphanumeric characters with spaces.
+    """
+    from app.core.utils import normalize_title
+    
+    # Example from the user's scenario
+    title_with_space = "zzz (2026)"
+    title_with_underscore = "zzz_(2026)"
+    
+    norm_space = normalize_title(title_with_space)
+    norm_underscore = normalize_title(title_with_underscore)
+    
+    # Both should evaluate to 'zzz 2026'
+    assert norm_space == "zzz 2026"
+    assert norm_underscore == "zzz 2026"
+    assert norm_space == norm_underscore
