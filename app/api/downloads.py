@@ -256,12 +256,7 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 if imdb_id:
                     h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
                 else:
-                    h_stmt = select(DownloadHistory).where(
-                        and_(
-                            DownloadHistory.year == meta.get("year"),
-                            DownloadHistory.category == meta.get("category")
-                        )
-                    )
+                    h_stmt = select(DownloadHistory).where(DownloadHistory.category == meta.get("category"))
                 
                 # For series, also match season/episode
                 if meta.get("category") == "series":
@@ -277,13 +272,24 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 if not imdb_id and existing:
                     from app.core.utils import normalize_title
                     from app.services.parser_service import parser_service
-                    clean_target = parser_service.parse_filename(title).get("title", title)
+                    
+                    target_parsed = parser_service.parse_filename(title)
+                    clean_target = target_parsed.get("title", title)
                     target_norm = normalize_title(clean_target)
+                    target_year = target_parsed.get("year") or meta.get("year")
+                    
                     existing_filtered = []
                     for ex in existing:
-                        clean_ex = parser_service.parse_filename(ex.title).get("title", ex.title)
+                        ex_parsed = parser_service.parse_filename(ex.title)
+                        clean_ex = ex_parsed.get("title", ex.title)
+                        ex_year = ex_parsed.get("year") or ex.year
+                        
                         if normalize_title(clean_ex) == target_norm:
-                            existing_filtered.append(ex)
+                            if target_year and ex_year:
+                                if str(target_year) == str(ex_year):
+                                    existing_filtered.append(ex)
+                            else:
+                                existing_filtered.append(ex)
                     existing = existing_filtered
                 
                 if existing:
