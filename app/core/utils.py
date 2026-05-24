@@ -62,8 +62,8 @@ def parse_size(size_str: str) -> int:
     except (ValueError, IndexError):
         return 0
 
-def get_quality_score(resolution: str = None, language: str = None, v_quality: str = None, quality: str = None, audio: str = None) -> int:
-    """Returns a numeric score for quality comparison (Resolution > Language > Video Quality > Audio > Source)."""
+def get_quality_score(resolution: str = None, language: str = None, v_quality: str = None, quality: str = None, audio: str = None, codec: str = None) -> int:
+    """Returns a numeric score for quality comparison (Resolution > Language > Video Quality > Audio > Source > Codec)."""
     score = 0
     
     # 1. Resolution
@@ -96,5 +96,9 @@ def get_quality_score(resolution: str = None, language: str = None, v_quality: s
     if "bluray" in q or "bdrip" in q: score += 10
     elif "web" in q: score += 7
     elif "hdtv" in q: score += 3
+    
+    # 6. Codec (HEVC / x265 > x264)
+    c = (codec or "").lower()
+    if "265" in c or "hevc" in c: score += 5
     
     return score

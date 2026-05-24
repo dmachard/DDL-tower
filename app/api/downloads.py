@@ -258,8 +258,15 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 # If no imdb_id was matched, filter by normalized title in Python
                 if not imdb_id and existing:
                     from app.core.utils import normalize_title
-                    target_norm = normalize_title(title)
-                    existing = [ex for ex in existing if normalize_title(ex.title) == target_norm]
+                    from app.services.parser_service import parser_service
+                    clean_target = parser_service.parse_filename(title).get("title", title)
+                    target_norm = normalize_title(clean_target)
+                    existing_filtered = []
+                    for ex in existing:
+                        clean_ex = parser_service.parse_filename(ex.title).get("title", ex.title)
+                        if normalize_title(clean_ex) == target_norm:
+                            existing_filtered.append(ex)
+                    existing = existing_filtered
                 
                 if existing:
                     # Check if any existing version is better or equal
@@ -268,7 +275,8 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                         meta.get("language"), 
                         meta.get("v_quality"), 
                         meta.get("quality"),
-                        meta.get("audio")
+                        meta.get("audio"),
+                        meta.get("codec")
                     )
                     is_upgrade = True
                     for ex in existing:
@@ -277,7 +285,8 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                             ex.language,
                             ex.v_quality,
                             ex.quality,
-                            ex.audio
+                            ex.audio,
+                            ex.codec
                         )
                         if ex_score >= new_score:
                             is_upgrade = False

@@ -60,10 +60,12 @@ class LibraryService:
                             # 2. Basic match: title in filename + year in filename
                             import unicodedata
                             def normalize_str(s):
-                                return unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8').lower()
+                                s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8').lower()
+                                s = re.sub(r'[^a-z0-9]', '.', s)
+                                return re.sub(r'\.+', '.', s).strip('.')
                             
                             norm_clean_title = normalize_str(clean_title)
-                            norm_item_name = normalize_str(item.name.replace(' ', '.'))
+                            norm_item_name = normalize_str(item.name)
                             
                             if norm_clean_title in norm_item_name:
                                 if not year or str(year) in item.name:

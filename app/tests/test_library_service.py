@@ -139,3 +139,34 @@ def test_movie_translated_cleanup(tmp_path, monkeypatch):
     assert not old_version2.exists(), "Old version 2 should have been deleted"
     expected_new = tmp_path / "The.Super.x.Galaxy.Movie.2026.MULTI.VF2.2160p.WEBRip.iT.DV.HDR10 .x265.EAC3.5.1.z-z.mkv"
     assert expected_new.exists(), "The new version should be in the library"
+
+def test_movie_duplicate_apostrophe(tmp_path, monkeypatch):
+    """
+    Test the duplication issue for movies when the title has an apostrophe 
+    but the filename uses a dot instead.
+    """
+    monkeypatch.setattr(library_service, "movies_dir", tmp_path)
+    
+    # Existing older file
+    old_version = tmp_path / "Si.J.En.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA.mkv"
+    old_version.write_text("old version")
+    
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+    
+    # New file arriving
+    source_file = download_dir / "Si.J.En.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA.WIN.mkv"
+    source_file.write_text("new version")
+    
+    success = library_service.organize_file(
+        file_path=str(source_file),
+        category="movie",
+        title="Si J'en",
+        year=2025
+    )
+    
+    assert success is True
+    assert not old_version.exists(), "The old version should be deleted despite the apostrophe in the title"
+    expected_new = tmp_path / "Si.J.En.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA.WIN.mkv"
+    assert expected_new.exists(), "The new version should be in the library"
+

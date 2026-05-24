@@ -138,13 +138,20 @@ class DownloaderService:
                 # If no imdb_id was matched, filter by normalized title in Python
                 if not imdb_id and existing_entries:
                     from app.core.utils import normalize_title
-                    target_norm = normalize_title(title)
-                    existing_entries = [ex for ex in existing_entries if normalize_title(ex.title) == target_norm]
+                    from app.services.parser_service import parser_service
+                    clean_target = parser_service.parse_filename(title).get("title", title)
+                    target_norm = normalize_title(clean_target)
+                    existing_filtered = []
+                    for ex in existing_entries:
+                        clean_ex = parser_service.parse_filename(ex.title).get("title", ex.title)
+                        if normalize_title(clean_ex) == target_norm:
+                            existing_filtered.append(ex)
+                    existing_entries = existing_filtered
                 
                 if existing_entries:
-                    new_score = get_quality_score(resolution, language, v_quality, quality, audio)
+                    new_score = get_quality_score(resolution, language, v_quality, quality, audio, codec)
                     for ex in existing_entries:
-                        ex_score = get_quality_score(ex.resolution, ex.language, ex.v_quality, ex.quality, ex.audio)
+                        ex_score = get_quality_score(ex.resolution, ex.language, ex.v_quality, ex.quality, ex.audio, ex.codec)
                         if ex_score >= new_score:
                             # We found a version that is same or better quality
                             # Check if it actually exists in library
@@ -312,8 +319,14 @@ class DownloaderService:
                              h_res = await session.execute(h_stmt)
                              entries = h_res.scalars().all()
                              if title:
-                                 target_norm = normalize_title(title)
-                                 old_filenames = [ex.filename for ex in entries if normalize_title(ex.title) == target_norm]
+                                 from app.services.parser_service import parser_service
+                                 clean_target = parser_service.parse_filename(title).get("title", title)
+                                 target_norm = normalize_title(clean_target)
+                                 old_filenames = []
+                                 for ex in entries:
+                                     clean_ex = parser_service.parse_filename(ex.title).get("title", ex.title)
+                                     if normalize_title(clean_ex) == target_norm:
+                                         old_filenames.append(ex.filename)
                              else:
                                  old_filenames = [ex.filename for ex in entries]
                      except Exception as e:

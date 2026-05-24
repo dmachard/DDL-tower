@@ -62,4 +62,67 @@ def test_source_ranking():
 
 def test_null_handling():
     # Should not crash with None values
-    assert get_quality_score(None, None, None, None, None) == 0
+    assert get_quality_score(None, None, None, None, None, None) == 0
+
+def test_equal_quality():
+    # User's specific cases:
+    from app.services.parser_service import parser_service
+    
+    f1 = "Si.J.En.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA.mkv"
+    f2 = "Si.J.En.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA.WIN.mkv"
+    
+    res1 = parser_service.parse_filename(f1)
+    res2 = parser_service.parse_filename(f2)
+    
+    score1 = get_quality_score(
+        resolution=res1.get("resolution"),
+        quality=res1.get("quality"),
+        v_quality=res1.get("v_quality"),
+        audio=res1.get("audio"),
+        language=" ".join(res1.get("languages", [])),
+        codec=res1.get("codec")
+    )
+    
+    score2 = get_quality_score(
+        resolution=res2.get("resolution"),
+        quality=res2.get("quality"),
+        v_quality=res2.get("v_quality"),
+        audio=res2.get("audio"),
+        language=" ".join(res2.get("languages", [])),
+        codec=res2.get("codec")
+    )
+    
+    # Both should have exactly the same score because Wawacity.WIN is just a release group suffix
+    assert score1 == score2
+
+def test_codec_score():
+    from app.services.parser_service import parser_service
+    
+    f1 = "Un.balco.2020.VOF.1080p.WEBRip.EAC3.2.0.x264-Fist.WIN.mkv"
+    f2 = "Un Balcon (2020) Vof.1080P.Webrip.Eac3.X265-ParadiZe.mkv"
+    
+    res1 = parser_service.parse_filename(f1)
+    res2 = parser_service.parse_filename(f2)
+    
+    score1 = get_quality_score(
+        resolution=res1.get("resolution"),
+        quality=res1.get("quality"),
+        v_quality=res1.get("v_quality"),
+        audio=res1.get("audio"),
+        language=" ".join(res1.get("languages", [])),
+        codec=res1.get("codec")
+    )
+    
+    score2 = get_quality_score(
+        resolution=res2.get("resolution"),
+        quality=res2.get("quality"),
+        v_quality=res2.get("v_quality"),
+        audio=res2.get("audio"),
+        language=" ".join(res2.get("languages", [])),
+        codec=res2.get("codec")
+    )
+    
+    # score2 should be greater because it's x265
+    assert score2 > score1
+
+
