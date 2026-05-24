@@ -116,13 +116,31 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
     results = await asyncio.gather(*unlock_tasks)
     
     valid_downloads = [] # List of (orig_url, unlocked_link, filename)
+    seen_mirrors = set()
+    from app.services.parser_service import parser_service
+    from app.core.utils import normalize_title
+    
     for idx, res in enumerate(results):
         orig_url = urls[idx]
         if res.get("status") == "success":
             data = res.get("data", {})
             link = data.get("link")
             filename = data.get("filename")
-            if link:
+            if link and filename:
+                parsed = parser_service.parse_filename(filename)
+                mirror_key = (
+                    normalize_title(parsed.get("title", filename)),
+                    parsed.get("year"),
+                    parsed.get("season"),
+                    parsed.get("episode"),
+                    parsed.get("resolution"),
+                    parsed.get("quality"),
+                    parsed.get("codec")
+                )
+                if mirror_key in seen_mirrors:
+                    print(f"[API] Skipping duplicate mirror link in batch: {filename}")
+                    continue
+                seen_mirrors.add(mirror_key)
                 valid_downloads.append((orig_url, link, filename))
         else:
             err_msg = res.get('error', 'Unknown error').strip() or "Debrid unlock failed"
