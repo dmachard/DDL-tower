@@ -268,10 +268,12 @@ async def get_downloads_rss_feed(
     items = result.scalars().all()
 
     rss_items = []
+    from app.services.parser_service import parser_service
     for item in items:
         # Title construction
         meta = item.metadata_rel
-        title = meta.title_fr if meta and meta.title_fr else (meta.official_title if meta else item.title)
+        raw_title = meta.title_fr if meta and meta.title_fr else (meta.official_title if meta else item.title)
+        title = parser_service.parse_filename(raw_title).get("title", raw_title) if raw_title else "Inconnu"
         year = meta.year if meta and meta.year else item.year
         
         display_cat = "Film" if item.category == "movie" else "TV"

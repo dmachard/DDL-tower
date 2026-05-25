@@ -70,10 +70,17 @@ class LibraryService:
                                 s = re.sub(r'[^a-z0-9]', '.', s)
                                 return re.sub(r'\.+', '.', s).strip('.')
                             
-                            norm_clean_title = normalize_str(clean_title)
+                            from app.services.parser_service import parser_service
+                            parsed_title_res = parser_service.parse_filename(title)
+                            parsed_clean_title = parsed_title_res.get("title", title)
+                            
+                            norm_clean_title = normalize_str(parsed_clean_title)
                             norm_item_name = normalize_str(item.name)
                             
-                            if norm_clean_title in norm_item_name:
+                            match_str = f".{norm_clean_title}."
+                            item_str = f".{norm_item_name}."
+                            
+                            if match_str in item_str:
                                 if not year or str(year) in item.name:
                                     print(f"[LIBRARY] Deleting old movie version: {item.name}")
                                     try: item.unlink()
@@ -147,6 +154,40 @@ class LibraryService:
                     if p.exists():
                         return p
         
+        return None
+
+    def find_by_metadata(self, title: str, year: int = None, category: str = "movie") -> Optional[Path]:
+        """
+        Checks if a file matching the given title and year exists in the library.
+        Useful when the filename in history (.rar) doesn't match the extracted file (.mkv).
+        """
+        if not title:
+            return None
+            
+        from app.services.parser_service import parser_service
+        parsed_clean_title = parser_service.parse_filename(title).get("title", title)
+        
+        import unicodedata
+        def normalize_str(s):
+            s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8').lower()
+            s = re.sub(r'[^a-z0-9]', '.', s)
+            return re.sub(r'\.+', '.', s).strip('.')
+            
+        norm_clean_title = normalize_str(parsed_clean_title)
+        match_str = f".{norm_clean_title}."
+        
+        if category == "movie":
+            if not self.movies_dir.exists(): return None
+            for item in self.movies_dir.iterdir():
+                if item.is_file():
+                    item_str = f".{normalize_str(item.name)}."
+                    if match_str in item_str:
+                        if not year or str(year) in item.name:
+                            return item
+        elif category == "series":
+            # For series we would need season/episode, but usually this is used for movies
+            pass
+            
         return None
 
 library_service = LibraryService()

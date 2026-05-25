@@ -164,6 +164,9 @@ class DownloaderService:
                             # We found a version that is same or better quality
                             # Check if it actually exists in library
                             lib_path = library_service.find_in_library(ex.filename)
+                            if not lib_path or not lib_path.exists():
+                                lib_path = library_service.find_by_metadata(ex.title, ex.year, ex.category)
+                                
                             if lib_path and lib_path.exists():
                                 print(f"[DOWNLOADER] Content '{title}' already exists in library with same/better quality ({ex.filename}). skipping.")
                                 # Mark as complete for the UI but don't create a new file/link to avoid redundant entries
