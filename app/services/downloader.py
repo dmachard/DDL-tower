@@ -69,19 +69,21 @@ class DownloaderService:
         
         # 1. Resolve filename and get total size via HEAD request
         total_size = 0
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.head(url, allow_redirects=True, timeout=10) as resp:
-                    if resp.status == 200:
-                        total_size = int(resp.headers.get('Content-Length', 0))
-                        if not filename:
-                            cd = resp.headers.get("Content-Disposition")
-                            if cd and "filename=" in cd:
-                                filename = cd.split("filename=")[1].strip('"')
-                            else:
-                                filename = os.path.basename(url.split('?')[0])
-            except Exception as e:
-                print(f"[DOWNLOADER] HEAD request failed for {url}: {e}")
+        is_youtube = "youtube.com/" in url or "youtu.be/" in url
+        if not is_youtube:
+            async with aiohttp.ClientSession() as session:
+                try:
+                    async with session.head(url, allow_redirects=True, timeout=10) as resp:
+                        if resp.status == 200:
+                            total_size = int(resp.headers.get('Content-Length', 0))
+                            if not filename:
+                                cd = resp.headers.get("Content-Disposition")
+                                if cd and "filename=" in cd:
+                                    filename = cd.split("filename=")[1].strip('"')
+                                else:
+                                    filename = os.path.basename(url.split('?')[0])
+                except Exception as e:
+                    print(f"[DOWNLOADER] HEAD request failed for {url}: {e}")
 
         if not filename:
             filename = os.path.basename(url.split('?')[0]) or "unknown_file"
@@ -95,7 +97,7 @@ class DownloaderService:
         # A. Check by exact filename (Download folder or Library)
         if file_path.exists():
             on_disk_size = file_path.stat().st_size
-            if total_size > 0 and on_disk_size == total_size:
+            if is_youtube or (total_size > 0 and on_disk_size == total_size):
                 print(f"[DOWNLOADER] {filename} already exists and is complete in download directory. Skipping.")
                 exists_complete = True
         
@@ -104,7 +106,7 @@ class DownloaderService:
             lib_path = library_service.find_in_library(filename)
             if lib_path and lib_path.exists():
                 on_disk_size = lib_path.stat().st_size
-                if total_size > 0 and on_disk_size == total_size:
+                if is_youtube or (total_size > 0 and on_disk_size == total_size):
                     print(f"[DOWNLOADER] {filename} found in library ({lib_path}). Skipping download.")
                     # Re-create symlink if missing in download dir to keep it visible
                     if not file_path.exists():
@@ -196,6 +198,73 @@ class DownloaderService:
                 group["progress"] = round((group["downloaded"] / group["total"]) * 100, 1)
             
             return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
+
+        # YouTube specific download flow
+        if is_youtube:
+            print(f"[DOWNLOADER] Downloading YouTube video {url} using yt-dlp...")
+            import yt_dlp
+            
+            def ydl_hook(d):
+                if d['status'] == 'downloading':
+                    downloaded = d.get('downloaded_bytes', 0)
+                    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                    if total > 0:
+                        prog = round((downloaded / total) * 100, 1)
+                        group["files"][filename] = {
+                            "progress": prog,
+                            "total": total,
+                            "downloaded": downloaded,
+                            "status": "downloading"
+                        }
+                        group["total"] = total
+                        group["downloaded"] = downloaded
+                        group["progress"] = prog
+                elif d['status'] == 'finished':
+                    pass
+
+            ydl_opts = {
+                'outtmpl': str(file_path.parent / (file_path.stem + '.%(ext)s')),
+                'format': 'bestvideo+bestaudio/best',
+                'progress_hooks': [ydl_hook],
+                'quiet': True,
+                'no_warnings': True,
+                'merge_output_format': 'mp4',
+            }
+            
+            try:
+                loop = asyncio.get_event_loop()
+                def sync_download():
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([url])
+                
+                await loop.run_in_executor(None, sync_download)
+                
+                actual_file_path = file_path
+                if not file_path.exists():
+                    for f in file_path.parent.iterdir():
+                        if f.stem == file_path.stem and f.suffix in ['.mp4', '.mkv', '.webm']:
+                            actual_file_path = f
+                            break
+                
+                if actual_file_path != file_path and actual_file_path.exists():
+                    filename = actual_file_path.name
+                    file_path = actual_file_path
+                
+                file_size = file_path.stat().st_size if file_path.exists() else 0
+                group["files"][filename] = {"progress": 100.0, "total": file_size, "downloaded": file_size, "status": "done"}
+                group["total"] = file_size
+                group["downloaded"] = file_size
+                group["progress"] = 100.0
+                
+                print(f"[DOWNLOADER] YouTube download finished: {filename}")
+                return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
+                
+            except Exception as e:
+                print(f"[DOWNLOADER] YouTube download failed: {e}")
+                group["status"] = "error"
+                if filename in group["files"]:
+                    group["files"][filename]["status"] = "error"
+                return None
 
         # Standard download flow
         if group["status"] not in ["extracting", "error"]:

@@ -14,7 +14,7 @@ from app.core.config import settings
 
 class EnrichmentService:
     @staticmethod
-    async def enrich_links(session: AsyncSession, links: List[DownloadLink] = None, force_year: int = None, force_type: str = None, force_imdb_id: str = None):
+    async def enrich_links(session: AsyncSession, links: List[DownloadLink] = None, force_year: int = None, force_type: str = None, force_imdb_id: str = None, url_to_poster: dict = None):
         """
         Entry point to orchestrate filename parsing and TMDb enrichment for a list of links.
         If no links are provided, it fetches all links that are missing metadata.
@@ -44,10 +44,10 @@ class EnrichmentService:
         if not processed_links:
             return
 
-        await enrichment_service.process_batch(session, processed_links, force_year, force_type, force_imdb_id)
+        await enrichment_service.process_batch(session, processed_links, force_year, force_type, force_imdb_id, url_to_poster)
 
     @staticmethod
-    async def enrich_link_metadata(session: AsyncSession, link: DownloadLink, force_year: int = None, force_type: str = None, force_imdb_id: str = None):
+    async def enrich_link_metadata(session: AsyncSession, link: DownloadLink, force_year: int = None, force_type: str = None, force_imdb_id: str = None, url_to_poster: dict = None):
         """
         Enriches a single link by fetching metadata from TMDb.
         """
@@ -135,10 +135,42 @@ class EnrichmentService:
         else:
             # Generate a local ID based on title to avoid grouping everything under "N/A"
             clean_t = re.sub(r'[^a-zA-Z0-9\s]', '', link.title or "unknown").lower().strip()
-            link.imdb_id = f"local_{clean_t.replace(' ', '_')}"[:40]
+            imdb_id = f"local_{clean_t.replace(' ', '_')}"[:40]
+            link.imdb_id = imdb_id
+            
+            # Check if MediaMetadata entry already exists for this local ID
+            stmt_id = select(MediaMetadata).where(MediaMetadata.imdb_id == imdb_id).limit(1)
+            existing_meta = (await session.execute(stmt_id)).scalar()
+            
+            if not existing_meta:
+                p_url = None
+                if url_to_poster and link.url in url_to_poster:
+                    p_url = url_to_poster[link.url]
+                
+                local_path = None
+                if p_url:
+                    local_path = await tmdb_service.download_poster(imdb_id, p_url)
+                
+                existing_meta = MediaMetadata(
+                    imdb_id=imdb_id,
+                    official_title=link.title,
+                    title_fr=link.title,
+                    year=link.year,
+                    poster_path=local_path,
+                    plot_en="Local Release",
+                    plot_fr="Sortie Locale"
+                )
+                session.add(existing_meta)
+                await session.flush()
+            else:
+                p_url = None
+                if url_to_poster and link.url in url_to_poster:
+                    p_url = url_to_poster[link.url]
+                if p_url and not existing_meta.poster_path:
+                    existing_meta.poster_path = await tmdb_service.download_poster(existing_meta.imdb_id, p_url)
 
     @staticmethod
-    async def process_batch(session: AsyncSession, links: List[DownloadLink], force_year: int = None, force_type: str = None, force_imdb_id: str = None):
+    async def process_batch(session: AsyncSession, links: List[DownloadLink], force_year: int = None, force_type: str = None, force_imdb_id: str = None, url_to_poster: dict = None):
         """
         Processes a batch of links for enrichment.
         """
@@ -204,7 +236,7 @@ class EnrichmentService:
         for (title, year, cat), group in needed.items():
             # We just need to enrich ONE link and then copy to others
             base_link = group[0]
-            await EnrichmentService.enrich_link_metadata(session, base_link, force_year, force_type, force_imdb_id)
+            await EnrichmentService.enrich_link_metadata(session, base_link, force_year, force_type, force_imdb_id, url_to_poster)
             for other in group[1:]:
                 other.imdb_id = base_link.imdb_id
                 other.title = base_link.title

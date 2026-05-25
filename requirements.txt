@@ -18,3 +18,4 @@ pytest
 pytest-asyncio
 docker
 jsonpath-ng
+yt-dlp

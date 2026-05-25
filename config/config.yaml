@@ -11,6 +11,7 @@ database_url: "sqlite+aiosqlite:///./data/ddl.db"
 download_dir: "/app/data/download"
 library_movies_dir: "/app/data/films"
 library_series_dir: "/app/data/series"
+library_youtube_dir: "/app/data/youtube"
 delete_rar_after_extraction: true
 keep_only_video_files: true
 
@@ -70,9 +71,18 @@ unlockers:
     extract_attribute: "value"
     skip_turnstile: true
 
+
 # --- Automated Discovery Sources (Scrapers) ---
 sources:
-  - name: "MyComplexSource"
+  - name: "YouTube source"
+    steps:
+      - name: "rss_feed"
+        url: "http://www.youtube.com/feeds/videos.xml?channel_id=UCGGhM6XCSJFQ6DTRffnKRIw"
+        type: "rss"
+        auto_download: true
+        category: "youtube"
+      
+  - name: "Custom source"
     steps:
       - name: "index"
         url: "https://example.com/index"
@@ -87,7 +97,6 @@ sources:
         use_browser: true
         item_delay: 2.0
         wait_for: ".download-button"
-        debug: true 
-        yield_links: true
+        debug: true
         hoster_patterns_url:
           - 'href=["''](https?://(?:www\.)?file\.com/\?[\w-]+)[^"'']*["'']'

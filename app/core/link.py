@@ -42,7 +42,7 @@ class LinkManager:
 
     async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str, 
                           override_filename: str = None, override_title: str = None, override_year: int = None, 
-                          tags: List[str] = None) -> List[DownloadLink]:
+                          tags: List[str] = None, category: str = None) -> List[DownloadLink]:
         """
         Manages link verification and database insertion with duplicate prevention.
         """
@@ -132,6 +132,8 @@ class LinkManager:
                         # Determine best raw_title for tooltips
                         existing.raw_title = self._get_best_raw_title(override_title, final_filename, link)
                         
+                        if category:
+                            existing.category = category
                         existing.year = override_year
                         existing.size = format_size(info.get('size', 0))
                         existing.size_bytes = info.get('size', 0)
@@ -149,6 +151,7 @@ class LinkManager:
                             title=override_title, 
                             raw_title=self._get_best_raw_title(override_title, final_filename, link),
                             year=override_year,
+                            category=category,
                             size=format_size(info.get('size', 0)),
                             size_bytes=info.get('size', 0),
                             last_checked=datetime.now(timezone.utc),

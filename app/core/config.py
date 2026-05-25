@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     DOWNLOAD_DIR: str = os.getenv("DOWNLOAD_DIR", _yaml_config.get("download_dir", "/app/data/download"))
     LIBRARY_MOVIES_DIR: str = os.getenv("LIBRARY_MOVIES_DIR", _yaml_config.get("library_movies_dir", "/app/data/films"))
     LIBRARY_SERIES_DIR: str = os.getenv("LIBRARY_SERIES_DIR", _yaml_config.get("library_series_dir", "/app/data/series"))
+    LIBRARY_YOUTUBE_DIR: str = os.getenv("LIBRARY_YOUTUBE_DIR", _yaml_config.get("library_youtube_dir", "/app/data/youtube"))
     POSTER_DIR: str = os.getenv("POSTER_DIR", _yaml_config.get("poster_dir", "/app/data/posters"))
     EXTRACT_RAR: bool = _yaml_config.get("extract_rar", True)
     DELETE_RAR_AFTER_EXTRACTION: bool = _yaml_config.get("delete_rar_after_extraction", True)

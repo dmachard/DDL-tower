@@ -251,6 +251,17 @@ class Scraper:
             if "title" not in item_data and "name" in item_data:
                 item_data["title"] = item_data["name"]
             if "content" not in item_data: item_data["content"] = str(item)
+            if "year" not in item_data:
+                pub_parsed = item_data.get("published_parsed")
+                if pub_parsed:
+                    try: item_data["year"] = str(pub_parsed.tm_year)
+                    except: pass
+                elif item_data.get("published"):
+                    m = re.match(r'^(\d{4})', str(item_data["published"]))
+                    if m: item_data["year"] = m.group(1)
+                elif item_data.get("updated"):
+                    m = re.match(r'^(\d{4})', str(item_data["updated"]))
+                    if m: item_data["year"] = m.group(1)
         else: item_data = {"content": str(item), "url": url}
         
         text = item_data.get("content", "")
@@ -343,6 +354,7 @@ class Scraper:
             if valid:
                 title = self._render_string(step.get("override_title"), new_ctx)
                 year = self._render_string(step.get("override_year"), new_ctx)
+                poster_url = None
                 if not title or title == "None":
                     for ps in reversed(self.steps[:step_idx + 1]):
                         pn = ps.get("name")
@@ -350,6 +362,21 @@ class Scraper:
                             title = new_ctx[pn]["title"]
                             if not year or year == "None": year = new_ctx[pn].get("year")
                             break
+                
+                for ps in reversed(self.steps[:step_idx + 1]):
+                    pn = ps.get("name")
+                    if pn in new_ctx and isinstance(new_ctx[pn], dict):
+                        thumb_list = new_ctx[pn].get("media_thumbnail")
+                        if thumb_list and isinstance(thumb_list, list) and len(thumb_list) > 0:
+                            poster_url = thumb_list[0].get("url")
+                            break
+                        elif new_ctx[pn].get("thumbnail"):
+                            poster_url = new_ctx[pn]["thumbnail"]
+                            break
+                        elif new_ctx[pn].get("image"):
+                            poster_url = new_ctx[pn]["image"]
+                            break
+                
                 print(f"[{self.name}] [{step_name}] Found {len(valid)} link(s)")
                 acc = list(set(context.get("__accumulated_tags__", []) + current_tags))
                 yield {
@@ -360,7 +387,9 @@ class Scraper:
                     "tags": acc, 
                     "auto_download": step.get("auto_download", False),
                     "auto_download_years": step.get("auto_download_years"),
-                    "auto_download_keywords": step.get("auto_download_keywords")
+                    "auto_download_keywords": step.get("auto_download_keywords"),
+                    "category": step.get("category"),
+                    "poster_url": poster_url
                 }
             elif is_last:
                 print(f"[{self.name}] [{step_name}] No matching links found.")

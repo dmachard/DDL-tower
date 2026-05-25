@@ -112,7 +112,18 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
     
     # 1. Unlock all links in parallel
     print(f"[API] Unlocking {len(urls)} links in parallel...")
-    unlock_tasks = [client.unlock_link(url) for url in urls]
+    async def unlock_helper(url: str):
+        if "youtube.com/" in url or "youtu.be/" in url:
+            return {
+                "status": "success",
+                "data": {
+                    "link": url,
+                    "filename": "YouTube Video"
+                }
+            }
+        return await client.unlock_link(url)
+
+    unlock_tasks = [unlock_helper(url) for url in urls]
     results = await asyncio.gather(*unlock_tasks)
     
     valid_downloads = [] # List of (orig_url, unlocked_link, filename)

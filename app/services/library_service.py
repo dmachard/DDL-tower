@@ -8,15 +8,19 @@ class LibraryService:
     def __init__(self):
         self.movies_dir = Path(settings.LIBRARY_MOVIES_DIR)
         self.series_dir = Path(settings.LIBRARY_SERIES_DIR)
+        self.youtube_dir = Path(settings.LIBRARY_YOUTUBE_DIR)
         try:
             self.movies_dir.mkdir(parents=True, exist_ok=True)
             self.series_dir.mkdir(parents=True, exist_ok=True)
+            self.youtube_dir.mkdir(parents=True, exist_ok=True)
         except OSError:
             # Fallback to /tmp in CI or restricted environments where /app is not writable
             self.movies_dir = Path("/tmp/ddltower/movies")
             self.series_dir = Path("/tmp/ddltower/series")
+            self.youtube_dir = Path("/tmp/ddltower/youtube")
             self.movies_dir.mkdir(parents=True, exist_ok=True)
             self.series_dir.mkdir(parents=True, exist_ok=True)
+            self.youtube_dir.mkdir(parents=True, exist_ok=True)
 
     def _sanitize_path(self, name: str) -> str:
         """Removes or replaces characters that are invalid for file paths."""
@@ -33,7 +37,7 @@ class LibraryService:
         - Movies: Moves to movies_dir, deletes other files with same title/year.
         - Series: Moves to series_dir/(Title (Year))/, deletes other files with same SxxExx.
         """
-        if category not in ["movie", "series"]:
+        if category not in ["movie", "series", "youtube"]:
             return False
 
         try:
@@ -43,7 +47,9 @@ class LibraryService:
                 return False
 
             # Determine destination folder and Cleanup old versions
-            if category == "movie":
+            if category == "youtube":
+                target_base_dir = self.youtube_dir
+            elif category == "movie":
                 target_base_dir = self.movies_dir
                 if title:
                     s_title = self._sanitize_path(title)

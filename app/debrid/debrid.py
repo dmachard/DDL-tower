@@ -32,6 +32,8 @@ class DebridService:
         Attempts to unlock a link using enabled clients.
         Falls back to the next client if the first one fails.
         """
+
+
         clients = self.get_enabled_clients()
         if not clients:
             return {"status": "failed", "error": "No debrid service configured"}

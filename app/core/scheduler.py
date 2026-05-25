@@ -29,6 +29,7 @@ async def run_scraper(scraper):
             override_title = batch.get("override_title")
             override_year = batch.get("override_year")
             tags = batch.get("tags", [])
+            category = batch.get("category")
 
             if links:
                 # 1. Insert/Update links first (Short transaction)
@@ -41,7 +42,8 @@ async def run_scraper(scraper):
                         source_name=scraper.name, 
                         override_title=override_title, 
                         override_year=int(override_year) if override_year and str(override_year).isdigit() else None,
-                        tags=tags
+                        tags=tags,
+                        category=category
                     )
                 
                 # 2. Enrich links (Separate transaction, can take time)
@@ -57,7 +59,14 @@ async def run_scraper(scraper):
                             stmt = select(DownloadLink).where(DownloadLink.id.in_(link_ids))
                             res = await db.execute(stmt)
                             links_to_enrich = res.scalars().all()
-                            await enrichment_service.enrich_links(db, links=links_to_enrich)
+                            
+                            url_to_poster = {}
+                            poster_url = batch.get("poster_url")
+                            if poster_url:
+                                for l in links_to_enrich:
+                                    url_to_poster[l.url] = poster_url
+                            
+                            await enrichment_service.enrich_links(db, links=links_to_enrich, url_to_poster=url_to_poster)
                         
                         # 3. Auto-download if requested in scraper config
                         auto_download = batch.get("auto_download")
