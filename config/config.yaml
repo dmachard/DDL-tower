@@ -77,7 +77,7 @@ sources:
   - name: "YouTube source"
     steps:
       - name: "rss_feed"
-        url: "http://www.youtube.com/feeds/videos.xml?channel_id=UCGGhM6XCSJFQ6DTRffnKRIw"
+        url: "http://www.youtube.com/feeds/videos.xml?channel_id="
         type: "rss"
         auto_download: true
         category: "youtube"
