@@ -139,6 +139,10 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
             filename = data.get("filename")
             if link and filename:
                 parsed = parser_service.parse_filename(filename)
+                import re
+                part_match = re.search(r'\.part(\d+)\.rar$', filename, re.I)
+                part_str = part_match.group(1) if part_match else "1"
+                
                 mirror_key = (
                     normalize_title(parsed.get("title", filename)),
                     parsed.get("year"),
@@ -146,7 +150,8 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                     parsed.get("episode"),
                     parsed.get("resolution"),
                     parsed.get("quality"),
-                    parsed.get("codec")
+                    parsed.get("codec"),
+                    part_str
                 )
                 if mirror_key in seen_mirrors:
                     print(f"[API] Skipping duplicate mirror link in batch: {filename}")
