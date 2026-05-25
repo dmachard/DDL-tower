@@ -417,26 +417,52 @@ class DownloaderService:
             try:
                 from app.db.database import AsyncSessionLocal
                 from app.db.models import DownloadHistory
+                from sqlalchemy import select
                 async with AsyncSessionLocal() as session:
-                    history = DownloadHistory(
-                        title=title or filename,
-                        filename=filename,
-                        category=category,
-                        year=year,
-                        season=season,
-                        episode=episode,
-                        resolution=resolution,
-                        quality=quality,
-                        language=language,
-                        v_quality=v_quality,
-                        codec=codec,
-                        network=network,
-                        audio=audio,
-                        channels=channels,
-                        is_auto=is_auto,
-                        imdb_id=imdb_id
-                    )
-                    session.add(history)
+                    stmt = select(DownloadHistory).where(DownloadHistory.filename == filename)
+                    res = await session.execute(stmt)
+                    existing_hist = res.scalars().first()
+                    
+                    if existing_hist:
+                        # Mettre à jour avec les métadonnées plus complètes si disponibles
+                        if title and existing_hist.title == existing_hist.filename:
+                            existing_hist.title = title
+                        if year and not existing_hist.year:
+                            existing_hist.year = year
+                        if imdb_id and not existing_hist.imdb_id:
+                            existing_hist.imdb_id = imdb_id
+                        existing_hist.download_date = datetime.now(timezone.utc)
+                    else:
+                        # Fallback parsing du nom de fichier si les métadonnées manquent
+                        final_title = title
+                        final_year = year
+                        if not final_title or not final_year:
+                            from app.services.parser_service import parser_service
+                            parsed = parser_service.parse_filename(filename)
+                            if not final_title:
+                                final_title = parsed.get("title") or filename
+                            if not final_year:
+                                final_year = parsed.get("year")
+
+                        history = DownloadHistory(
+                            title=final_title,
+                            filename=filename,
+                            category=category,
+                            year=final_year,
+                            season=season,
+                            episode=episode,
+                            resolution=resolution,
+                            quality=quality,
+                            language=language,
+                            v_quality=v_quality,
+                            codec=codec,
+                            network=network,
+                            audio=audio,
+                            channels=channels,
+                            is_auto=is_auto,
+                            imdb_id=imdb_id
+                        )
+                        session.add(history)
                     await session.commit()
             except Exception as he:
                 print(f"[DOWNLOADER] Error saving history: {he}")

@@ -31,6 +31,24 @@ class LibraryService:
         s = re.sub(r'[<>|?*"]', '', s)
         return s.strip()
 
+    def _delete_file(self, item: Path):
+        """Helper to delete a file from library and its corresponding file/symlink in download folder."""
+        # 1. Delete from download dir
+        try:
+            download_path = Path(settings.DOWNLOAD_DIR) / item.name
+            if download_path.exists() or download_path.is_symlink():
+                print(f"[LIBRARY] Deleting corresponding download item: {download_path.name}")
+                download_path.unlink()
+        except Exception as e:
+            print(f"[LIBRARY] Error deleting download item {item.name}: {e}")
+            
+        # 2. Delete from library
+        try:
+            print(f"[LIBRARY] Deleting library item: {item.name}")
+            item.unlink()
+        except Exception as e:
+            print(f"[LIBRARY] Error deleting library item {item.name}: {e}")
+
     def organize_file(self, file_path: str, category: str = "movie", title: str = None, year: int = None, season: str = None, episode: str = None, old_filenames: list = None) -> bool:
         """
         Organizes a file based on its category and removes older versions if they exist.
@@ -46,21 +64,31 @@ class LibraryService:
                 print(f"[LIBRARY] Error: Source file {file_path} does not exist.")
                 return False
 
+            # Fallback parsing du nom de fichier si les métadonnées manquent
+            if category in ["movie", "series"] and (not title or not year or (category == "series" and (not season or not episode))):
+                from app.services.parser_service import parser_service
+                parsed = parser_service.parse_filename(src.name)
+                if not title:
+                    title = parsed.get("title")
+                if not year:
+                    year = parsed.get("year")
+                if category == "series":
+                    if not season:
+                        season = parsed.get("season")
+                    if not episode:
+                        episode = parsed.get("episode")
+
             # Determine destination folder and Cleanup old versions
             if category == "youtube":
                 target_base_dir = self.youtube_dir
             elif category == "movie":
                 target_base_dir = self.movies_dir
                 if title:
-                    s_title = self._sanitize_path(title)
-                    clean_title = s_title.replace(' ', '.')
                     for item in target_base_dir.iterdir():
                         if item.is_file() and item.name != src.name:
                             # 1. Match from explicit old_filenames
                             if old_filenames and item.name in old_filenames:
-                                print(f"[LIBRARY] Deleting old movie version (from history): {item.name}")
-                                try: item.unlink()
-                                except: pass
+                                self._delete_file(item)
                                 continue
 
                             # 2. Basic match: title in filename + year in filename
@@ -82,9 +110,7 @@ class LibraryService:
                             
                             if match_str in item_str:
                                 if not year or str(year) in item.name:
-                                    print(f"[LIBRARY] Deleting old movie version: {item.name}")
-                                    try: item.unlink()
-                                    except: pass
+                                    self._delete_file(item)
             else: # series
                 s_title = self._sanitize_path(title or "Unknown-Series")
                 # Capitalize each word for cleaner default names (e.g., "FROM" -> "From")
@@ -110,9 +136,7 @@ class LibraryService:
                     for item in target_base_dir.iterdir():
                         if item.is_file() and item.name != src.name:
                             if any(p in item.name.upper() for p in patterns):
-                                print(f"[LIBRARY] Deleting old episode version: {item.name}")
-                                try: item.unlink()
-                                except: pass
+                                self._delete_file(item)
             
             dest = target_base_dir / src.name
             
