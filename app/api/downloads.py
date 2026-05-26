@@ -159,7 +159,12 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 seen_mirrors.add(mirror_key)
                 valid_downloads.append((orig_url, link, filename))
         else:
-            err_msg = res.get('error', 'Unknown error').strip() or "Debrid unlock failed"
+            error_val = res.get('error', 'Unknown error')
+            if isinstance(error_val, dict):
+                err_msg = error_val.get('message') or error_val.get('code') or str(error_val)
+            else:
+                err_msg = str(error_val)
+            err_msg = err_msg.strip() or "Debrid unlock failed"
             print(f"[API] Failed to unlock {orig_url}: {err_msg}")
             try:
                 from app.db.models import ScrapedURL

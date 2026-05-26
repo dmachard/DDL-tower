@@ -98,6 +98,10 @@ class AllDebridClient:
                         return {"status": "error", "error": f"HTTP {response.status}"}
                     
                     data = await response.json()
+                    if data.get("status") != "success" and "error" in data:
+                        err_val = data["error"]
+                        if isinstance(err_val, dict):
+                            data["error"] = err_val.get("message") or err_val.get("code") or str(err_val)
                     return data
             except Exception as e:
                 return {"status": "error", "error": str(e)}

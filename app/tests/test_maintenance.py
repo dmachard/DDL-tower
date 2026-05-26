@@ -85,3 +85,32 @@ async def test_repair_download_history():
         # So deleted count should be 2.
         assert deleted == 2
         print("[TEST] repair_download_history verified successfully!")
+
+
+@pytest.mark.asyncio
+async def test_run_download_task_debrid_error_handling():
+    """Test that run_download_task correctly handles string and dict error responses from the debrid service."""
+    from app.api.downloads import run_download_task
+    
+    # Mock debrid client unlock_link
+    mock_res_dict_error = {
+        "status": "error",
+        "error": {
+            "code": "LINK_DOWN",
+            "message": "This link is not available on the file hoster website"
+        }
+    }
+    
+    with patch("app.api.downloads.debrid_service.unlock_link", new_callable=AsyncMock) as mock_unlock, \
+         patch("app.api.downloads.AsyncSessionLocal") as mock_db:
+        
+        mock_session = AsyncMock()
+        mock_db.return_value.__aenter__.return_value = mock_session
+        
+        mock_unlock.return_value = mock_res_dict_error
+        
+        # This shouldn't raise AttributeError: 'dict' object has no attribute 'strip'
+        await run_download_task(["https://example.com/file.rar"])
+        
+        # Verify it attempted to unlock
+        mock_unlock.assert_called_once_with("https://example.com/file.rar")
