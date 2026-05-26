@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.db.models import DownloadHistory, MediaMetadata
+from app.db.models import DownloadHistory, MediaMetadata, DownloadLink
 from app.services.maintenance_service import maintenance_service
 
 @pytest.mark.asyncio
@@ -114,3 +114,83 @@ async def test_run_download_task_debrid_error_handling():
         
         # Verify it attempted to unlock
         mock_unlock.assert_called_once_with("https://example.com/file.rar")
+
+
+@pytest.mark.asyncio
+async def test_si_j_en_avais_la_force_duplicate_prevention():
+    """Test that a 1080p version auto-download is skipped if a 2160p version exists, even with mismatched imdb_id presence."""
+    from app.api.downloads import run_download_task
+    
+    url = "https://example.com/sijenavaislaforce-1080p"
+    
+    # Setup the new scraped link (1080p)
+    mock_row = MagicMock()
+    mock_row.url = url
+    mock_row.category = "movie"
+    mock_row.title_fr = "Si j'en avais la force"
+    mock_row.official_title = "Si j'en avais la force"
+    mock_row.title = "Si J_En Avais La Force"
+    mock_row.filename = "Si J_En Avais La Force (2025) Multi.Vff.1080P.Web.Eac3.H.265-ParadiZe"
+    mock_row.year = 2025
+    mock_row.year_1 = 2025
+    mock_row.imdb_id = "tt_sijenavaislaforce"
+    mock_row.season = None
+    mock_row.episode = None
+    mock_row.resolution = "1080p"
+    mock_row.quality = "WEB"
+    mock_row.language = "FRENCH"
+    mock_row.v_quality = ""
+    mock_row.codec = "H265"
+    mock_row.network = ""
+    mock_row.audio = "EAC3"
+    mock_row.channels = ""
+    
+    # Setup history entry (2160p, but without imdb_id)
+    existing_history = MagicMock(spec=DownloadHistory)
+    existing_history.title = "Si.J.En.Avais.La.Force.2025.MULTi.VFF.2160p.DV.HDR.WEB.EAC3.5.1.H265-TFA"
+    existing_history.year = 2025
+    existing_history.category = "movie"
+    existing_history.imdb_id = None  # Crucial mismatch: no imdb_id in history
+    existing_history.resolution = "2160p"
+    existing_history.quality = "WEB"
+    existing_history.language = "FRENCH"
+    existing_history.v_quality = "DV HDR"
+    existing_history.audio = "EAC3"
+    existing_history.codec = "H265"
+
+    with patch("app.api.downloads.debrid_service.unlock_link", new_callable=AsyncMock) as mock_unlock, \
+         patch("app.api.downloads.AsyncSessionLocal") as mock_db, \
+         patch("app.services.downloader.downloader_service.download_file", new_callable=AsyncMock) as mock_download:
+        
+        mock_unlock.return_value = {
+            "status": "success",
+            "data": {
+                "link": "https://debrid.com/unlocked",
+                "filename": "Si J_En Avais La Force (2025) Multi.Vff.1080P.Web.Eac3.H.265-ParadiZe"
+            }
+        }
+        
+        mock_session = AsyncMock()
+        mock_db.return_value.__aenter__.return_value = mock_session
+        
+        mock_res_meta = MagicMock()
+        mock_res_meta.__iter__.return_value = [mock_row]
+        
+        mock_res_hist = MagicMock()
+        mock_res_hist.scalars.return_value.all.return_value = [existing_history]
+        
+        # We need to trace what session.execute is called with
+        # To debug, let's wrap execution of session.execute to print inputs
+        async def mock_execute(stmt):
+            print(f"[TEST DEBUG] Executing stmt: {stmt}")
+            if "download_history" in str(stmt):
+                return mock_res_hist
+            return mock_res_meta
+        
+        mock_session.execute.side_effect = mock_execute
+        
+        await run_download_task([url], is_auto=True)
+        
+        # The download should be skipped because we already have a better version (2160p > 1080p)
+        mock_download.assert_not_called()
+        print("[TEST] 1080p skipped because of existing 2160p verified successfully!")

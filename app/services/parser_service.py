@@ -101,8 +101,21 @@ class ParserService:
         p = PTN.parse(filename)
         year = p.get('year')
         
+        # Check if the filename contains typical release markers
+        fn_upper = filename.upper()
+        typical_tags = [
+            "1080P", "720P", "2160P", "4K", "BLURAY", "BDRIP", "DVDRIP", "WEBRIP", "WEB-DL", "WEBLIGHT", "WEB",
+            "H264", "H265", "X264", "X265", "HEVC", "MULTI", "FRENCH", "TRUEFRENCH", "VOSTFR", "VFF", "VFQ", "VOST"
+        ]
+        has_tags = any(tag in fn_upper for tag in typical_tags)
+        has_ext = filename.lower().endswith(('.mkv', '.mp4', '.avi', '.mov', '.rar', '.ts', '.m2ts'))
+        
         # Title handling
-        raw_title = p.get('title', filename)
+        if not has_tags and not has_ext:
+            raw_title = filename
+        else:
+            raw_title = p.get('title', filename)
+            
         title = html.unescape(raw_title) if raw_title else raw_title
         
         # Aggressive title cleaning if tags leaked into it

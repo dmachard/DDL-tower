@@ -274,10 +274,7 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 imdb_id = meta.get("imdb_id")
                 
                 # Check history
-                if imdb_id:
-                    h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
-                else:
-                    h_stmt = select(DownloadHistory).where(DownloadHistory.category == meta.get("category"))
+                h_stmt = select(DownloadHistory).where(DownloadHistory.category == meta.get("category"))
                 
                 # For series, also match season/episode
                 if meta.get("category") == "series":
@@ -289,8 +286,7 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 h_res = await session.execute(h_stmt)
                 existing = h_res.scalars().all()
                 
-                # If no imdb_id was matched, filter by normalized title in Python
-                if not imdb_id and existing:
+                if existing:
                     from app.core.utils import normalize_title
                     from app.services.parser_service import parser_service
                     
@@ -301,6 +297,13 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                     
                     existing_filtered = []
                     for ex in existing:
+                        # 1. Match by imdb_id if both have a valid one
+                        if imdb_id and ex.imdb_id and not imdb_id.startswith("local_") and not ex.imdb_id.startswith("local_"):
+                            if imdb_id == ex.imdb_id:
+                                existing_filtered.append(ex)
+                                continue
+                        
+                        # 2. Match by normalized title and year (fallback or if no imdb_id match)
                         ex_parsed = parser_service.parse_filename(ex.title)
                         clean_ex = ex_parsed.get("title", ex.title)
                         ex_year = ex_parsed.get("year") or ex.year
