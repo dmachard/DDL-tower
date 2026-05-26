@@ -312,5 +312,131 @@ class MaintenanceService:
                 await enrichment_service.process_batch(session, missing)
                 await session.commit()
 
+    @staticmethod
+    async def repair_download_history():
+        """
+        Enriches missing metadata and removes duplicates in the download history.
+        """
+        from app.db.models import DownloadHistory, MediaMetadata
+        from app.core.utils import normalize_title
+        from app.services.parser_service import parser_service
+        from sqlalchemy import select, delete
+
+        print("[MAINTENANCE] Running repair on DownloadHistory...")
+        async with AsyncSessionLocal() as session:
+            # 1. Fetch all download history entries
+            stmt = select(DownloadHistory)
+            res = await session.execute(stmt)
+            history_entries = res.scalars().all()
+            
+            # 2. Fetch all media metadata for matching
+            stmt_meta = select(MediaMetadata)
+            res_meta = await session.execute(stmt_meta)
+            all_metadata = res_meta.scalars().all()
+            
+            # Pre-index metadata by normalized titles
+            meta_by_norm_title = {}
+            for meta in all_metadata:
+                norm_titles = []
+                if meta.official_title:
+                    norm_titles.append(normalize_title(meta.official_title))
+                if meta.title_fr:
+                    norm_titles.append(normalize_title(meta.title_fr))
+                
+                for nt in norm_titles:
+                    if nt:
+                        if nt not in meta_by_norm_title:
+                            meta_by_norm_title[nt] = []
+                        meta_by_norm_title[nt].append(meta)
+            
+            updated_count = 0
+            # Enrich missing metadata in history
+            for entry in history_entries:
+                if not entry.imdb_id or entry.imdb_id == "N/A" or entry.imdb_id.startswith("local_"):
+                    # Try to parse and match
+                    parsed = parser_service.parse_filename(entry.title)
+                    clean_title = parsed.get("title", entry.title) if entry.title else ""
+                    norm_entry_title = normalize_title(clean_title)
+                    entry_year = entry.year or parsed.get("year")
+                    
+                    if norm_entry_title in meta_by_norm_title:
+                        # Find the best metadata match (matching year if possible)
+                        candidates = meta_by_norm_title[norm_entry_title]
+                        matched_meta = None
+                        if entry_year:
+                            for cand in candidates:
+                                if cand.year == entry_year:
+                                    matched_meta = cand
+                                    break
+                        if not matched_meta:
+                            # Fallback to the first candidate if no year match
+                            matched_meta = candidates[0]
+                            
+                        if matched_meta:
+                            entry.imdb_id = matched_meta.imdb_id
+                            if matched_meta.title_fr:
+                                entry.title = matched_meta.title_fr
+                            elif matched_meta.official_title:
+                                entry.title = matched_meta.official_title
+                            
+                            if matched_meta.year:
+                                entry.year = matched_meta.year
+                            elif entry_year:
+                                entry.year = entry_year
+                                
+                            updated_count += 1
+
+            if updated_count > 0:
+                await session.commit()
+                print(f"[MAINTENANCE] Enriched {updated_count} history entries.")
+                
+            # 3. Deduplicate history
+            # Re-fetch entries to have updated metadata
+            stmt = select(DownloadHistory).order_by(DownloadHistory.download_date.desc())
+            res = await session.execute(stmt)
+            history_entries = res.scalars().all()
+            
+            seen_keys = set()
+            deleted_ids = []
+            
+            for entry in history_entries:
+                # Key can be:
+                # - (imdb_id, season, episode) if imdb_id is available
+                # - (normalized_title, year, season, episode) otherwise
+                parsed = parser_service.parse_filename(entry.title)
+                clean_title = parsed.get("title", entry.title) if entry.title else ""
+                norm_title = normalize_title(clean_title)
+                year = entry.year or parsed.get("year")
+                
+                # Normalize season/episode values
+                def norm_se(val):
+                    if not val: return ""
+                    try:
+                        return str(int(val)).zfill(2)
+                    except:
+                        return str(val).strip().upper()
+                
+                s_str = norm_se(entry.season)
+                e_str = norm_se(entry.episode)
+                
+                if entry.imdb_id and not entry.imdb_id.startswith("local_"):
+                    key = (entry.imdb_id, s_str, e_str)
+                else:
+                    key = (norm_title, year, s_str, e_str)
+                
+                if key in seen_keys:
+                    deleted_ids.append(entry.id)
+                else:
+                    seen_keys.add(key)
+            
+            if deleted_ids:
+                del_stmt = delete(DownloadHistory).where(DownloadHistory.id.in_(deleted_ids))
+                await session.execute(del_stmt)
+                await session.commit()
+                print(f"[MAINTENANCE] Deleted {len(deleted_ids)} duplicate history entries.")
+                return updated_count, len(deleted_ids)
+            
+            return updated_count, 0
+
 maintenance_service = MaintenanceService()
 

@@ -57,7 +57,11 @@ class DBCommands:
         print("--- [DB] Global Title Harmonization ---")
         unique_groups, updated_fields = await maintenance_service.harmonize_titles()
         print(f"[DB] Found {unique_groups} unique title groups. Harmonizing...")
-        print(f"\nSUCCESS: Harmonized {updated_fields} link fields (titles/years).")
+        print(f"SUCCESS: Harmonized {updated_fields} link fields (titles/years).")
+
+        print("\n--- [DB] Download History Repair and Deduplication ---")
+        enriched_count, deleted_count = await maintenance_service.repair_download_history()
+        print(f"SUCCESS: Enriched {enriched_count} history entries, removed {deleted_count} duplicates.")
 
     @staticmethod
     async def update_title(link_id: Optional[int], old_title: Optional[str], new_title: str):

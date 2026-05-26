@@ -358,21 +358,80 @@ class DownloaderService:
         group = self.active_downloads.get(group_name)
         if not group: return str(file_path)
 
-        if settings.EXTRACT_RAR and not group.get("extraction_triggered"):
+        is_rar_file = extraction_service.is_rar(str(file_path))
+
+        if settings.EXTRACT_RAR and is_rar_file and not group.get("extraction_triggered"):
             if extraction_service.should_extract(str(file_path), self.active_downloads):
                 group["extraction_triggered"] = True
                 group["status"] = "extracting"
                 group["progress"] = 100
                 
-                success = await extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
+                success, promoted_files = await extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
                 if not success:
                     group["status"] = "error"
                     group["error"] = "Extraction failed"
                     return str(file_path)
                 else:
                     group["status"] = "done"
+                    # Record in history for each promoted video file
+                    for p_file in (promoted_files or [filename]):
+                        try:
+                            from app.db.database import AsyncSessionLocal
+                            from app.db.models import DownloadHistory
+                            from sqlalchemy import select
+                            from datetime import datetime, timezone
+                            async with AsyncSessionLocal() as session:
+                                stmt = select(DownloadHistory).where(DownloadHistory.filename == p_file)
+                                res = await session.execute(stmt)
+                                existing_hist = res.scalars().first()
+                                
+                                if existing_hist:
+                                    if title and existing_hist.title == existing_hist.filename:
+                                        existing_hist.title = title
+                                    if year and not existing_hist.year:
+                                        existing_hist.year = year
+                                    if imdb_id and not existing_hist.imdb_id:
+                                        existing_hist.imdb_id = imdb_id
+                                    existing_hist.download_date = datetime.now(timezone.utc)
+                                else:
+                                    final_title = title
+                                    final_year = year
+                                    if not final_title or not final_year:
+                                        from app.services.parser_service import parser_service
+                                        parsed = parser_service.parse_filename(p_file)
+                                        if not final_title:
+                                            final_title = parsed.get("title") or p_file
+                                        if not final_year:
+                                            final_year = parsed.get("year")
+
+                                    history = DownloadHistory(
+                                        title=final_title,
+                                        filename=p_file,
+                                        category=category,
+                                        year=final_year,
+                                        season=season,
+                                        episode=episode,
+                                        resolution=resolution,
+                                        quality=quality,
+                                        language=language,
+                                        v_quality=v_quality,
+                                        codec=codec,
+                                        network=network,
+                                        audio=audio,
+                                        channels=channels,
+                                        is_auto=is_auto,
+                                        imdb_id=imdb_id
+                                    )
+                                    session.add(history)
+                                await session.commit()
+                        except Exception as he:
+                            print(f"[DOWNLOADER] Error saving RAR extraction history: {he}")
+                    
                     self.active_downloads.pop(group_name, None)
                     return str(file_path)
+            else:
+                # RAR part, but not all parts are finished yet. Skip history.
+                return str(file_path)
         
         # If not RAR or extraction not triggered
         if group["status"] != "error":
@@ -380,36 +439,36 @@ class DownloaderService:
                  if file_path.exists():
                      old_filenames = []
                      try:
-                         from app.db.database import AsyncSessionLocal
-                         from app.db.models import DownloadHistory
-                         from sqlalchemy import select, and_
-                         from app.core.utils import normalize_title
-                         async with AsyncSessionLocal() as session:
-                             if imdb_id:
-                                 h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
-                             else:
-                                 h_stmt = select(DownloadHistory).where(
-                                     and_(
-                                         DownloadHistory.year == year,
-                                         DownloadHistory.category == category
-                                     )
-                                 )
-                             h_res = await session.execute(h_stmt)
-                             entries = h_res.scalars().all()
-                             if title:
-                                 from app.services.parser_service import parser_service
-                                 clean_target = parser_service.parse_filename(title).get("title", title)
-                                 target_norm = normalize_title(clean_target)
-                                 old_filenames = []
-                                 for ex in entries:
-                                     clean_ex = parser_service.parse_filename(ex.title).get("title", ex.title)
-                                     if normalize_title(clean_ex) == target_norm:
-                                         old_filenames.append(ex.filename)
-                             else:
-                                 old_filenames = [ex.filename for ex in entries]
+                          from app.db.database import AsyncSessionLocal
+                          from app.db.models import DownloadHistory
+                          from sqlalchemy import select, and_
+                          from app.core.utils import normalize_title
+                          async with AsyncSessionLocal() as session:
+                              if imdb_id:
+                                  h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
+                              else:
+                                  h_stmt = select(DownloadHistory).where(
+                                      and_(
+                                          DownloadHistory.year == year,
+                                          DownloadHistory.category == category
+                                      )
+                                  )
+                              h_res = await session.execute(h_stmt)
+                              entries = h_res.scalars().all()
+                              if title:
+                                  from app.services.parser_service import parser_service
+                                  clean_target = parser_service.parse_filename(title).get("title", title)
+                                  target_norm = normalize_title(clean_target)
+                                  old_filenames = []
+                                  for ex in entries:
+                                      clean_ex = parser_service.parse_filename(ex.title).get("title", ex.title)
+                                      if normalize_title(clean_ex) == target_norm:
+                                          old_filenames.append(ex.filename)
+                              else:
+                                  old_filenames = [ex.filename for ex in entries]
                      except Exception as e:
-                         print(f"[DOWNLOADER] Error fetching old versions: {e}")
-                         
+                          print(f"[DOWNLOADER] Error fetching old versions: {e}")
+                          
                      from app.services.library_service import library_service
                      library_service.organize_file(str(file_path), category, title=title, year=year, season=season, episode=episode, old_filenames=old_filenames)
 
@@ -418,6 +477,7 @@ class DownloaderService:
                 from app.db.database import AsyncSessionLocal
                 from app.db.models import DownloadHistory
                 from sqlalchemy import select
+                from datetime import datetime, timezone
                 async with AsyncSessionLocal() as session:
                     stmt = select(DownloadHistory).where(DownloadHistory.filename == filename)
                     res = await session.execute(stmt)
@@ -480,4 +540,3 @@ class DownloaderService:
 
 
 downloader_service = DownloaderService()
-

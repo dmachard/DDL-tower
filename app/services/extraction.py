@@ -68,16 +68,17 @@ class ExtractionService:
         parts.sort()
         return parts[0]
 
-    async def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> bool:
+    async def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> tuple:
         """
         Extracts a RAR archive using the system unrar command.
         Ensures extraction starts from the first volume.
+        Returns a tuple: (success: bool, promoted_files: List[str])
         """
         # We need to import library_service here to avoid circular imports if any
         from app.services.library_service import library_service
         
         if not self.should_extract(file_path, active_downloads):
-            return False
+            return False, []
 
         path = Path(file_path)
         # Identify the first volume to start extraction
@@ -143,6 +144,7 @@ class ExtractionService:
                             pass
                 
                 # 3. Promote video file to root and remove empty folder
+                promoted_files = []
                 if video_files:
                     # If multiple video files, we move all of them to parent
                     for video_p in video_files:
@@ -151,12 +153,14 @@ class ExtractionService:
                             if not new_path.exists():
                                 shutil.move(str(video_p), str(new_path))
                                 print(f"[EXTRACTION] Promoted {video_p.name} to {path.parent}")
+                                promoted_files.append(video_p.name)
                                 
                                 # Library Organization (Movies & Series)
                                 if category in ["movie", "series"]:
                                     library_service.organize_file(str(new_path), category, title=title, year=year, season=season, episode=episode)
                             else:
                                 print(f"[EXTRACTION] {video_p.name} already exists in destination, skipping move.")
+                                promoted_files.append(video_p.name)
                         except Exception as e:
                             print(f"[EXTRACTION] Could not move {video_p.name}: {e}")
                     
@@ -168,15 +172,15 @@ class ExtractionService:
                     except Exception as e:
                         print(f"[EXTRACTION] Could not remove folder {dest_dir}: {e}")
 
-                return True
+                return True, promoted_files
             else:
                 stderr_dec = stderr.decode('utf-8', errors='replace')
                 print(f"[EXTRACTION] Failed to extract {path.name}: {stderr_dec}")
-                return False
+                return False, []
                 
         except Exception as e:
             print(f"[EXTRACTION] Exception during extraction of {path.name}: {str(e)}")
-            return False
+            return False, []
 
 
 extraction_service = ExtractionService()
