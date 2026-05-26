@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
     IGNORE_RESOLUTIONS: List[str] = _yaml_config.get("ignore_resolutions", [])
     AUTO_DOWNLOAD_SERIES_PACKS: bool = _yaml_config.get("auto_download_series_packs", False)
+    AUTO_DOWNLOAD_LOWER_THAN: Optional[str] = _yaml_config.get("auto_download_lower_than", None)
     
     # Scheduler window (Hours when scanning is allowed, e.g. 6 to 0 for 06:00-00:00)
     SCAN_START_HOUR: int = _yaml_config.get("scan_start_hour", 6)
@@ -91,6 +92,16 @@ class Settings(BaseSettings):
     @property
     def UNLOCKERS(self) -> List[dict]:
         return _yaml_config.get("unlockers") or []
+
+    @property
+    def AUTO_DOWNLOAD_MAX_SIZE_BYTES(self) -> Optional[int]:
+        if not self.AUTO_DOWNLOAD_LOWER_THAN:
+            return None
+        from app.core.utils import parse_size
+        try:
+            return parse_size(self.AUTO_DOWNLOAD_LOWER_THAN)
+        except Exception:
+            return None
 
     model_config = ConfigDict(env_file=".env", extra="ignore")
 

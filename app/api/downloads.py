@@ -228,7 +228,9 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
             DownloadLink.codec,
             DownloadLink.network,
             DownloadLink.audio,
-            DownloadLink.channels
+            DownloadLink.channels,
+            DownloadLink.size,
+            DownloadLink.size_bytes
         ).outerjoin(
             MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id
         ).where(DownloadLink.url.in_(urls))
@@ -259,7 +261,9 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 "codec": row.codec,
                 "network": row.network,
                 "audio": row.audio,
-                "channels": row.channels
+                "channels": row.channels,
+                "size": row.size,
+                "size_bytes": row.size_bytes
             }
 
     # 5. Filter for Auto-download: Skip if already downloaded with same or better quality
@@ -345,6 +349,20 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                         continue
                     else:
                         print(f"[API] Upgrade detected for {title}: {meta.get('resolution')} is better than existing.")
+
+                # Size filtering
+                if settings.AUTO_DOWNLOAD_MAX_SIZE_BYTES:
+                    link_size_bytes = meta.get("size_bytes")
+                    if not link_size_bytes and meta.get("size"):
+                        from app.core.utils import parse_size
+                        try:
+                            link_size_bytes = parse_size(meta.get("size"))
+                        except Exception:
+                            link_size_bytes = 0
+                    
+                    if link_size_bytes and link_size_bytes > settings.AUTO_DOWNLOAD_MAX_SIZE_BYTES:
+                        print(f"[API] Skipping auto-download for {title}: Size {meta.get('size')} exceeds the limit of {settings.AUTO_DOWNLOAD_LOWER_THAN}.")
+                        continue
 
                 # Series Pack filtering
                 if not settings.AUTO_DOWNLOAD_SERIES_PACKS and meta.get("category") == "series":

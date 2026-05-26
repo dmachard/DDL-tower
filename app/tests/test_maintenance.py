@@ -144,6 +144,8 @@ async def test_si_j_en_avais_la_force_duplicate_prevention():
     mock_row.network = ""
     mock_row.audio = "EAC3"
     mock_row.channels = ""
+    mock_row.size = None
+    mock_row.size_bytes = None
     
     # Setup history entry (2160p, but without imdb_id)
     existing_history = MagicMock(spec=DownloadHistory)
@@ -180,9 +182,7 @@ async def test_si_j_en_avais_la_force_duplicate_prevention():
         mock_res_hist.scalars.return_value.all.return_value = [existing_history]
         
         # We need to trace what session.execute is called with
-        # To debug, let's wrap execution of session.execute to print inputs
         async def mock_execute(stmt):
-            print(f"[TEST DEBUG] Executing stmt: {stmt}")
             if "download_history" in str(stmt):
                 return mock_res_hist
             return mock_res_meta
@@ -194,3 +194,110 @@ async def test_si_j_en_avais_la_force_duplicate_prevention():
         # The download should be skipped because we already have a better version (2160p > 1080p)
         mock_download.assert_not_called()
         print("[TEST] 1080p skipped because of existing 2160p verified successfully!")
+
+
+@pytest.mark.asyncio
+async def test_run_download_task_size_filtering():
+    """Test that auto-download skips links exceeding AUTO_DOWNLOAD_LOWER_THAN limit."""
+    from app.api.downloads import run_download_task
+    from app.core.config import settings
+    
+    url_too_large = "https://example.com/movie-large"
+    url_small_enough = "https://example.com/movie-small"
+    
+    # 25 GB link (exceeds 20GB limit)
+    mock_row_large = MagicMock()
+    mock_row_large.url = url_too_large
+    mock_row_large.category = "movie"
+    mock_row_large.title = "Large Movie"
+    mock_row_large.filename = "Large.Movie.2025.mkv"
+    mock_row_large.year = 2025
+    mock_row_large.year_1 = 2025
+    mock_row_large.size_bytes = 25 * 1024 * 1024 * 1024 # 25 GB
+    mock_row_large.size = "25 GB"
+    mock_row_large.imdb_id = None
+    mock_row_large.season = None
+    mock_row_large.episode = None
+    mock_row_large.resolution = "1080p"
+    mock_row_large.quality = "WEB"
+    mock_row_large.language = "FRENCH"
+    mock_row_large.v_quality = ""
+    mock_row_large.codec = "H265"
+    mock_row_large.network = ""
+    mock_row_large.audio = "EAC3"
+    mock_row_large.channels = ""
+    
+    # 15 GB link (under 20GB limit)
+    mock_row_small = MagicMock()
+    mock_row_small.url = url_small_enough
+    mock_row_small.category = "movie"
+    mock_row_small.title = "Small Movie"
+    mock_row_small.filename = "Small.Movie.2025.mkv"
+    mock_row_small.year = 2025
+    mock_row_small.year_1 = 2025
+    mock_row_small.size_bytes = 15 * 1024 * 1024 * 1024 # 15 GB
+    mock_row_small.size = "15 GB"
+    mock_row_small.imdb_id = None
+    mock_row_small.season = None
+    mock_row_small.episode = None
+    mock_row_small.resolution = "1080p"
+    mock_row_small.quality = "WEB"
+    mock_row_small.language = "FRENCH"
+    mock_row_small.v_quality = ""
+    mock_row_small.codec = "H265"
+    mock_row_small.network = ""
+    mock_row_small.audio = "EAC3"
+    mock_row_small.channels = ""
+
+    with patch.object(settings, "AUTO_DOWNLOAD_LOWER_THAN", "20GB"), \
+         patch("app.api.downloads.AsyncSessionLocal") as mock_db, \
+         patch("app.api.downloads.debrid_service.unlock_link", new_callable=AsyncMock) as mock_unlock, \
+         patch("app.services.downloader.downloader_service.download_file", new_callable=AsyncMock) as mock_download:
+        
+        mock_unlock.return_value = {
+            "status": "success",
+            "data": {
+                "link": "https://debrid.com/unlocked",
+                "filename": "Small.Movie.2025.mkv"
+            }
+        }
+        
+        mock_session = AsyncMock()
+        mock_db.return_value.__aenter__.return_value = mock_session
+        
+        # Large movie execution
+        mock_res_meta_large = MagicMock()
+        mock_res_meta_large.__iter__.return_value = [mock_row_large]
+        mock_res_hist_large = MagicMock()
+        mock_res_hist_large.scalars.return_value.all.return_value = []
+        
+        async def mock_execute_large(stmt):
+            if "download_history" in str(stmt):
+                return mock_res_hist_large
+            return mock_res_meta_large
+        mock_session.execute.side_effect = mock_execute_large
+        
+        await run_download_task([url_too_large], is_auto=True)
+        # Should be skipped!
+        mock_download.assert_not_called()
+        
+        # Reset mock
+        mock_download.reset_mock()
+        
+        # Small movie execution
+        mock_res_meta_small = MagicMock()
+        mock_res_meta_small.__iter__.return_value = [mock_row_small]
+        mock_res_hist_small = MagicMock()
+        mock_res_hist_small.scalars.return_value.all.return_value = []
+        
+        async def mock_execute_small(stmt):
+            if "download_history" in str(stmt):
+                return mock_res_hist_small
+            return mock_res_meta_small
+        mock_session.execute.side_effect = mock_execute_small
+        
+        await run_download_task([url_small_enough], is_auto=True)
+        # Should NOT be skipped!
+        mock_download.assert_called_once()
+        
+        print("[TEST] Size filtering auto-download checks verified successfully!")
