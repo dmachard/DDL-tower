@@ -14,6 +14,12 @@ app = FastAPI(title=settings.APP_NAME)
 @app.on_event("startup")
 async def startup():
     await init_db()
+    
+    # Resume active downloads from database in the background
+    import asyncio
+    from app.services.downloader import downloader_service
+    asyncio.create_task(downloader_service.resume_active_downloads())
+    
     start_scheduler()
 
 app.mount("/posters", StaticFiles(directory=settings.POSTER_DIR), name="posters")

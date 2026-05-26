@@ -84,3 +84,26 @@ class DownloadHistory(Base):
     # Reference to centralized metadata for poster/plot in RSS
     imdb_id = Column(String, ForeignKey("media_metadata.imdb_id"), nullable=True)
     metadata_rel = relationship("MediaMetadata")
+
+class ActiveDownload(Base):
+    __tablename__ = "active_downloads"
+
+    url = Column(String, primary_key=True)
+    filename = Column(String, nullable=True)
+    category = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    year = Column(Integer, nullable=True)
+    is_auto = Column(Boolean, default=False)
+    imdb_id = Column(String, nullable=True)
+    season = Column(String, nullable=True)
+    episode = Column(String, nullable=True)
+    resolution = Column(String, nullable=True)
+    quality = Column(String, nullable=True)
+    language = Column(String, nullable=True)
+    v_quality = Column(String, nullable=True)
+    codec = Column(String, nullable=True)
+    network = Column(String, nullable=True)
+    audio = Column(String, nullable=True)
+    channels = Column(String, nullable=True)
+    status = Column(String, default="waiting") # waiting, downloading, paused, error
+    error = Column(String, nullable=True)

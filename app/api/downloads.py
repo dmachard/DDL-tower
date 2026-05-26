@@ -28,12 +28,26 @@ async def get_active_downloads():
 @router.delete("/active-downloads/{group_name}")
 async def delete_active_download(group_name: str):
     """
-    Removes an active download from the active list (usually to clear errors).
+    Removes an active download from the active list.
     """
-    if group_name in downloader_service.active_downloads:
-        downloader_service.active_downloads.pop(group_name, None)
-        return {"status": "success"}
-    return {"status": "error", "message": "Not found"}
+    await downloader_service.delete_group(group_name)
+    return {"status": "success"}
+
+@router.post("/active-downloads/{group_name}/pause")
+async def pause_active_download(group_name: str):
+    """
+    Pauses an active download group.
+    """
+    await downloader_service.pause_group(group_name)
+    return {"status": "success"}
+
+@router.post("/active-downloads/{group_name}/resume")
+async def resume_active_download(group_name: str):
+    """
+    Resumes or retries a paused/error active download group.
+    """
+    await downloader_service.resume_group(group_name)
+    return {"status": "success"}
 
 @router.get("/downloads")
 async def get_downloads():

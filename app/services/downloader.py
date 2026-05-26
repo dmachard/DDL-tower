@@ -55,6 +55,194 @@ class DownloaderService:
                     "status": "waiting"
                 }
 
+    async def _save_to_db(self, url: str, filename: str, category: str, title: str, year: int, is_auto: bool, imdb_id: str, season: str, episode: str, resolution: str, quality: str, language: str, v_quality: str, codec: str, network: str, audio: str, channels: str, status: str):
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload).where(ActiveDownload.url == url))
+            existing = q.scalar_one_or_none()
+            if existing:
+                existing.filename = filename
+                existing.category = category
+                existing.title = title
+                existing.year = year
+                existing.is_auto = is_auto
+                existing.imdb_id = imdb_id
+                existing.season = season
+                existing.episode = episode
+                existing.resolution = resolution
+                existing.quality = quality
+                existing.language = language
+                existing.v_quality = v_quality
+                existing.codec = codec
+                existing.network = network
+                existing.audio = audio
+                existing.channels = channels
+                existing.status = status
+            else:
+                session.add(ActiveDownload(
+                    url=url, filename=filename, category=category, title=title,
+                    year=year, is_auto=is_auto, imdb_id=imdb_id, season=season,
+                    episode=episode, resolution=resolution, quality=quality,
+                    language=language, v_quality=v_quality, codec=codec,
+                    network=network, audio=audio, channels=channels, status=status
+                ))
+            await session.commit()
+
+    async def _update_db_status(self, url: str, status: str, error_msg: str = None):
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload).where(ActiveDownload.url == url))
+            existing = q.scalar_one_or_none()
+            if existing:
+                existing.status = status
+                existing.error = error_msg
+            await session.commit()
+
+    async def _delete_from_db(self, url: str):
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload).where(ActiveDownload.url == url))
+            existing = q.scalar_one_or_none()
+            if existing:
+                await session.delete(existing)
+            await session.commit()
+
+    async def pause_group(self, group_name: str):
+        if group_name in self.active_downloads:
+            group = self.active_downloads[group_name]
+            group["status"] = "paused"
+            for fn in group["files"]:
+                group["files"][fn]["status"] = "paused"
+
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload))
+            rows = q.scalars().all()
+            for row in rows:
+                if self._get_group_name(row.filename) == group_name:
+                    row.status = "paused"
+            await session.commit()
+
+    async def resume_group(self, group_name: str):
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload))
+            rows = q.scalars().all()
+            group_rows = [row for row in rows if self._get_group_name(row.filename) == group_name]
+            
+            if not group_rows:
+                return
+
+            if group_name in self.active_downloads:
+                group = self.active_downloads[group_name]
+                group["status"] = "waiting"
+                for fn in group["files"]:
+                    group["files"][fn]["status"] = "waiting"
+
+            for row in group_rows:
+                row.status = "waiting"
+                row.error = None
+            await session.commit()
+
+            # Trigger background downloads
+            for row in group_rows:
+                asyncio.create_task(self.download_file(
+                    row.url, row.filename, category=row.category, title=row.title,
+                    year=row.year, is_auto=row.is_auto, imdb_id=row.imdb_id,
+                    season=row.season, episode=row.episode, resolution=row.resolution,
+                    quality=row.quality, language=row.language, v_quality=row.v_quality,
+                    codec=row.codec, network=row.network, audio=row.audio,
+                    channels=row.channels
+                ))
+
+    async def delete_group(self, group_name: str):
+        if group_name in self.active_downloads:
+            self.active_downloads[group_name]["status"] = "paused"
+            for fn in self.active_downloads[group_name]["files"]:
+                self.active_downloads[group_name]["files"][fn]["status"] = "paused"
+
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload))
+            rows = q.scalars().all()
+            for row in rows:
+                if self._get_group_name(row.filename) == group_name:
+                    await session.delete(row)
+            await session.commit()
+
+        self.active_downloads.pop(group_name, None)
+
+    async def resume_active_downloads(self):
+        from app.db.database import AsyncSessionLocal
+        from app.db.models import ActiveDownload
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            q = await session.execute(select(ActiveDownload))
+            rows = q.scalars().all()
+            
+            if not rows:
+                return
+
+            print(f"[DOWNLOADER] Found {len(rows)} active downloads in database on startup.")
+            
+            for row in rows:
+                group_name = self._get_group_name(row.filename)
+                if group_name not in self.active_downloads:
+                    self.active_downloads[group_name] = {
+                        "name": group_name,
+                        "files": {},
+                        "progress": 0,
+                        "total": 0,
+                        "downloaded": 0,
+                        "status": row.status if row.status == "paused" else "waiting",
+                        "extraction_triggered": False
+                    }
+                
+                file_path = self.download_dir / row.filename
+                downloaded = file_path.stat().st_size if file_path.exists() else 0
+                
+                self.active_downloads[group_name]["files"][row.filename] = {
+                    "progress": 0,
+                    "total": 0,
+                    "downloaded": downloaded,
+                    "status": row.status if row.status == "paused" else "waiting"
+                }
+
+            for row in rows:
+                if row.status != "paused":
+                    row.status = "waiting"
+                    row.error = None
+                    
+                    asyncio.create_task(self.download_file(
+                        row.url, row.filename, category=row.category, title=row.title,
+                        year=row.year, is_auto=row.is_auto, imdb_id=row.imdb_id,
+                        season=row.season, episode=row.episode, resolution=row.resolution,
+                        quality=row.quality, language=row.language, v_quality=row.v_quality,
+                        codec=row.codec, network=row.network, audio=row.audio,
+                        channels=row.channels
+                    ))
+            
+            await session.commit()
+
     async def download_file(self, url: str, filename: str = None, category: str = None, title: str = None, year: int = None, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None, language: str = None, v_quality: str = None, codec: str = None, network: str = None, audio: str = None, channels: str = None) -> str:
         """
         Downloads a file from a URL to the download directory with resume support and retries.
@@ -100,6 +288,7 @@ class DownloaderService:
             if is_youtube or (total_size > 0 and on_disk_size == total_size):
                 print(f"[DOWNLOADER] {filename} already exists and is complete in download directory. Skipping.")
                 exists_complete = True
+                await self._delete_from_db(url)
         
         from app.services.library_service import library_service
         if not exists_complete:
@@ -113,6 +302,7 @@ class DownloaderService:
                         try: os.symlink(str(lib_path), str(file_path))
                         except: pass
                     exists_complete = True
+                    await self._delete_from_db(url)
 
         # B. Check by metadata (Same content, different filename)
         if not exists_complete and (title or imdb_id):
@@ -200,6 +390,7 @@ class DownloaderService:
             if group["total"] > 0:
                 group["progress"] = round((group["downloaded"] / group["total"]) * 100, 1)
             
+            await self._delete_from_db(url)
             return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
 
         # YouTube specific download flow
@@ -273,9 +464,23 @@ class DownloaderService:
         if group["status"] not in ["extracting", "error"]:
             group["status"] = "downloading"
 
-        for attempt in range(max_retries):
+        attempt = 0
+        last_downloaded = 0
+        while attempt < max_retries:
+            # Check if paused before starting/resuming
+            if group.get("status") == "paused" or group["files"].get(filename, {}).get("status") == "paused":
+                print(f"[DOWNLOADER] Download of {filename} is paused. Skipping start.")
+                return None
+
             try:
+                await self._save_to_db(url, filename, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels, "downloading")
+                
                 downloaded_on_disk = file_path.stat().st_size if file_path.exists() else 0
+                if downloaded_on_disk > last_downloaded:
+                    # Reset attempt count if progress has been made since the last attempt
+                    attempt = 0
+                last_downloaded = downloaded_on_disk
+
                 headers = {}
                 if downloaded_on_disk > 0:
                     headers["Range"] = f"bytes={downloaded_on_disk}-"
@@ -283,12 +488,18 @@ class DownloaderService:
                 else:
                     print(f"[DOWNLOADER] Starting download of {filename} (Attempt {attempt+1})")
 
-                async with aiohttp.ClientSession() as session:
+                # Configure timeout: total=None prevents standard aiohttp 5-minute timeout for large files.
+                # connect=30 and sock_read=30 safeguard against hung requests.
+                timeout = aiohttp.ClientTimeout(total=None, connect=30, sock_read=30)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(url, headers=headers) as response:
                         if response.status not in [200, 206]:
                             print(f"[DOWNLOADER] Failed to download {url}: HTTP {response.status}")
-                            if attempt == max_retries - 1: return None
-                            await asyncio.sleep(retry_delay * (attempt + 1))
+                            attempt += 1
+                            if attempt >= max_retries:
+                                await self._update_db_status(url, "error", f"HTTP {response.status}")
+                                return None
+                            await asyncio.sleep(retry_delay * attempt)
                             continue
 
                         # Handle partial content or full content
@@ -315,8 +526,14 @@ class DownloaderService:
                             group["total"] += total_size
                         
                         mode = "ab" if is_resume else "wb"
+                        is_paused = False
                         with open(file_path, mode) as f:
                             async for chunk in response.content.iter_chunked(1024 * 64):
+                                # Check if paused during download
+                                if group.get("status") == "paused" or group["files"].get(filename, {}).get("status") == "paused":
+                                    is_paused = True
+                                    break
+                                
                                 f.write(chunk)
                                 chunk_len = len(chunk)
                                 
@@ -331,27 +548,37 @@ class DownloaderService:
                                 if group["total"] > 0:
                                     group["progress"] = round((group["downloaded"] / group["total"]) * 100, 1)
 
+                        if is_paused:
+                            print(f"[DOWNLOADER] Cleanly paused download of {filename}")
+                            group["status"] = "paused"
+                            group["files"][filename]["status"] = "paused"
+                            await self._update_db_status(url, "paused")
+                            return None
+
                         # Success!
                         print(f"[DOWNLOADER] Finished download of {filename}")
                         group["files"][filename]["progress"] = 100
                         group["files"][filename]["status"] = "done"
+                        await self._delete_from_db(url)
                         
                         # Trigger extraction or organization
                         return await self._finalize_download(file_path, filename, group_name, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
 
             except (aiohttp.ClientPayloadError, aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
                 print(f"[DOWNLOADER] Connection error during {filename} (attempt {attempt+1}): {str(e)}")
-                if attempt == max_retries - 1:
+                attempt += 1
+                if attempt >= max_retries:
                     group["status"] = "error"
                     group["error"] = f"Download failed after {max_retries} attempts: {str(e)}"
+                    await self._update_db_status(url, "error", f"Download failed after {max_retries} attempts: {str(e)}")
                     return None
-                await asyncio.sleep(retry_delay * (attempt + 1))
+                await asyncio.sleep(retry_delay * attempt)
             except Exception as e:
                 print(f"[DOWNLOADER] Unexpected exception during download of {url}: {str(e)}")
                 group["status"] = "error"
                 group["error"] = str(e)
+                await self._update_db_status(url, "error", str(e))
                 return None
-        
         return None
 
     async def _finalize_download(self, file_path: Path, filename: str, group_name: str, category: str, title: str, year: int, is_auto: bool = False, imdb_id: str = None, season: str = None, episode: str = None, resolution: str = None, quality: str = None, language: str = None, v_quality: str = None, codec: str = None, network: str = None, audio: str = None, channels: str = None) -> str:

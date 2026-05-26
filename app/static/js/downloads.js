@@ -21,23 +21,48 @@ export const renderActiveDownloads = () => {
         const row = clone.querySelector('.link-row');
         row.classList.add('active-download');
         if (group.status === 'error') row.classList.add('error-download');
+        if (group.status === 'paused') {
+            row.style.borderLeftColor = 'var(--warning)';
+        }
 
         clone.querySelector('.download-name').textContent = group.name || groupName;
 
         const iconEl = clone.querySelector('.file-icon');
-        if (group.status === 'error') iconEl.className = 'fas fa-exclamation-triangle error-icon';
-        else if (group.status === 'extracting') iconEl.className = 'fas fa-box-open fa-bounce';
-        else iconEl.className = 'fas fa-spinner fa-spin';
+        if (group.status === 'error') {
+            iconEl.className = 'fas fa-exclamation-triangle error-icon';
+        } else if (group.status === 'extracting') {
+            iconEl.className = 'fas fa-box-open fa-bounce';
+        } else if (group.status === 'paused') {
+            iconEl.className = 'fas fa-pause-circle';
+            iconEl.style.color = 'var(--warning)';
+        } else {
+            iconEl.className = 'fas fa-spinner fa-spin';
+        }
 
         const progressContainer = clone.querySelector('.download-progress-container');
         progressContainer.classList.remove('hidden');
 
         const progressBar = clone.querySelector('.download-progress-bar');
         progressBar.style.width = `${progress}%`;
-        if (group.status === 'error') progressBar.style.background = 'var(--error)';
+        if (group.status === 'error') {
+            progressBar.style.background = 'var(--error)';
+        } else if (group.status === 'paused') {
+            progressBar.style.background = 'var(--warning)';
+        } else {
+            progressBar.style.background = '';
+        }
 
         const progressText = clone.querySelector('.download-progress-text');
-        progressText.textContent = group.status === 'error' ? (group.error || 'Error') : `${progress}%`;
+        if (group.status === 'error') {
+            progressText.textContent = group.error || 'Error';
+            progressText.style.color = 'var(--error)';
+        } else if (group.status === 'paused') {
+            progressText.textContent = `${progress}% (PAUSED)`;
+            progressText.style.color = 'var(--warning)';
+        } else {
+            progressText.textContent = `${progress}%`;
+            progressText.style.color = '';
+        }
 
         const sizeCol = clone.querySelector('.col-size');
         sizeCol.textContent = group.total > 0 ? formatBytes(group.downloaded) + ' / ' + formatBytes(group.total) : '...';
@@ -64,20 +89,57 @@ export const renderActiveDownloads = () => {
 
         const deleteBtn = clone.querySelector('.btn-delete-download');
         const downloadBtn = clone.querySelector('.btn-download-local');
+        const pauseBtn = clone.querySelector('.btn-pause-download');
+        const resumeBtn = clone.querySelector('.btn-resume-download');
+        const retryBtn = clone.querySelector('.btn-retry-download');
 
-        if (group.status === 'error') {
-            deleteBtn.onclick = async () => { 
+        downloadBtn.classList.add('hidden');
+
+        // Always enable delete/cancel action
+        deleteBtn.onclick = async () => {
+            const title = state.language === 'fr' ? 'Confirmer la suppression' : 'Confirm Deletion';
+            const msg = state.language === 'fr' 
+                ? `Voulez-vous supprimer et annuler ce téléchargement : ${groupName} ?`
+                : `Do you want to delete and cancel this download: ${groupName}?`;
+            if (await showConfirm(title, msg)) {
                 try {
                     await fetch(`/api/active-downloads/${encodeURIComponent(groupName)}`, { method: 'DELETE' });
+                    delete state.downloads.active[groupName];
+                    renderDownloads(state.downloads.items);
                 } catch (e) { console.error('Failed to delete active download:', e); }
-                delete state.downloads.active[groupName]; 
-                renderDownloads(state.downloads.items); 
+            }
+        };
+
+        // Pause/Resume/Retry buttons logic
+        if (group.status === 'downloading' || group.status === 'waiting') {
+            pauseBtn.classList.remove('hidden');
+            pauseBtn.onclick = async () => {
+                try {
+                    await fetch(`/api/active-downloads/${encodeURIComponent(groupName)}/pause`, { method: 'POST' });
+                    group.status = 'paused';
+                    renderDownloads(state.downloads.items);
+                } catch (e) { console.error('Failed to pause download:', e); }
             };
-        } else {
-            deleteBtn.disabled = true;
-            deleteBtn.style.opacity = 0.3;
+        } else if (group.status === 'paused') {
+            resumeBtn.classList.remove('hidden');
+            resumeBtn.onclick = async () => {
+                try {
+                    await fetch(`/api/active-downloads/${encodeURIComponent(groupName)}/resume`, { method: 'POST' });
+                    group.status = 'waiting';
+                    renderDownloads(state.downloads.items);
+                } catch (e) { console.error('Failed to resume download:', e); }
+            };
+        } else if (group.status === 'error') {
+            retryBtn.classList.remove('hidden');
+            retryBtn.onclick = async () => {
+                try {
+                    await fetch(`/api/active-downloads/${encodeURIComponent(groupName)}/resume`, { method: 'POST' });
+                    group.status = 'waiting';
+                    renderDownloads(state.downloads.items);
+                } catch (e) { console.error('Failed to retry download:', e); }
+            };
         }
-        downloadBtn.classList.add('hidden');
+
         downloadsContainer.prepend(clone);
     });
 };
