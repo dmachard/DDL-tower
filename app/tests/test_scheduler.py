@@ -223,3 +223,40 @@ async def test_download_duplicate_prevention_accent_insensitive():
         
         mock_download.assert_not_called()
         print("[TEST] Accent-insensitive duplicate prevention verified successfully!")
+
+@pytest.mark.asyncio
+async def test_scheduler_enable_flag():
+    """Test that disabled scrapers are skipped in full runs but manual/targeted runs bypass this check."""
+    from app.core.scheduler import run_scrapers
+    
+    scraper_enabled = MagicMock()
+    scraper_enabled.name = "EnabledScraper"
+    scraper_enabled.enabled = True
+    
+    scraper_disabled = MagicMock()
+    scraper_disabled.name = "DisabledScraper"
+    scraper_disabled.enabled = False
+    
+    with patch("app.core.scheduler.get_scrapers", new_callable=AsyncMock) as mock_get_scrapers, \
+         patch("app.core.scheduler.run_scraper", new_callable=AsyncMock) as mock_run_scraper, \
+         patch("app.core.scheduler.enrichment_service.enrich_links", new_callable=AsyncMock):
+        
+        mock_get_scrapers.return_value = [scraper_enabled, scraper_disabled]
+        
+        # Scenario 1: Full run (no specific source)
+        await run_scrapers(source_name=None)
+        
+        # Enabled should be run, disabled should be skipped
+        mock_run_scraper.assert_any_call(scraper_enabled)
+        # Verify disabled was not called
+        assert scraper_disabled not in [call.args[0] for call in mock_run_scraper.call_args_list]
+        
+        # Reset the mock calls
+        mock_run_scraper.reset_mock()
+        
+        # Scenario 2: Manual specific source run for the disabled scraper
+        await run_scrapers(source_name="DisabledScraper")
+        
+        # The disabled scraper should be executed because it was targeted specifically
+        mock_run_scraper.assert_called_once_with(scraper_disabled)
+        print("[TEST] Scraper enable/disable scheduling and manual override verified.")

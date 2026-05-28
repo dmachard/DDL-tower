@@ -141,7 +141,11 @@ async def run_scrapers(source_name: str = None):
     """Runs all scrapers or a specific one once. Used by manual trigger."""
     scrapers = await get_scrapers()
     for scraper in scrapers:
-        if source_name and scraper.name.lower() != source_name.lower():
+        if source_name:
+            if scraper.name.lower() != source_name.lower():
+                continue
+        elif not scraper.enabled:
+            print(f"[SCHEDULER] Skipping scraper {scraper.name} (disabled in config)")
             continue
         
         await run_scraper(scraper)

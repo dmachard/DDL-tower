@@ -24,6 +24,7 @@ class Scraper:
     def __init__(self, config: dict):
         self.config = config
         self.name = config.get("name", "Unknown")
+        self.enabled = config.get("enable") if config.get("enable") is not None else True
         self.steps = config.get("steps", [])
         self.headers = config.get("headers", {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -449,7 +450,10 @@ class Scraper:
         async with async_playwright() as p:
             browser = await browser_manager.get_browser(p, url=url)
             if not browser: return None
-            ctx_pw = await browser.new_context(user_agent=headers.get("User-Agent", self.headers["User-Agent"]), extra_http_headers=headers)
+            if browser.contexts:
+                ctx_pw = browser.contexts[0]
+            else:
+                ctx_pw = await browser.new_context(user_agent=headers.get("User-Agent", self.headers["User-Agent"]), extra_http_headers=headers)
             page = await ctx_pw.new_page()
             try:
                 try: resp = await page.goto(url, wait_until=step.get("wait_until", "domcontentloaded"), timeout=self.timeout*1000)
@@ -476,7 +480,10 @@ class Scraper:
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] Browser error: {e}")
                 return None
-            finally: await browser.close()
+            finally:
+                try: await page.close()
+                except: pass
+                await browser.close()
 
     def _extract_rss(self, content: str) -> List[Dict[str, Any]]:
         feed = feedparser.parse(content)
