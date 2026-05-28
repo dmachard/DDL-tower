@@ -76,26 +76,50 @@ class Scraper:
         if not to_process:
             return
 
-        # 2. Bulk check for scrape_once/scrape_one
+        # 2. Bulk check for scrape_once/scrape_one/cooldown
         final_list = []
         skipped_count = 0
-        if step.get("scrape_once") or step.get("scrape_one"):
+        cooldown_hours = step.get("cooldown_hours") or step.get("scrape_cooldown_hours")
+        
+        if step.get("scrape_once") or step.get("scrape_one") or cooldown_hours is not None:
             all_urls = [i["url"] for i in to_process]
             async with get_db_ctx() as session:
-                stmt = select(ScrapedURL.url).where(ScrapedURL.url.in_(all_urls))
-                res = await session.execute(stmt)
-                already_scraped = set(res.scalars().all())
-                
-                for item in to_process:
-                    if item["url"] in already_scraped:
-                        skipped_count += 1
-                    else:
+                if cooldown_hours is not None:
+                    from datetime import timedelta
+                    stmt = select(ScrapedURL).where(ScrapedURL.url.in_(all_urls))
+                    res = await session.execute(stmt)
+                    scraped_records = {r.url: r for r in res.scalars().all()}
+                    
+                    now = datetime.now(timezone.utc)
+                    cooldown_delta = timedelta(hours=float(cooldown_hours))
+                    
+                    for item in to_process:
+                        url = item["url"]
+                        record = scraped_records.get(url)
+                        if record:
+                            last_scraped = record.last_scraped
+                            if last_scraped.tzinfo is None:
+                                last_scraped = last_scraped.replace(tzinfo=timezone.utc)
+                            
+                            if now - last_scraped < cooldown_delta:
+                                skipped_count += 1
+                                continue
                         final_list.append(item)
+                else:
+                    stmt = select(ScrapedURL.url).where(ScrapedURL.url.in_(all_urls))
+                    res = await session.execute(stmt)
+                    already_scraped = set(res.scalars().all())
+                    
+                    for item in to_process:
+                        if item["url"] in already_scraped:
+                            skipped_count += 1
+                        else:
+                            final_list.append(item)
         else:
             final_list = to_process
 
         if skipped_count > 0:
-            print(f"[{self.name}] [{step_name}] {len(final_list)} new URL(s) to visit ({skipped_count} skipped)")
+            print(f"[{self.name}] [{step_name}] {len(final_list)} new URL(s) to visit ({skipped_count} skipped by scrape_once/cooldown)")
         elif step_idx > 0: # Only print for non-root steps to avoid noise
             print(f"[{self.name}] [{step_name}] Processing {len(final_list)} URL(s)")
 
@@ -150,7 +174,7 @@ class Scraper:
 
     
                     # Cleanup/Record
-                    if step.get("scrape_once"):
+                    if step.get("scrape_once") or cooldown_hours is not None:
                         await self._record_scraped(url)
 
     
