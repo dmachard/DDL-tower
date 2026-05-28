@@ -259,3 +259,85 @@ def test_deduplicate_links(scraper):
     assert "https://rapidgator.net/file/4bc1a631/file.part1.rar" in cleaned
     assert "https://1fichier.com/?abc123def" in cleaned
     assert not any(l.endswith(".html") for l in cleaned)
+
+@pytest.mark.asyncio
+async def test_scraped_url_item_level_skip():
+    """Test that a custom scraped_url is used to check the database and skip the unlock if present."""
+    config = {
+        "name": "TestCustomScrapedURL",
+        "steps": [
+            {
+                "name": "step1",
+                "url": "https://site.com",
+                "unlock_links": True,
+                "yield_links": True
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    
+    # Custom item from JS code
+    item = {
+        "url": "https://volatile.link",
+        "scraped_url": "https://stable.link#Episode-1"
+    }
+    
+    # Mock database to simulate that 'https://stable.link#Episode-1' is already in the database
+    with patch("app.core.scraper.get_db_ctx") as mock_db_ctx:
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        # Simulate record exists in DB
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = MagicMock() # Non-None value means existing record
+        mock_session.execute.return_value = mock_result
+        
+        results = []
+        async for res in scraper._handle_item(client, item, config["steps"][0], {}, 0, "https://site.com", ""):
+            results.append(res)
+            
+        # Verify that unlocker was NOT called
+        assert len(results) == 0 # Skipped entirely
+
+@pytest.mark.asyncio
+async def test_scraped_url_record_after_yield():
+    """Test that a custom scraped_url is recorded in the database after the item is successfully yielded."""
+    config = {
+        "name": "TestRecordScrapedURL",
+        "steps": [
+            {
+                "name": "step1",
+                "url": "https://site.com",
+                "unlock_links": False,  # Not unlockable
+                "yield_links": True
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    
+    # Custom item from JS code
+    item = {
+        "url": "https://some-link.com",
+        "scraped_url": "https://stable.link#Episode-2"
+    }
+    
+    # Mock get_db_ctx to simulate database query (not in DB)
+    with patch("app.core.scraper.get_db_ctx") as mock_db_ctx, \
+         patch.object(scraper, "_record_scraped", new_callable=AsyncMock) as mock_record:
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        # Simulate record does NOT exist in DB
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+        
+        results = []
+        async for res in scraper._handle_item(client, item, config["steps"][0], {}, 0, "https://site.com", ""):
+            results.append(res)
+            
+        assert len(results) == 1
+        # Verify that _record_scraped was called with the custom scraped_url
+        mock_record.assert_awaited_once_with("https://stable.link#Episode-2")

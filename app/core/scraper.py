@@ -299,6 +299,15 @@ class Scraper:
             item_data["year"] = override_y
 
         new_ctx[step_name] = item_data
+
+        # Check item-level scraped_url deduplication
+        db_url = item_data.get("scraped_url")
+        if db_url:
+            async with get_db_ctx() as session:
+                stmt = select(ScrapedURL).where(ScrapedURL.url == db_url)
+                if (await session.execute(stmt)).scalar_one_or_none():
+                    print(f"[{self.name}] [{step_name}] Skipping item (already in database): {db_url}")
+                    return
         
         # 1. Filter
         ignore = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step.get("ignore_resolutions", [])))
@@ -351,14 +360,15 @@ class Scraper:
             if is_unlockable:
                 print(f"[{self.name}] [{step_name}] is_unlockable: {is_unlockable} for {h}")
                 # OPTIMIZATION: Check if this intermediate link was already scraped/unlocked
+                db_url = item_data.get("scraped_url") or h
                 already_unlocked = False
                 async with get_db_ctx() as session:
-                    stmt = select(ScrapedURL).where(ScrapedURL.url == h)
+                    stmt = select(ScrapedURL).where(ScrapedURL.url == db_url)
                     if (await session.execute(stmt)).scalar_one_or_none():
                         already_unlocked = True
                 
                 if already_unlocked:
-                    print(f"[{self.name}] [{step_name}] Skipping unlock (already in database): {h}")
+                    print(f"[{self.name}] [{step_name}] Skipping unlock (already in database): {db_url}")
                     continue
 
 
@@ -367,7 +377,7 @@ class Scraper:
                     if u: 
                         final.extend(u)
                         # Record success to avoid re-unlocking this specific link
-                        await self._record_scraped(h)
+                        await self._record_scraped(db_url)
                 except: pass
             else: final.append(h)
 
@@ -415,6 +425,9 @@ class Scraper:
                     "category": step.get("category"),
                     "poster_url": poster_url
                 }
+                item_scraped_url = item_data.get("scraped_url")
+                if item_scraped_url:
+                    await self._record_scraped(item_scraped_url)
             elif is_last:
                 print(f"[{self.name}] [{step_name}] No matching links found.")
 
