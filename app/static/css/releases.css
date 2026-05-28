@@ -141,6 +141,11 @@
     color: var(--error);
 }
 
+.btn-action-round.success {
+    color: var(--success) !important;
+    opacity: 1 !important;
+}
+
 .btn-all-toggle {
     font-weight: 900;
     font-size: 10px !important;
@@ -261,6 +266,7 @@
 }
 
 .rel-p-copy,
+.rel-p-copy-title,
 .rel-p-download,
 .rel-p-identify,
 .rel-p-check {
@@ -278,7 +284,8 @@
     font-size: 12px;
 }
 
-.rel-p-copy:hover {
+.rel-p-copy:hover,
+.rel-p-copy-title:hover {
     background: rgba(59, 130, 246, 0.1);
     border-color: var(--accent);
     color: var(--accent);
@@ -299,6 +306,7 @@
 }
 
 .rel-p-copy.success,
+.rel-p-copy-title.success,
 .rel-p-download.success,
 .rel-p-identify.success,
 .rel-p-check.success {

@@ -39,6 +39,9 @@ export const createReleaseCard = (rel) => {
                     <button class="rel-p-check" data-urls="${p.urls.join('\n')}" title="Check links">
                         <i class="fas fa-heartbeat"></i>
                     </button>
+                    <button class="rel-p-copy-title" data-title="${sub.raw_title || sub.title || sub.filename}" title="${TRANSLATIONS[state.language].copy_release_name || 'Copy release name'}">
+                        <i class="fas fa-tag"></i>
+                    </button>
                     <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].copy_links}">
                         <i class="fas fa-copy"></i>
                     </button>
@@ -81,6 +84,21 @@ export const createReleaseCard = (rel) => {
             const ids = btn.getAttribute('data-ids').split(',').map(id => parseInt(id));
             const title = btn.getAttribute('data-title');
             import('./modals.js').then(({ openIdentifyModal }) => openIdentifyModal(ids, title));
+        };
+    });
+
+    card.querySelectorAll('.rel-p-copy-title').forEach(btn => {
+        btn.onclick = async (e) => {
+            e.stopPropagation();
+            const title = btn.getAttribute('data-title');
+            try {
+                await navigator.clipboard.writeText(title);
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('success');
+                setTimeout(() => { icon.className = originalClass; btn.classList.remove('success'); }, 1000);
+            } catch (err) { console.error('Failed to copy title!', err); }
         };
     });
 
@@ -234,6 +252,65 @@ export const renderReleases = (groups) => {
             import('./modals.js').then(({ openIdentifyModal }) => openIdentifyModal(allLinks, group.official_title || group.title || ''));
         };
         actionsEl.appendChild(btnIdentify);
+
+        const btnCopyMarkdown = document.createElement('div');
+        btnCopyMarkdown.className = 'btn-action-round';
+        btnCopyMarkdown.title = TRANSLATIONS[state.language].copy_all_markdown || "Copier le résumé Markdown";
+        btnCopyMarkdown.innerHTML = '<i class="fab fa-markdown"></i>';
+        btnCopyMarkdown.onclick = async (e) => {
+            e.stopPropagation();
+            let md = `# ${titleText} ${group.year ? `(${group.year})` : ''}\n\n`;
+            
+            const resolutions = group.resolutions || {};
+            const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
+            const sortedRes = Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0));
+
+            sortedRes.forEach(res => {
+                md += `## ${res}\n\n`;
+                
+                const seasonGroups = {};
+                resolutions[res].forEach(rel => {
+                    const s = rel.season || 'Other';
+                    if (!seasonGroups[s]) seasonGroups[s] = [];
+                    seasonGroups[s].push(rel);
+                });
+
+                const sortedSeasons = Object.keys(seasonGroups).sort((a, b) => {
+                    if (a === 'Other') return 1;
+                    if (b === 'Other') return -1;
+                    return parseInt(a) - parseInt(b);
+                });
+
+                sortedSeasons.forEach(s => {
+                    if (group.category === 'series' && s !== 'Other') {
+                        md += `### Season ${s.toString().padStart(2, '0')}\n\n`;
+                    }
+                    
+                    seasonGroups[s].forEach(rel => {
+                        rel.sub_releases.forEach(sub => {
+                            const name = sub.raw_title || sub.title || sub.filename;
+                            md += `* **${name}**\n`;
+                            sub.parts.forEach(p => {
+                                md += `  * [${p.hoster || 'Link'}](${p.url})\n`;
+                            });
+                        });
+                    });
+                    md += `\n`;
+                });
+            });
+
+            try {
+                await navigator.clipboard.writeText(md.trim());
+                const icon = btnCopyMarkdown.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btnCopyMarkdown.classList.add('success');
+                setTimeout(() => { icon.className = originalClass; btnCopyMarkdown.classList.remove('success'); }, 1000);
+            } catch (err) {
+                console.error('Failed to copy Markdown summary:', err);
+            }
+        };
+        actionsEl.appendChild(btnCopyMarkdown);
         
         const btnDelete = document.createElement('div');
         btnDelete.className = 'btn-action-round btn-danger';
