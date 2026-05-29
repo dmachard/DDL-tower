@@ -188,12 +188,15 @@ async def scheduler_loop():
     
     last_run_dates = {}  # scraper_name -> YYYY-MM-DD
     last_run_times = {}  # scraper_name -> timestamp of last run
+    first_run = True
+    last_status_print = 0
     
     while True:
         try:
             now = datetime.now()
             today_str = now.strftime("%Y-%m-%d")
             current_hour = now.hour
+            current_time = time.time()
             
             scrapers = await get_scrapers()
             run_any = False
@@ -228,9 +231,9 @@ async def scheduler_loop():
                     if is_in_scan_window():
                         last_run = last_run_times.get(scraper.name, 0)
                         interval_seconds = settings.SCAN_INTERVAL_MINUTES * 60
-                        if time.time() - last_run >= interval_seconds:
+                        if current_time - last_run >= interval_seconds:
                             print(f"[SCHEDULER] [{datetime_now()}] Triggering interval scraper: {scraper.name}")
-                            last_run_times[scraper.name] = time.time()
+                            last_run_times[scraper.name] = current_time
                             await run_scraper(scraper)
                             run_any = True
             
@@ -239,6 +242,47 @@ async def scheduler_loop():
                 # Categorization (Enrichment)
                 async with get_db_ctx() as db:
                     await enrichment_service.enrich_links(db)
+            
+            # Print status update on first run, after any execution, or every 10 minutes (600 seconds)
+            if first_run or run_any or (current_time - last_status_print >= 600):
+                first_run = False
+                last_status_print = current_time
+                
+                next_runs_info = []
+                for s in scrapers:
+                    if not s.enabled:
+                        continue
+                    
+                    s_hour_val = s.config.get("schedule_hour")
+                    s_hour = None
+                    if s_hour_val is not None:
+                        try:
+                            s_hour = int(s_hour_val)
+                        except (ValueError, TypeError):
+                            if isinstance(s_hour_val, str) and ":" in s_hour_val:
+                                try:
+                                    s_hour = int(s_hour_val.split(":")[0])
+                                except:
+                                    pass
+                    
+                    if s_hour is not None:
+                        if current_hour < s_hour:
+                            next_runs_info.append(f"{s.name} at {s_hour:02d}:00 today")
+                        else:
+                            next_runs_info.append(f"{s.name} at {s_hour:02d}:00 tomorrow")
+                    else:
+                        last_run = last_run_times.get(s.name, 0)
+                        if is_in_scan_window():
+                            elapsed = current_time - last_run
+                            remaining = max(0.0, (settings.SCAN_INTERVAL_MINUTES * 60) - elapsed)
+                            next_runs_info.append(f"{s.name} in {remaining/60:.1f}m")
+                        else:
+                            next_runs_info.append(f"{s.name} (waiting for scan window)")
+                
+                if next_runs_info:
+                    print(f"[SCHEDULER] [{datetime_now()}] Next runs: {', '.join(next_runs_info)}")
+                else:
+                    print(f"[SCHEDULER] [{datetime_now()}] No active scrapers configured.")
             
             # Check conditions every 60 seconds
             await asyncio.sleep(60)
