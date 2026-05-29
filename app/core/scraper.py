@@ -314,9 +314,11 @@ class Scraper:
         ignore = list(set(settings.IGNORE_RESOLUTIONS + self.global_ignore_resolutions + step.get("ignore_resolutions", [])))
         if ignore:
             target = item_data.get("title") or item_data.get("name") or text
-            if any(re.search(rf'\b{re.escape(res)}\b', target, re.I) for res in ignore):
-                print(f"[{self.name}] [{step_name}] Item ignored (Resolution): {target[:50]}...")
-                return
+            for res in ignore:
+                if re.search(rf'\b{re.escape(res)}\b', target, re.I):
+                    display = item_data.get("title") or item_data.get("name") or item_data.get("url") or (text[:100] + "...")
+                    print(f"[{self.name}] [{step_name}] Item ignored (Resolution: {res}): {display}")
+                    return
 
         current_tags = []
         if step.get("required_keywords"):
