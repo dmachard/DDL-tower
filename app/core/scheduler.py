@@ -180,26 +180,68 @@ def is_in_scan_window():
 
 async def scheduler_loop():
     """Main scheduler loop."""
-    print(f"[SCHEDULER] Starting with interval: {settings.SCAN_INTERVAL_MINUTES} minutes")
-    print(f"[SCHEDULER] Allowed window: {settings.SCAN_START_HOUR:02d}h to {settings.SCAN_END_HOUR:02d}h")
+    print(f"[SCHEDULER] Starting loop with global interval: {settings.SCAN_INTERVAL_MINUTES} minutes")
+    print(f"[SCHEDULER] Global allowed window: {settings.SCAN_START_HOUR:02d}h to {settings.SCAN_END_HOUR:02d}h")
+    
+    import time
+    from datetime import datetime
+    
+    last_run_dates = {}  # scraper_name -> YYYY-MM-DD
+    last_run_times = {}  # scraper_name -> timestamp of last run
     
     while True:
         try:
-            if not is_in_scan_window():
-                print(f"[SCHEDULER] [{datetime_now()}] Outside allowed window. Sleeping 10 minutes...")
-                await asyncio.sleep(600)
-                continue
-
-            print(f"[SCHEDULER] [{datetime_now()}] Starting sequence...")
-            await run_scrapers()
+            now = datetime.now()
+            today_str = now.strftime("%Y-%m-%d")
+            current_hour = now.hour
             
-            # Randomize interval (jitter +/- 20%)
-            base_interval = settings.SCAN_INTERVAL_MINUTES
-            jitter = random.uniform(0.8, 1.2)
-            wait_minutes = base_interval * jitter
+            scrapers = await get_scrapers()
+            run_any = False
             
-            print(f"[SCHEDULER] Sequence finished. Waiting {wait_minutes:.1f} minutes (randomized from {base_interval}m).")
-            await asyncio.sleep(wait_minutes * 60)
+            for scraper in scrapers:
+                if not scraper.enabled:
+                    continue
+                
+                # Check for per-source schedule
+                schedule_hour_val = scraper.config.get("schedule_hour")
+                sc_hour = None
+                if schedule_hour_val is not None:
+                    try:
+                        sc_hour = int(schedule_hour_val)
+                    except (ValueError, TypeError):
+                        if isinstance(schedule_hour_val, str) and ":" in schedule_hour_val:
+                            try:
+                                sc_hour = int(schedule_hour_val.split(":")[0])
+                            except:
+                                pass
+                
+                if sc_hour is not None:
+                    # Scheduled scraper: runs only at specific hour, ignoring global window
+                    if current_hour == sc_hour:
+                        if last_run_dates.get(scraper.name) != today_str:
+                            print(f"[SCHEDULER] [{datetime_now()}] Triggering scheduled scraper: {scraper.name} (scheduled for {sc_hour:02d}h)")
+                            last_run_dates[scraper.name] = today_str
+                            await run_scraper(scraper)
+                            run_any = True
+                else:
+                    # Interval scraper: runs in global window, at the specified interval
+                    if is_in_scan_window():
+                        last_run = last_run_times.get(scraper.name, 0)
+                        interval_seconds = settings.SCAN_INTERVAL_MINUTES * 60
+                        if time.time() - last_run >= interval_seconds:
+                            print(f"[SCHEDULER] [{datetime_now()}] Triggering interval scraper: {scraper.name}")
+                            last_run_times[scraper.name] = time.time()
+                            await run_scraper(scraper)
+                            run_any = True
+            
+            if run_any:
+                print(f"[SCHEDULER] [{datetime_now()}] Scrapers sequence finished. Triggering categorization/enrichment...")
+                # Categorization (Enrichment)
+                async with get_db_ctx() as db:
+                    await enrichment_service.enrich_links(db)
+            
+            # Check conditions every 60 seconds
+            await asyncio.sleep(60)
             
         except Exception as e:
             print(f"[SCHEDULER] Critical error: {e}")

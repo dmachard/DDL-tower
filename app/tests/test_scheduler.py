@@ -260,3 +260,49 @@ async def test_scheduler_enable_flag():
         # The disabled scraper should be executed because it was targeted specifically
         mock_run_scraper.assert_called_once_with(scraper_disabled)
         print("[TEST] Scraper enable/disable scheduling and manual override verified.")
+
+@pytest.mark.asyncio
+async def test_scheduler_loop_schedule_hour():
+    """Test scheduler_loop behavior with per-source schedule_hour."""
+    from app.core.scheduler import scheduler_loop
+    
+    scraper_scheduled = MagicMock()
+    scraper_scheduled.name = "ScheduledScraper"
+    scraper_scheduled.enabled = True
+    scraper_scheduled.config = {"schedule_hour": 1}
+    
+    scraper_interval = MagicMock()
+    scraper_interval.name = "IntervalScraper"
+    scraper_interval.enabled = True
+    scraper_interval.config = {}
+    
+    # Mock datetime to control current hour
+    mock_now = MagicMock()
+    # Let's say current hour is 1 (matching scheduled scraper)
+    mock_now.hour = 1
+    mock_now.strftime.return_value = "2026-05-29"
+    
+    with patch("app.core.scheduler.get_scrapers", new_callable=AsyncMock) as mock_get_scrapers, \
+         patch("app.core.scheduler.run_scraper", new_callable=AsyncMock) as mock_run_scraper, \
+         patch("app.core.scheduler.is_in_scan_window", return_value=False), \
+         patch("app.core.scheduler.enrichment_service.enrich_links", new_callable=AsyncMock) as mock_enrich, \
+         patch("datetime.datetime") as mock_datetime, \
+         patch("asyncio.sleep", side_effect=Exception("Exit Loop")):
+         
+        mock_datetime.now.return_value = mock_now
+        mock_get_scrapers.return_value = [scraper_scheduled, scraper_interval]
+        
+        with pytest.raises(Exception, match="Exit Loop"):
+            await scheduler_loop()
+            
+        # Scheduled scraper should be run because hour matches 1
+        mock_run_scraper.assert_any_call(scraper_scheduled)
+        
+        # Interval scraper should NOT be run because is_in_scan_window is False and it's an interval scraper
+        run_args = [call.args[0] for call in mock_run_scraper.call_args_list]
+        assert scraper_scheduled in run_args
+        assert scraper_interval not in run_args
+        
+        # Verify enrichment was triggered because run_any was True
+        mock_enrich.assert_called_once()
+        print("[TEST] Per-source schedule_hour execution logic verified successfully!")
