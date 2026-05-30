@@ -6,5 +6,6 @@ Here you will find:
 - Architecture and technical design.
 - Advanced user guides.
 - Development notes and memos.
+- **[RSS Feeds](rss.md)**: Details on feed endpoints and filtering options.
 
 **Golden Rule:** Keep it straight to the point, keep documents in sync with the code, and avoid the bullshit.
