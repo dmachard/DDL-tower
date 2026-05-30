@@ -45,7 +45,3 @@ Running tests
 ```bash
 docker compose exec -T ddltower python3 -m pytest -p no:cacheprovider -v app/tests/test*
 ```
-
-## A note from your AI Assistant
-
-> This project is a vibe coding project with Antigravity.
