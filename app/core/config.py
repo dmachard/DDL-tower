@@ -44,7 +44,9 @@ class Settings(BaseSettings):
     LIBRARY_MOVIES_DIR: str = os.getenv("LIBRARY_MOVIES_DIR", _yaml_config.get("library_movies_dir", "/app/data/films"))
     LIBRARY_SERIES_DIR: str = os.getenv("LIBRARY_SERIES_DIR", _yaml_config.get("library_series_dir", "/app/data/series"))
     LIBRARY_YOUTUBE_DIR: str = os.getenv("LIBRARY_YOUTUBE_DIR", _yaml_config.get("library_youtube_dir", "/app/data/youtube"))
+    DATA_EXPORT_DIR: str = os.getenv("DATA_EXPORT_DIR", _yaml_config.get("data_export_dir", "/app/data/export"))
     POSTER_DIR: str = os.getenv("POSTER_DIR", _yaml_config.get("poster_dir", "/app/data/posters"))
+
     EXTRACT_RAR: bool = _yaml_config.get("extract_rar", True)
     DELETE_RAR_AFTER_EXTRACTION: bool = _yaml_config.get("delete_rar_after_extraction", True)
     KEEP_ONLY_VIDEO_FILES: bool = _yaml_config.get("keep_only_video_files", True)
@@ -71,6 +73,17 @@ class Settings(BaseSettings):
     # Translation Settings (MyMemory)
     _yaml_mymemory = _yaml_config.get("mymemory", {})
     MYMEMORY_EMAIL: str = _yaml_mymemory.get("email", "dmachard@gmail.com")
+    
+    # Git Configuration
+    _yaml_git = _yaml_config.get("git", {})
+    GIT_ENABLED: bool = os.getenv("GIT_ENABLED", str(_yaml_git.get("enabled", "false"))).lower() in ("true", "1")
+    GIT_REPO_URL: str = os.getenv("GIT_REPO_URL", _yaml_git.get("repo_url", ""))
+    GIT_BRANCH: str = os.getenv("GIT_BRANCH", _yaml_git.get("branch", "main"))
+    GIT_USERNAME: str = os.getenv("GIT_USERNAME", _yaml_git.get("username", ""))
+    GIT_EMAIL: str = os.getenv("GIT_EMAIL", _yaml_git.get("email", ""))
+    GIT_TOKEN: str = os.getenv("GIT_TOKEN", _yaml_git.get("token", ""))
+    GIT_CLONE_DIR: str = os.getenv("GIT_CLONE_DIR", _yaml_git.get("clone_dir", "data/git_export"))
+
     
     @property
     def ALLDEBRID_ENABLED(self) -> bool:

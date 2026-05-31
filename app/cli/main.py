@@ -5,6 +5,7 @@ from app.cli.db import DBCommands
 from app.cli.tags import TagCommands
 from app.cli.links import LinkCommands
 from app.cli.scan import ScanCommands
+from app.cli.export import ExportCommands
 
 async def run_cli():
     from app.db.database import init_db
@@ -60,6 +61,11 @@ async def run_cli():
     scan_parser = subparsers.add_parser("scan", help="Manually trigger a full scan of all sources")
     scan_parser.add_argument("--source", help="Only scan this specific source name")
 
+    export_parser = subparsers.add_parser("export", help="Export releases database and stats for dashboard")
+    export_parser.add_argument("--type", choices=["all", "data", "stats"], default="all", help="What components to export")
+    export_parser.add_argument("--output-dir", help="Path to export directory (defaults to Releascenifydb/web/data or data/export)")
+    export_parser.add_argument("--input", help="Path to an input file/JSON to parse and merge (optional)")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -110,6 +116,13 @@ async def run_cli():
         
         elif args.command == "scan":
             await ScanCommands.trigger(source_name=args.source)
+            
+        elif args.command == "export":
+            await ExportCommands.run_export(
+                export_type=args.type,
+                output_dir=args.output_dir,
+                input_file=args.input
+            )
 
     except Exception as e:
         print(f"Error executing command: {e}")

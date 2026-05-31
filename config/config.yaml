@@ -12,6 +12,7 @@ download_dir: "/app/data/download"
 library_movies_dir: "/app/data/films"
 library_series_dir: "/app/data/series"
 library_youtube_dir: "/app/data/youtube"
+data_export_dir: "/app/data/export"
 delete_rar_after_extraction: true
 keep_only_video_files: true
 
@@ -35,6 +36,17 @@ mymemory:
 # Default language (fr or en)
 default_language: en
 
+# Git Configuration (for automatic export push)
+git:
+  enabled: false
+  repo_url: "[GIT_REPO_URL]"
+  branch: "main"
+  username: "[GIT_USERNAME]"
+  email: "[GIT_EMAIL]"
+  token: "[GIT_TOKEN]"
+  clone_dir: "data/git_export"
+
+
 # --- Scraper Global Settings ---
 scan_interval_minutes: 60
 scan_novelty_multiplier: 2
@@ -44,8 +56,8 @@ concurrent_hoster_checks: 10
 scan_start_hour: 6 
 scan_end_hour: 0 
 
-# Resolution filter (global)
-ignore_resolutions: ["720p", "480p", "DVD", "SD"]
+# Resolution filter: "720p", "480p", "DVD", "SD"
+ignore_resolutions: []
 
 # Automatic download settings
 auto_download_series_packs: true
@@ -56,9 +68,7 @@ webtop_container_name: "ddltower-browser"
 
 # --- Direct & Global Extraction Patterns ---
 direct_scan_patterns:
-  - 'https?://(?:www\.)?1fichier\.com/(?:\?)?[^\s"''<>]+'
-  - 'https?://(?:www\.)?rapidgator\.net/file/[^\s"''<>]+'
-  - 'https?://(?:www\.)?nitroflare\.com/view/[^\s"''<>]+'
+  - "https://www.youtube.com/feeds/videos.xml?channel_id="
 
 # --- Global Unlockers ---
 unlockers:
@@ -73,8 +83,14 @@ unlockers:
 
 
 # --- Automated Discovery Sources (Scrapers) ---
+# Note: You can add `schedule_hour: <0-23>` at the source level (e.g. `schedule_hour: 1` to run at 01:00).
+# Sources with `schedule_hour` will run only once per day during that specific hour,
+# and will completely ignore the global scheduler settings (scan_interval_minutes, scan_start_hour, scan_end_hour).
 sources:
+
+          
   - name: "YouTube source"
+    schedule_hour: 1  # Example: Scrape only once a day at 01:00
     steps:
       - name: "rss_feed"
         url: "http://www.youtube.com/feeds/videos.xml?channel_id="
