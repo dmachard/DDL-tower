@@ -271,8 +271,21 @@ class ExportCommands:
                 print(f"Warning: Failed to load existing database: {e}")
                 
         # Merge parsed_list into existing_releases, avoiding duplicates
-        existing_filenames = {item['filename'] for item in existing_releases if 'filename' in item}
-        merged_list = list(existing_releases)
+        valid_existing_releases = []
+        for item in existing_releases:
+            fname = item.get('filename')
+            if not fname:
+                continue
+            try:
+                # Re-validate against the current parser rules to prune old junk
+                parse_filename(fname)
+                valid_existing_releases.append(item)
+            except ValueError:
+                print(f"[EXPORT] Excluding invalid/obfuscated existing release from merge: {fname}")
+                continue
+
+        existing_filenames = {item['filename'] for item in valid_existing_releases}
+        merged_list = list(valid_existing_releases)
         
         for item in parsed_list:
             if item['filename'] not in existing_filenames:
