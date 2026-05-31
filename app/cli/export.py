@@ -383,6 +383,14 @@ class ExportCommands:
             os.makedirs(git_target_dir, exist_ok=True)
             
             for fname, fbytes in generated_files:
+                # Filter files based on git export type if specified
+                if settings.GIT_EXPORT_TYPE == "stats" and fname != "stats.db.gz":
+                    print(f"[GIT] Skipping {fname} from Git sync (GIT_EXPORT_TYPE is stats)")
+                    continue
+                if settings.GIT_EXPORT_TYPE == "data" and fname != "data.db.gz":
+                    print(f"[GIT] Skipping {fname} from Git sync (GIT_EXPORT_TYPE is data)")
+                    continue
+
                 git_file_path = os.path.join(git_target_dir, fname)
                 with open(git_file_path, "wb") as f:
                     f.write(fbytes)
