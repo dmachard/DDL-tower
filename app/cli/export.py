@@ -58,6 +58,18 @@ def run_git_cmd(args, cwd):
         raise Exception(f"Git command {' '.join(args)} failed: {res.stderr.strip()}")
     return res.stdout.strip()
 
+def check_needs_push(clone_dir: str, branch: str) -> bool:
+    try:
+        run_git_cmd(["git", "rev-parse", "--verify", f"origin/{branch}"], cwd=clone_dir)
+    except Exception:
+        # Remote branch doesn't exist, we must push to create it
+        return True
+    try:
+        log_out = run_git_cmd(["git", "log", f"origin/{branch}..{branch}", "--oneline"], cwd=clone_dir)
+        return bool(log_out.strip())
+    except Exception:
+        return True
+
 def get_authenticated_url(repo_url, username, token):
     if not repo_url:
         return ""
@@ -340,7 +352,7 @@ class ExportCommands:
             else:
                 print(f"[GIT] Updating remote URL and fetching...")
                 run_git_cmd(["git", "remote", "set-url", "origin", auth_url], cwd=clone_dir)
-                run_git_cmd(["git", "fetch", "origin"], cwd=clone_dir)
+                run_git_cmd(["git", "fetch", "--prune", "origin"], cwd=clone_dir)
                 
             # Config credentials in repo
             if settings.GIT_USERNAME:
@@ -380,10 +392,13 @@ class ExportCommands:
             # Check status and commit/push
             status = run_git_cmd(["git", "status", "--porcelain"], cwd=clone_dir)
             if status:
-                print("[GIT] Committing and pushing changes...")
+                print("[GIT] Committing changes...")
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 run_git_cmd(["git", "commit", "-m", f"Automated export: {timestamp}"], cwd=clone_dir)
+                
+            if status or check_needs_push(clone_dir, settings.GIT_BRANCH):
+                print("[GIT] Pushing changes to remote...")
                 run_git_cmd(["git", "push", "origin", settings.GIT_BRANCH], cwd=clone_dir)
                 print("[GIT] Push completed successfully!")
             else:
-                print("[GIT] No changes to commit.")
+                print("[GIT] No changes to commit or push.")
