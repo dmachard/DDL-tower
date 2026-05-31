@@ -74,6 +74,25 @@ Control the headless browser instance:
 sudo docker compose exec ddltower curl -X POST http://localhost:8001/api/browser/restart
 ```
 
+## Database Export & Git Synchronization (`export`)
+Export releases database and stats for static dashboard rendering:
+```bash
+# Export both data.db.gz and stats.db.gz to configured data_export_dir
+sudo docker compose exec ddltower python3 -m app.cli.main export
+
+# Export only data (data.db.gz) or only stats (stats.db.gz)
+sudo docker compose exec ddltower python3 -m app.cli.main export --type data
+sudo docker compose exec ddltower python3 -m app.cli.main export --type stats
+
+# Specify a custom local output folder (overriding the configuration file)
+sudo docker compose exec ddltower python3 -m app.cli.main export --output-dir /app/data/custom_export
+
+# Parse and merge external input files (JSON or text-based line releases)
+sudo docker compose exec ddltower python3 -m app.cli.main export --input /app/data/my_releases.json
+```
+
+If Git synchronization is enabled in your `config.yaml` (`git.enabled: true`), the exported files will be committed and pushed to the configured repository and branch automatically. If the branch does not exist on the remote repository yet, DDLtower will automatically create and publish it.
+
 ## Sqlite
 
 ```bash

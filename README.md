@@ -9,6 +9,7 @@ DDLtower is an automation tool for web link extraction, tagging, and management.
 - **Stats Dashboard**: Complete overview of library volume and health.
 - **Embedded Browser**: Dedicated Chromium instance via **Webtop** for manual navigation.
 - **RSS**: Generate **RSS 2.0** feeds for both latest discovered releases and completed download history.
+- **Git Database Export**: Auto-export stats and data to a remote Git repository
 
 ## Getting Started
 

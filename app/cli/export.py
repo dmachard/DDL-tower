@@ -329,29 +329,36 @@ class ExportCommands:
             os.makedirs(os.path.dirname(os.path.abspath(clone_dir)), exist_ok=True)
             
             # Setup repo
+            auth_url = get_authenticated_url(settings.GIT_REPO_URL, settings.GIT_USERNAME, settings.GIT_TOKEN)
             if not os.path.exists(os.path.join(clone_dir, ".git")):
-                print(f"[GIT] Cloning branch '{settings.GIT_BRANCH}' from remote...")
-                auth_url = get_authenticated_url(settings.GIT_REPO_URL, settings.GIT_USERNAME, settings.GIT_TOKEN)
-                
+                print(f"[GIT] Cloning default branch from remote...")
                 if os.path.exists(clone_dir) and os.listdir(clone_dir):
                     print(f"[GIT] Cleaning clone directory {clone_dir}...")
                     shutil.rmtree(clone_dir)
                     os.makedirs(clone_dir, exist_ok=True)
-                    
-                run_git_cmd(["git", "clone", "-b", settings.GIT_BRANCH, auth_url, "."], cwd=clone_dir)
+                run_git_cmd(["git", "clone", auth_url, "."], cwd=clone_dir)
             else:
-                print(f"[GIT] Fetching and checkout of branch '{settings.GIT_BRANCH}'...")
-                auth_url = get_authenticated_url(settings.GIT_REPO_URL, settings.GIT_USERNAME, settings.GIT_TOKEN)
+                print(f"[GIT] Updating remote URL and fetching...")
                 run_git_cmd(["git", "remote", "set-url", "origin", auth_url], cwd=clone_dir)
                 run_git_cmd(["git", "fetch", "origin"], cwd=clone_dir)
-                run_git_cmd(["git", "checkout", settings.GIT_BRANCH], cwd=clone_dir)
-                run_git_cmd(["git", "pull", "origin", settings.GIT_BRANCH], cwd=clone_dir)
                 
             # Config credentials in repo
             if settings.GIT_USERNAME:
                 run_git_cmd(["git", "config", "user.name", settings.GIT_USERNAME], cwd=clone_dir)
             if settings.GIT_EMAIL:
                 run_git_cmd(["git", "config", "user.email", settings.GIT_EMAIL], cwd=clone_dir)
+                
+            # Checkout or create branch
+            try:
+                print(f"[GIT] Checking out branch '{settings.GIT_BRANCH}'...")
+                run_git_cmd(["git", "checkout", settings.GIT_BRANCH], cwd=clone_dir)
+                try:
+                    run_git_cmd(["git", "pull", "origin", settings.GIT_BRANCH], cwd=clone_dir)
+                except Exception:
+                    pass
+            except Exception:
+                print(f"[GIT] Branch '{settings.GIT_BRANCH}' not found. Creating it...")
+                run_git_cmd(["git", "checkout", "-b", settings.GIT_BRANCH], cwd=clone_dir)
                 
             # Find the best target directory in repo to place the files
             git_target_dir = clone_dir
