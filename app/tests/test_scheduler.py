@@ -157,6 +157,86 @@ async def test_scheduler_auto_download_year_unmatched():
         mock_dl_task.assert_not_called()
         print("[TEST] Year-unmatched auto-download skipping verified.")
 
+
+@pytest.mark.asyncio
+async def test_scheduler_auto_download_resolution_matched():
+    """Test that when resolution filter is set, and the resolved movie matches the resolution, the download is triggered."""
+    scraper = MagicMock()
+    scraper.name = "TestAutoDLResMatch"
+    
+    async def mock_run():
+        yield {
+            "links": ["https://hoster.com/file1"],
+            "source_url": "https://source.com/page1",
+            "auto_download": True,
+            "auto_download_resolutions": ["1080p", "4kLight"],
+            "override_title": "Test Movie"
+        }
+    scraper.run = mock_run
+    
+    with patch("app.core.scheduler.get_db_ctx") as mock_db_ctx, \
+         patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
+         patch("app.services.enrichment_service.EnrichmentService.enrich_links", new_callable=AsyncMock) as mock_enrich, \
+         patch("app.api.downloads.run_download_task", new_callable=AsyncMock) as mock_dl_task:
+        
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        mock_link = MagicMock(spec=DownloadLink)
+        mock_link.id = 123
+        mock_link.url = "https://hoster.com/file1"
+        mock_link.resolution = "1080p"  # Matches 1080p!
+        mock_check.return_value = [mock_link]
+        
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_link]
+        mock_session.execute.return_value = mock_result
+        
+        await run_scraper(scraper)
+        
+        mock_dl_task.assert_called_once_with(["https://hoster.com/file1"], is_auto=True)
+        print("[TEST] Resolution-matched auto-download verified.")
+
+
+@pytest.mark.asyncio
+async def test_scheduler_auto_download_resolution_unmatched():
+    """Test that when resolution filter is set, but the resolved movie does not match the resolution, download is skipped."""
+    scraper = MagicMock()
+    scraper.name = "TestAutoDLResUnmatched"
+    
+    async def mock_run():
+        yield {
+            "links": ["https://hoster.com/file2"],
+            "source_url": "https://source.com/page2",
+            "auto_download": True,
+            "auto_download_resolutions": ["1080p", "4kLight"],
+            "override_title": "Test Movie 720p"
+        }
+    scraper.run = mock_run
+    
+    with patch("app.core.scheduler.get_db_ctx") as mock_db_ctx, \
+         patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
+         patch("app.services.enrichment_service.EnrichmentService.enrich_links", new_callable=AsyncMock) as mock_enrich, \
+         patch("app.api.downloads.run_download_task", new_callable=AsyncMock) as mock_dl_task:
+        
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        mock_link = MagicMock(spec=DownloadLink)
+        mock_link.id = 124
+        mock_link.url = "https://hoster.com/file2"
+        mock_link.resolution = "720p"  # Does NOT match!
+        mock_check.return_value = [mock_link]
+        
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_link]
+        mock_session.execute.return_value = mock_result
+        
+        await run_scraper(scraper)
+        
+        mock_dl_task.assert_not_called()
+        print("[TEST] Resolution-unmatched auto-download skipping verified.")
+
 @pytest.mark.asyncio
 async def test_download_duplicate_prevention_accent_insensitive():
     """Test that run_download_task skips auto-download if the movie (even with different accent/case) is already in history."""

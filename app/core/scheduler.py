@@ -129,6 +129,27 @@ async def run_scraper(scraper):
                                     print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: No keyword from {allowed_keywords} found in release")
                                     should_download = False
                             
+                            allowed_resolutions = batch.get("auto_download_resolutions", [])
+                            if isinstance(allowed_resolutions, str):
+                                allowed_resolutions = [allowed_resolutions]
+                                
+                            if should_download and allowed_resolutions:
+                                resolution_found = False
+                                for link in (links_to_enrich or []):
+                                    link_res = (link.resolution or "").strip().lower()
+                                    link_text = f"{link.title or ''} {link.filename or ''}".lower()
+                                    for res in allowed_resolutions:
+                                        res_clean = str(res).strip().lower()
+                                        if res_clean == link_res or (res_clean in link_text):
+                                            resolution_found = True
+                                            break
+                                    if resolution_found:
+                                        break
+                                        
+                                if not resolution_found:
+                                    print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: No resolution from {allowed_resolutions} found in release")
+                                    should_download = False
+                            
                             if should_download:
                                 from app.api.downloads import run_download_task
                                 # We run it in the background as a task to not block the scraper

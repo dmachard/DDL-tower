@@ -21,6 +21,7 @@ The Universal Scraper allows complex multi-step scraping (chaining) where result
   - Can also accept a list of years, e.g., `auto_download: [2025, 2026]` to only download releases from specific years.
   - Alternatively, you can specify `auto_download_years: [2025, 2026]` at the same level as `auto_download: true` to restrict downloads by year for that specific step.
   - You can also specify `auto_download_keywords: ["multi", "truefrench"]` to only download releases where the title or filename contains at least one of these keywords (case-insensitive).
+  - You can also specify `auto_download_resolutions: ["1080p", "4kLight"]` to only download releases that match one of these resolutions (either matched via parsed metadata or containing the resolution text in the title/filename).
 - **`schedule_hour: 1`**: (Optional, source-level) Scheduled hour (0-23) to run this source. When defined, the scraper for this source will run only once a day at that specific hour, completely bypassing and ignoring the global scheduler restrictions (`scan_start_hour`, `scan_end_hour`, `scan_interval_minutes`).
 - **Global Settings** (in `config/config.yaml`):
   - **`auto_download_series_packs: false`**: (New) If set to `false`, prevents automatic download of series packs (full seasons). Default is `true`.

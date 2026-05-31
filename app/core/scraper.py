@@ -425,6 +425,7 @@ class Scraper:
                     "auto_download": step.get("auto_download", False),
                     "auto_download_years": step.get("auto_download_years"),
                     "auto_download_keywords": step.get("auto_download_keywords"),
+                    "auto_download_resolutions": step.get("auto_download_resolutions"),
                     "category": step.get("category"),
                     "poster_url": poster_url
                 }
