@@ -306,3 +306,27 @@ async def test_scheduler_loop_schedule_hour():
         # Verify enrichment was triggered because run_any was True
         mock_enrich.assert_called_once()
         print("[TEST] Per-source schedule_hour execution logic verified successfully!")
+
+@pytest.mark.asyncio
+async def test_post_scraping_flow_auto_export():
+    """Test that post_scraping_flow calls ExportCommands.run_export if AUTO_EXPORT_ENABLED is True."""
+    from app.core.scheduler import post_scraping_flow
+    
+    with patch("app.core.scheduler.settings") as mock_settings, \
+         patch("app.core.scheduler.enrichment_service.enrich_links", new_callable=AsyncMock) as mock_enrich, \
+         patch("app.cli.export.ExportCommands.run_export", new_callable=AsyncMock) as mock_export:
+         
+        # Case 1: Disabled
+        mock_settings.AUTO_EXPORT_ENABLED = False
+        mock_settings.AUTO_EXPORT_TYPE = "stats"
+        await post_scraping_flow()
+        mock_enrich.assert_called_once()
+        mock_export.assert_not_called()
+        
+        # Case 2: Enabled
+        mock_enrich.reset_mock()
+        mock_settings.AUTO_EXPORT_ENABLED = True
+        await post_scraping_flow()
+        mock_enrich.assert_called_once()
+        mock_export.assert_called_once_with(export_type="stats")
+

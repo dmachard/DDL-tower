@@ -326,7 +326,7 @@ class ExportCommands:
                 return
                 
             clone_dir = settings.GIT_CLONE_DIR
-            os.makedirs(os.path.dirname(os.path.abspath(clone_dir)), exist_ok=True)
+            os.makedirs(clone_dir, exist_ok=True)
             
             # Setup repo
             auth_url = get_authenticated_url(settings.GIT_REPO_URL, settings.GIT_USERNAME, settings.GIT_TOKEN)
@@ -374,7 +374,8 @@ class ExportCommands:
                 git_file_path = os.path.join(git_target_dir, fname)
                 with open(git_file_path, "wb") as f:
                     f.write(fbytes)
-                run_git_cmd(["git", "add", git_file_path], cwd=clone_dir)
+                rel_git_path = os.path.relpath(git_file_path, clone_dir)
+                run_git_cmd(["git", "add", rel_git_path], cwd=clone_dir)
                 
             # Check status and commit/push
             status = run_git_cmd(["git", "status", "--porcelain"], cwd=clone_dir)

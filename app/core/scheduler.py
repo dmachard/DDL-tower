@@ -137,6 +137,20 @@ async def run_scraper(scraper):
         print(f"[SCHEDULER] Error running scraper {scraper.name}: {e}")
         traceback.print_exc()
 
+async def post_scraping_flow():
+    """Runs categorization and handles auto-export if enabled."""
+    print(f"[SCHEDULER] [{datetime_now()}] Triggering categorization/enrichment...")
+    async with get_db_ctx() as db:
+        await enrichment_service.enrich_links(db)
+        
+    if settings.AUTO_EXPORT_ENABLED:
+        print(f"[SCHEDULER] [{datetime_now()}] Auto-export triggered (Type: {settings.AUTO_EXPORT_TYPE})")
+        try:
+            from app.cli.export import ExportCommands
+            await ExportCommands.run_export(export_type=settings.AUTO_EXPORT_TYPE)
+        except Exception as e:
+            print(f"[SCHEDULER] Error during auto-export: {e}")
+
 async def run_scrapers(source_name: str = None):
     """Runs all scrapers or a specific one once. Used by manual trigger."""
     scrapers = await get_scrapers()
@@ -150,10 +164,7 @@ async def run_scrapers(source_name: str = None):
         
         await run_scraper(scraper)
     
-    # Categorization (Enrichment)
-    async with get_db_ctx() as db:
-        await enrichment_service.enrich_links(db)
-        # commit is handled by get_db_ctx
+    await post_scraping_flow()
 
 async def run_categorization():
     """Runs the categorization process only."""
@@ -238,10 +249,8 @@ async def scheduler_loop():
                             run_any = True
             
             if run_any:
-                print(f"[SCHEDULER] [{datetime_now()}] Scrapers sequence finished. Triggering categorization/enrichment...")
-                # Categorization (Enrichment)
-                async with get_db_ctx() as db:
-                    await enrichment_service.enrich_links(db)
+                print(f"[SCHEDULER] [{datetime_now()}] Scrapers sequence finished.")
+                await post_scraping_flow()
             
             # Print status update on first run, after any execution, or every 10 minutes (600 seconds)
             if first_run or run_any or (current_time - last_status_print >= 600):

@@ -46,6 +46,11 @@ git:
   token: "[GIT_TOKEN]"
   clone_dir: "data/git_export"
 
+# Auto Export Settings (after scrapers finish running)
+auto_export:
+  enabled: false
+  type: "all" # options: all, data, stats
+
 
 # --- Scraper Global Settings ---
 scan_interval_minutes: 60

@@ -93,6 +93,17 @@ sudo docker compose exec ddltower python3 -m app.cli.main export --input /app/da
 
 If Git synchronization is enabled in your `config.yaml` (`git.enabled: true`), the exported files will be committed and pushed to the configured repository and branch automatically. If the branch does not exist on the remote repository yet, DDLtower will automatically create and publish it.
 
+### Automatic Exporting after Scraping
+
+You can configure DDLtower to automatically run the export process (and sync to Git if enabled) immediately after scrapers finish running. This is configured in `config.yaml`:
+
+```yaml
+# Auto Export Settings (after scrapers finish running)
+auto_export:
+  enabled: true # Enable/disable auto-export
+  type: "all"   # Options: "all", "data", "stats"
+```
+
 ## Sqlite
 
 ```bash

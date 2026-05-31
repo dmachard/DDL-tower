@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     GIT_EMAIL: str = os.getenv("GIT_EMAIL", _yaml_git.get("email", ""))
     GIT_TOKEN: str = os.getenv("GIT_TOKEN", _yaml_git.get("token", ""))
     GIT_CLONE_DIR: str = os.getenv("GIT_CLONE_DIR", _yaml_git.get("clone_dir", "data/git_export"))
+    
+    # Auto Export Configuration
+    _yaml_auto_export = _yaml_config.get("auto_export", {})
+    AUTO_EXPORT_ENABLED: bool = os.getenv("AUTO_EXPORT_ENABLED", str(_yaml_auto_export.get("enabled", "false"))).lower() in ("true", "1")
+    AUTO_EXPORT_TYPE: str = os.getenv("AUTO_EXPORT_TYPE", _yaml_auto_export.get("type", "all"))
 
     
     @property
