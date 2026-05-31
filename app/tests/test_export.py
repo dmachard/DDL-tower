@@ -12,6 +12,7 @@ async def test_export_git_filtering_stats_only():
          patch("app.cli.export.settings") as mock_settings, \
          patch("os.path.exists", return_value=True), \
          patch("os.path.isdir", return_value=True), \
+         patch("os.makedirs"), \
          patch("builtins.open", new_callable=MagicMock) as mock_open:
          
         mock_settings.DATA_EXPORT_DIR = "/app/data/export"
@@ -82,6 +83,8 @@ async def test_export_prunes_invalid_existing_releases():
     with patch("app.cli.export.get_db_ctx") as mock_db_ctx, \
          patch("app.cli.export.settings") as mock_settings, \
          patch("os.path.exists", return_value=True), \
+         patch("os.path.isdir", return_value=True), \
+         patch("os.makedirs"), \
          patch("builtins.open", side_effect=mock_open_impl):
          
         mock_settings.DATA_EXPORT_DIR = "/app/data/export"
