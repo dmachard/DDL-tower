@@ -66,6 +66,7 @@ ignore_resolutions: []
 
 # Automatic download settings
 auto_download_series_packs: true
+auto_download_lower_than: 20GB
 
 # Browser connection for Webtop/Cloudflare bypass
 browser_url: "http://ddltower-browser:9222"

@@ -178,6 +178,43 @@ async def test_pagination_infinite_loop_protection():
 
 
 @pytest.mark.asyncio
+async def test_pagination_start_page():
+    """Test that pagination starts at start_page and increments correctly."""
+    config = {
+        "name": "TestStartPage",
+        "steps": [
+            {
+                "name": "step1",
+                "url": "https://site.com/films",
+                "pagination": {"param": "page", "start_page": 5, "max_pages": 6}
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    client.get = AsyncMock()
+    
+    # Mock responses for pages 5 and 6
+    resp5 = MagicMock()
+    resp5.text = "Content Page 5"
+    
+    resp6 = MagicMock()
+    resp6.text = "Content Page 6"
+    
+    client.get.side_effect = [resp5, resp6]
+
+    results = []
+    async for batch in scraper._execute_step(client, 0, [{}]):
+        results.append(batch)
+        
+    assert client.get.call_count == 2
+    # Verify exact URLs requested
+    calls = client.get.call_args_list
+    assert "page=5" in calls[0].args[0]
+    assert "page=6" in calls[1].args[0]
+
+
+@pytest.mark.asyncio
 async def test_dict_item_link_extraction():
     """Test that dictionary items use 'url' or 'href' directly without mangling."""
     config = {

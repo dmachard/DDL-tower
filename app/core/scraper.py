@@ -144,6 +144,9 @@ class Scraper:
                 prev_content_hash = None
     
                 while True:
+                    if step.get("pagination"):
+                        url = self._update_url_param(url, step["pagination"].get("param", "page"), current_page)
+                    
                     # 1. Fetch
                     content = await self._get_content(client, url, step, ctx, step_idx)
                     if not content: break
@@ -172,18 +175,15 @@ class Scraper:
                     if next_batch_contexts:
                         async for b in self._execute_step(client, step_idx + 1, next_batch_contexts):
                             yield b
-
     
                     # Cleanup/Record
                     if step.get("scrape_once") or cooldown_hours is not None:
                         await self._record_scraped(url)
-
     
                     # Next page?
                     if not step.get("pagination"): break
                     current_page += 1
                     if current_page > step.get("pagination", {}).get("max_pages", 999): break
-                    url = self._update_url_param(url, step["pagination"].get("param", "page"), current_page)
 
             except Exception as e:
                 err_msg = str(e).strip() or type(e).__name__
