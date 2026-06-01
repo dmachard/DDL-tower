@@ -384,8 +384,13 @@ class ExportCommands:
 
             # Create an orphan commit (no history) on the data branch.
             # This ensures the branch always has exactly one commit → constant size.
-            # --orphan fails if a local branch with that name already exists → delete it first.
+            # --orphan fails if we're currently ON that branch (can't delete the checked-out branch).
+            # Fix: detach HEAD first, then delete the local branch, then create the orphan.
             print(f"[GIT] Creating orphan commit on branch '{settings.GIT_BRANCH}'...")
+            try:
+                run_git_cmd(["git", "checkout", "--detach"], cwd=clone_dir)
+            except Exception:
+                pass  # already detached or no commits yet, that's fine
             try:
                 run_git_cmd(["git", "branch", "-D", settings.GIT_BRANCH], cwd=clone_dir)
                 print(f"[GIT] Deleted existing local branch '{settings.GIT_BRANCH}'.")
