@@ -2,6 +2,10 @@
 
 DDLtower is an automation tool for web link extraction, tagging, and management.
 
+<p align="center">
+  <img src="docs/log_ddltower.png" alt="DDLtower Logo" width="400">
+</p>
+
 ## Features
 
 - **Quick-Scan**: Instant URL extraction via headless browser.
