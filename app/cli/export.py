@@ -377,38 +377,30 @@ class ExportCommands:
             try:
                 # Check if remote branch exists
                 run_git_cmd(["git", "rev-parse", "--verify", f"origin/{settings.GIT_BRANCH}"], cwd=clone_dir)
-                print(f"[GIT] Checking out branch '{settings.GIT_BRANCH}'...")
-                run_git_cmd(["git", "checkout", settings.GIT_BRANCH], cwd=clone_dir)
-                try:
-                    run_git_cmd(["git", "pull", "origin", settings.GIT_BRANCH], cwd=clone_dir)
-                except Exception:
-                    pass
+                # Orphan commit strategy: ignore existing branch state
+                pass
             except Exception:
-                print(f"[GIT] Branch '{settings.GIT_BRANCH}' not found on remote.")
-                try:
-                    # Switch to default branch first so we can delete the local branch if it exists
-                    try:
-                        head_ref = run_git_cmd(["git", "symbolic-ref", "refs/remotes/origin/HEAD"], cwd=clone_dir)
-                        default_branch = head_ref.split("/")[-1]
-                    except Exception:
-                        default_branch = "main"
-                    run_git_cmd(["git", "checkout", default_branch], cwd=clone_dir)
-                    run_git_cmd(["git", "branch", "-D", settings.GIT_BRANCH], cwd=clone_dir)
-                except Exception:
-                    pass
-                print(f"[GIT] Creating branch '{settings.GIT_BRANCH}' fresh from remote default branch...")
-                run_git_cmd(["git", "checkout", "-b", settings.GIT_BRANCH], cwd=clone_dir)
-                
+                pass
+
+            # Create an orphan commit (no history) on the data branch.
+            # This ensures the branch always has exactly one commit → constant size.
+            print(f"[GIT] Creating orphan commit on branch '{settings.GIT_BRANCH}'...")
+            run_git_cmd(["git", "checkout", "--orphan", settings.GIT_BRANCH], cwd=clone_dir)
+
+            # Stage only the files we want to export (clean working tree first)
+            run_git_cmd(["git", "rm", "-rf", "--cached", "."], cwd=clone_dir)
+
             # Find the best target directory in repo to place the files
             git_target_dir = clone_dir
             if os.path.isdir(os.path.join(clone_dir, "web", "data")):
                 git_target_dir = os.path.join(clone_dir, "web", "data")
             elif os.path.isdir(os.path.join(clone_dir, "data")):
                 git_target_dir = os.path.join(clone_dir, "data")
-                
+
             print(f"[GIT] Copying files to: {git_target_dir}")
             os.makedirs(git_target_dir, exist_ok=True)
-            
+
+            files_added = []
             for fname, fbytes in generated_files:
                 # Filter files based on git export type if specified
                 if settings.GIT_EXPORT_TYPE == "stats" and fname != "stats.db.gz":
@@ -423,17 +415,14 @@ class ExportCommands:
                     f.write(fbytes)
                 rel_git_path = os.path.relpath(git_file_path, clone_dir)
                 run_git_cmd(["git", "add", rel_git_path], cwd=clone_dir)
-                
-            # Check status and commit/push
-            status = run_git_cmd(["git", "status", "--porcelain"], cwd=clone_dir)
-            if status:
-                print("[GIT] Committing changes...")
+                files_added.append(fname)
+
+            if files_added:
+                print("[GIT] Committing orphan snapshot...")
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                run_git_cmd(["git", "commit", "-m", f"Automated export: {timestamp}"], cwd=clone_dir)
-                
-            if status or check_needs_push(clone_dir, settings.GIT_BRANCH):
-                print("[GIT] Pushing changes to remote...")
-                run_git_cmd(["git", "push", "origin", settings.GIT_BRANCH], cwd=clone_dir)
+                run_git_cmd(["git", "commit", "-m", f"update data: {timestamp}"], cwd=clone_dir)
+                print("[GIT] Force-pushing orphan commit to remote (single-commit branch)...")
+                run_git_cmd(["git", "push", "origin", settings.GIT_BRANCH, "--force"], cwd=clone_dir)
                 print("[GIT] Push completed successfully!")
             else:
-                print("[GIT] No changes to commit or push.")
+                print("[GIT] No files to export, skipping commit.")
