@@ -384,7 +384,13 @@ class ExportCommands:
 
             # Create an orphan commit (no history) on the data branch.
             # This ensures the branch always has exactly one commit → constant size.
+            # --orphan fails if a local branch with that name already exists → delete it first.
             print(f"[GIT] Creating orphan commit on branch '{settings.GIT_BRANCH}'...")
+            try:
+                run_git_cmd(["git", "branch", "-D", settings.GIT_BRANCH], cwd=clone_dir)
+                print(f"[GIT] Deleted existing local branch '{settings.GIT_BRANCH}'.")
+            except Exception:
+                pass  # branch didn't exist locally, that's fine
             run_git_cmd(["git", "checkout", "--orphan", settings.GIT_BRANCH], cwd=clone_dir)
 
             # Stage only the files we want to export (clean working tree first)
