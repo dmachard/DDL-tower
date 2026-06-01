@@ -657,7 +657,22 @@ class DownloaderService:
                     self.active_downloads.pop(group_name, None)
                     return str(file_path)
             else:
-                # RAR part, but not all parts are finished yet. Skip history.
+                # RAR part, but not all parts are finished yet (or some parts are missing).
+                # Check if all files in the group are finished downloading.
+                all_finished = True
+                for fn, info in group.get("files", {}).items():
+                    if info.get("status") != "done" and info.get("progress", 0) < 100:
+                        all_finished = False
+                        break
+                
+                if all_finished:
+                    # All registered files are downloaded, but should_extract is False.
+                    # This means we must be missing some parts.
+                    missing_parts = extraction_service.check_missing_parts(str(file_path))
+                    if missing_parts:
+                        group["status"] = "error"
+                        group["error"] = f"Missing part(s): {', '.join(f'part{p}' for p in missing_parts)}"
+                        print(f"[DOWNLOADER] Group {group_name} marked as error because of missing parts: {missing_parts}")
                 return str(file_path)
         
         # If not RAR or extraction not triggered

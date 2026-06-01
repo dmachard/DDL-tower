@@ -31,11 +31,43 @@ class ExtractionService:
         
         return [str(path)]
 
+    def check_missing_parts(self, file_path: str) -> List[int]:
+        """
+        For a multi-part RAR, returns a list of missing part numbers.
+        If no parts are missing (or it's not a multi-part RAR), returns an empty list.
+        """
+        path = Path(file_path)
+        name = path.name
+        part_match = re.search(r'\.part(\d+)\.rar$', name, re.I)
+        if not part_match:
+            return []
+
+        base = name[:part_match.start()]
+        pattern = re.compile(re.escape(base) + r'\.part(\d+)\.rar$', re.I)
+        
+        # Scan directory for existing parts and extract their numbers
+        existing_part_numbers = set()
+        for f in path.parent.glob('*'):
+            m = pattern.match(f.name)
+            if m:
+                existing_part_numbers.add(int(m.group(1)))
+                
+        if not existing_part_numbers:
+            return []
+            
+        max_part = max(existing_part_numbers)
+        # Determine if parts start at 0 or 1
+        start_part = 0 if 0 in existing_part_numbers else 1
+        
+        expected_parts = set(range(start_part, max_part + 1))
+        missing = sorted(list(expected_parts - existing_part_numbers))
+        return missing
+
     def should_extract(self, file_path: str, active_downloads: dict = None) -> bool:
         """
         Determines if this file should trigger an extraction.
-        If it's a multi-part RAR, it only triggers if no other parts 
-        are currently downloading for the same group.
+        If it's a multi-part RAR, it only triggers if all parts are present on disk
+        and no other parts are currently downloading for the same group.
         """
         path = Path(file_path)
         name = path.name
@@ -44,17 +76,25 @@ class ExtractionService:
             return False
             
         part_match = re.search(r'\.part(\d+)\.rar$', name, re.I)
-        if part_match and active_downloads:
-            base = name[:part_match.start()]
-            
-            # Find the group in active_downloads
-            for group_name, group_info in active_downloads.items():
-                if group_name.lower() in base.lower() or base.lower() in group_name.lower():
-                    # Check if all files in this group are finished
-                    for fn, info in group_info.get("files", {}).items():
-                        if info.get("status") != "done" and info.get("progress", 0) < 100:
-                            print(f"[EXTRACTION] Skipping {name} for now because {fn} is not done (status: {info.get('status')}, {info.get('progress', 0)}%).")
-                            return False
+        if part_match:
+            # 1. Check if any parts are missing on disk
+            missing_parts = self.check_missing_parts(file_path)
+            if missing_parts:
+                print(f"[EXTRACTION] Skipping {name} because some parts are missing: {missing_parts}")
+                return False
+
+            # 2. Check if all files in this group are finished in active_downloads
+            if active_downloads:
+                base = name[:part_match.start()]
+                
+                # Find the group in active_downloads
+                for group_name, group_info in active_downloads.items():
+                    if group_name.lower() in base.lower() or base.lower() in group_name.lower():
+                        # Check if all files in this group are finished
+                        for fn, info in group_info.get("files", {}).items():
+                            if info.get("status") != "done" and info.get("progress", 0) < 100:
+                                print(f"[EXTRACTION] Skipping {name} for now because {fn} is not done (status: {info.get('status')}, {info.get('progress', 0)}%).")
+                                return False
         
         return True
 

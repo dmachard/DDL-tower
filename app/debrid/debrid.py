@@ -32,7 +32,7 @@ class DebridService:
         Attempts to unlock a link using enabled clients.
         Falls back to the next client if the first one fails.
         """
-
+        import asyncio
 
         clients = self.get_enabled_clients()
         if not clients:
@@ -40,14 +40,36 @@ class DebridService:
 
         last_res = {"status": "failed", "error": "Unknown error"}
         for client in clients:
-            res = await client.unlock_link(link)
-            if res.get("status") == "success":
-                return res
-            
-            # If it's a specific error like infringing_file, we might want to log it
-            # and try the next one anyway, as another debrid might have it cached.
-            last_res = res
-            print(f"[DEBRID] {client.__class__.__name__} failed to unlock: {res.get('error')}. Trying next...")
+            max_retries = 3
+            for attempt in range(1, max_retries + 1):
+                res = await client.unlock_link(link)
+                if res.get("status") == "success":
+                    return res
+                
+                err_msg = ""
+                error_val = res.get("error", "")
+                if isinstance(error_val, dict):
+                    err_msg = error_val.get("message") or error_val.get("code") or str(error_val)
+                else:
+                    err_msg = str(error_val)
+                
+                # Check for temporary/hoster errors that justify a retry
+                is_temporary = any(term in err_msg.lower() for term in [
+                    "not available on the file hoster",
+                    "host_unreachable",
+                    "hoster_unavailable",
+                    "link_host_no_link",
+                    "bad_link"
+                ])
+                
+                if is_temporary and attempt < max_retries:
+                    delay = attempt * 3 # 3s, 6s delay
+                    print(f"[DEBRID] {client.__class__.__name__} failed to unlock {link}: '{err_msg}'. Retrying in {delay}s (Attempt {attempt}/{max_retries})...")
+                    await asyncio.sleep(delay)
+                else:
+                    last_res = res
+                    print(f"[DEBRID] {client.__class__.__name__} failed to unlock: {err_msg}. Trying next...")
+                    break
 
         return last_res
 
