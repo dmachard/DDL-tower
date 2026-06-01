@@ -98,18 +98,42 @@ class DirectScanner:
     async def scan_text(self, text: str):
         """
         Extracts links from raw text using configured patterns and processes them.
+        Supports both direct hoster links and unlocker links (e.g. MultiUp).
         """
+        from app.core.config import settings
+        from app.services.unlocker import LinkUnlocker
+
         found_links = set()
+
+        # 1. Extract direct hoster links via configured patterns
         for pattern in self.target_patterns:
             found_links.update(re.findall(pattern, text))
-        
+
+        # 2. Detect and unlock any unlocker links (e.g. MultiUp)
+        unlocker = LinkUnlocker()
+        for unl_cfg in settings.UNLOCKERS:
+            unl_patterns = unl_cfg.get("patterns", [])
+            for unl_pattern in unl_patterns:
+                unlocker_matches = re.findall(unl_pattern, text)
+                for unlocker_url in unlocker_matches:
+                    print(f"[DIRECT-SCAN] Unlocker link detected ({unl_cfg.get('name', '?')}): {unlocker_url}")
+                    try:
+                        unlocked = await unlocker.unlock(unlocker_url)
+                        if unlocked:
+                            print(f"[DIRECT-SCAN] Unlocked {len(unlocked)} link(s) from {unlocker_url}")
+                            found_links.update(unlocked)
+                        else:
+                            print(f"[DIRECT-SCAN] No links unlocked from {unlocker_url}")
+                    except Exception as e:
+                        print(f"[DIRECT-SCAN] Unlock failed for {unlocker_url}: {e}")
+
         if not found_links:
             print("[DIRECT-SCAN] No links found in provided text.")
             return []
 
         total_found = len(found_links)
         print(f"[DIRECT-SCAN] Found {total_found} links in text.")
-        
+
         async with AsyncSessionLocal() as session:
             new_links = await self.link_manager.check_links(
                 session=session,
@@ -118,15 +142,16 @@ class DirectScanner:
                 source_name="Quick-Scan"
             )
             await session.commit()
-            
+
             new_added = len(new_links) if new_links else 0
-            
+
             if new_links:
                 await enrichment_service.enrich_links(session, links=new_links)
                 await session.commit()
-            
+
             return {
                 "total_found": total_found,
                 "new_added": new_added,
                 "links": new_links
             }
+

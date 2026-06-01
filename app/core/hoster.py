@@ -8,6 +8,7 @@ from app.hosters.nitroflare import NitroflareService
 from app.hosters.rapidgator import RapidgatorService
 from app.hosters.turbobit import TurbobitService
 from app.hosters.youtube import YoutubeService
+from app.hosters.dailyuploads import DailyUploadsService
 from app.debrid.debrid import debrid_service
 from app.core.config import settings
 
@@ -24,7 +25,8 @@ class Hoster:
             "rapidgator.net": RapidgatorService,
             "turbobit.net": TurbobitService,
             "youtube.com": YoutubeService,
-            "youtu.be": YoutubeService
+            "youtu.be": YoutubeService,
+            "dailyuploads.net": DailyUploadsService
         }
         # Limit browser-based checks to concurrent tasks to save CPU/Memory
         self.semaphore = asyncio.Semaphore(settings.CONCURRENT_HOSTER_CHECKS)

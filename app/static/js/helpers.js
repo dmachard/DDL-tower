@@ -41,8 +41,17 @@ export const formatBytes = (bytes, decimals = 2) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
+const HOSTER_DISPLAY_NAMES = {
+    'dailyuploads.net': 'DailyUploads',
+    '1fichier.com': '1Fichier',
+    'nitroflare.com': 'Nitroflare',
+    'rapidgator.net': 'Rapidgator',
+    'turbobit.net': 'Turbobit',
+};
+
 export const beautifyHoster = (h) => {
     if (!h || h === 'Unknown') return h || 'Unknown';
+    if (HOSTER_DISPLAY_NAMES[h.toLowerCase()]) return HOSTER_DISPLAY_NAMES[h.toLowerCase()];
     const name = h.split('.')[0];
     return name.charAt(0).toUpperCase() + name.slice(1);
 };
