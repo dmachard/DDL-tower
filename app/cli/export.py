@@ -439,5 +439,32 @@ class ExportCommands:
                 print("[GIT] Force-pushing orphan commit to remote (single-commit branch)...")
                 run_git_cmd(["git", "push", "origin", settings.GIT_BRANCH, "--force"], cwd=clone_dir)
                 print("[GIT] Push completed successfully!")
+
+                # --- Update CHANGELOG.md on main branch to trigger Github Actions ---
+                print("[GIT] Updating CHANGELOG.md on main branch to trigger workflow...")
+                try:
+                    run_git_cmd(["git", "fetch", "origin", "main"], cwd=clone_dir)
+                    run_git_cmd(["git", "checkout", "-f", "main"], cwd=clone_dir)
+                    run_git_cmd(["git", "pull", "origin", "main"], cwd=clone_dir)
+                    
+                    changelog_path = os.path.join(clone_dir, "CHANGELOG.md")
+                    new_entry = f"## Mise à jour automatique\n- **Date :** {timestamp}\n- **Entrées totales :** {len(merged_list)}\n\n"
+                    
+                    if os.path.exists(changelog_path):
+                        with open(changelog_path, "r", encoding="utf-8") as f:
+                            existing_content = f.read()
+                    else:
+                        existing_content = "# Historique des mises à jour\n\n"
+                        
+                    with open(changelog_path, "w", encoding="utf-8") as f:
+                        f.write(new_entry + existing_content)
+                        
+                    run_git_cmd(["git", "add", "CHANGELOG.md"], cwd=clone_dir)
+                    run_git_cmd(["git", "commit", "-m", f"docs: update changelog {timestamp}"], cwd=clone_dir)
+                    run_git_cmd(["git", "push", "origin", "main"], cwd=clone_dir)
+                    print("[GIT] CHANGELOG.md updated and pushed to main branch successfully!")
+                except Exception as e:
+                    print(f"[GIT] Warning: Failed to update CHANGELOG.md on main branch: {e}")
+
             else:
                 print("[GIT] No files to export, skipping commit.")
