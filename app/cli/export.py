@@ -375,6 +375,8 @@ class ExportCommands:
                 
             # Checkout or create branch
             try:
+                # Check if remote branch exists
+                run_git_cmd(["git", "rev-parse", "--verify", f"origin/{settings.GIT_BRANCH}"], cwd=clone_dir)
                 print(f"[GIT] Checking out branch '{settings.GIT_BRANCH}'...")
                 run_git_cmd(["git", "checkout", settings.GIT_BRANCH], cwd=clone_dir)
                 try:
@@ -382,7 +384,19 @@ class ExportCommands:
                 except Exception:
                     pass
             except Exception:
-                print(f"[GIT] Branch '{settings.GIT_BRANCH}' not found. Creating it...")
+                print(f"[GIT] Branch '{settings.GIT_BRANCH}' not found on remote.")
+                try:
+                    # Switch to default branch first so we can delete the local branch if it exists
+                    try:
+                        head_ref = run_git_cmd(["git", "symbolic-ref", "refs/remotes/origin/HEAD"], cwd=clone_dir)
+                        default_branch = head_ref.split("/")[-1]
+                    except Exception:
+                        default_branch = "main"
+                    run_git_cmd(["git", "checkout", default_branch], cwd=clone_dir)
+                    run_git_cmd(["git", "branch", "-D", settings.GIT_BRANCH], cwd=clone_dir)
+                except Exception:
+                    pass
+                print(f"[GIT] Creating branch '{settings.GIT_BRANCH}' fresh from remote default branch...")
                 run_git_cmd(["git", "checkout", "-b", settings.GIT_BRANCH], cwd=clone_dir)
                 
             # Find the best target directory in repo to place the files
