@@ -5,7 +5,7 @@ import re
 import gzip
 import subprocess
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from releascenify import parse_filename
@@ -123,7 +123,11 @@ class ExportCommands:
             parsed['link_source'] = link.source_name
             
             if link.last_checked:
-                parsed['date_added'] = link.last_checked.strftime("%d/%m/%Y %H:%M:%S")
+                lc = link.last_checked
+                if lc.tzinfo is None:
+                    lc = lc.replace(tzinfo=timezone.utc)
+                local_lc = lc.astimezone(datetime.now().astimezone().tzinfo)
+                parsed['date_added'] = local_lc.strftime("%d/%m/%Y %H:%M:%S")
             else:
                 parsed['date_added'] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                 
