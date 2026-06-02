@@ -302,17 +302,20 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                     )
 
                 h_res = await session.execute(h_stmt)
-                existing = h_res.scalars().all()
+                existing = list(h_res.scalars().all())
+                
+                from app.core.utils import normalize_title
+                from app.services.parser_service import parser_service
+                import os
+                
+                target_parsed = parser_service.parse_filename(title)
+                clean_target = target_parsed.get("title", title)
+                target_norm = normalize_title(clean_target)
+                target_year = target_parsed.get("year") or meta.get("year")
+                target_season = meta.get("season")
+                target_episode = meta.get("episode")
                 
                 if existing:
-                    from app.core.utils import normalize_title
-                    from app.services.parser_service import parser_service
-                    
-                    target_parsed = parser_service.parse_filename(title)
-                    clean_target = target_parsed.get("title", title)
-                    target_norm = normalize_title(clean_target)
-                    target_year = target_parsed.get("year") or meta.get("year")
-                    
                     existing_filtered = []
                     for ex in existing:
                         # 1. Match by imdb_id if both have a valid one
@@ -333,6 +336,33 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                             else:
                                 existing_filtered.append(ex)
                     existing = existing_filtered
+                
+                # Also check physical files in the download directory
+                if os.path.exists(settings.DOWNLOAD_DIR):
+                    for local_item in os.listdir(settings.DOWNLOAD_DIR):
+                        local_path = os.path.join(settings.DOWNLOAD_DIR, local_item)
+                        if os.path.isfile(local_path) and local_item.lower().endswith(tuple(settings.VIDEO_EXTENSIONS)):
+                            local_parsed = parser_service.parse_filename(local_item)
+                            local_norm = normalize_title(local_parsed.get("title", local_item))
+                            local_year = local_parsed.get("year")
+                            local_season = local_parsed.get("season")
+                            local_episode = local_parsed.get("episode")
+                            
+                            if meta.get("category") == "series":
+                                if str(target_season) != str(local_season) or str(target_episode) != str(local_episode):
+                                    continue
+                            
+                            if local_norm == target_norm:
+                                if not target_year or not local_year or str(target_year) == str(local_year):
+                                    class LocalFileMock:
+                                        def __init__(self, p):
+                                            self.resolution = p.get("resolution")
+                                            self.language = ", ".join(p.get("languages", []))
+                                            self.v_quality = p.get("v_quality")
+                                            self.quality = p.get("quality")
+                                            self.audio = p.get("audio")
+                                            self.codec = p.get("codec")
+                                    existing.append(LocalFileMock(local_parsed))
                 
                 if existing:
                     # Check if any existing version is better or equal
