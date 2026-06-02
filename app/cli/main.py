@@ -124,7 +124,11 @@ async def run_cli():
                 input_file=args.input
             )
 
+    except asyncio.CancelledError:
+        pass
     except Exception as e:
+        if isinstance(e, RuntimeError) and ("closed" in str(e).lower() or "finalized" in str(e).lower() or "no running" in str(e).lower()):
+            sys.exit(0)
         print(f"Error executing command: {e}")
         import traceback
         traceback.print_exc()

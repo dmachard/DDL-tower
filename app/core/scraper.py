@@ -65,14 +65,14 @@ class Scraper:
                 urls = []
                 if isinstance(rendered, str) and rendered.startswith("[") and rendered.endswith("]"):
                     try: urls = json.loads(rendered.replace("'", '"'))
-                    except: urls = [rendered]
+                    except Exception: urls = [rendered]
                 elif isinstance(rendered, list): urls = rendered
                 else: urls = [rendered]
                 
                 for u in urls:
                     if u and u.startswith("http"):
                         to_process.append({"url": u, "ctx": ctx})
-            except: pass
+            except Exception: pass
 
         if not to_process:
             return
@@ -188,7 +188,10 @@ class Scraper:
             except Exception as e:
                 err_msg = str(e).strip() or type(e).__name__
                 print(f"[{self.name}] [{step_name}] URL error ({url}): {err_msg}")
-                await self._record_scraped(url, status=f"failed: {err_msg[:100]}")
+                try:
+                    await self._record_scraped(url, status=f"failed: {err_msg[:100]}")
+                except RuntimeError:
+                    pass
 
     # --- HELPERS ---
 
@@ -246,18 +249,18 @@ class Scraper:
                         results = [r for r in results if str(r.get(k)) == str(v)]
                     else:
                         try: results = [m.value for m in jsonpath_parse(f_rend).find(results)]
-                        except: pass
+                        except Exception: pass
                 r_path = step.get("result_path")
                 if r_path and results:
                     try: results = [m.value for m in jsonpath_parse(r_path).find(results)]
-                    except: pass
-            except: pass
+                    except Exception: pass
+            except Exception: pass
 
         if not results and step.get("js_code") and step.get("use_browser"):
             try:
                 results = json.loads(content)
                 if not isinstance(results, list): results = [results]
-            except: pass
+            except Exception: pass
 
         if results: print(f"[{self.name}] [{step.get('name') or 'step'}]{page_info} Processing {len(results)} item(s)")
         return results, page_info
@@ -280,7 +283,7 @@ class Scraper:
                 pub_parsed = item_data.get("published_parsed")
                 if pub_parsed:
                     try: item_data["year"] = str(pub_parsed.tm_year)
-                    except: pass
+                    except Exception: pass
                 elif item_data.get("published"):
                     m = re.match(r'^(\d{4})', str(item_data["published"]))
                     if m: item_data["year"] = m.group(1)
@@ -381,7 +384,7 @@ class Scraper:
                         final.extend(u)
                         # Record success to avoid re-unlocking this specific link
                         await self._record_scraped(db_url)
-                except: pass
+                except Exception: pass
             else: final.append(h)
 
         # 3. Success or Follow
@@ -467,26 +470,27 @@ class Scraper:
                     raise e
                 if step.get("wait_for"):
                     try: await page.wait_for_selector(step["wait_for"], state="attached", timeout=step.get("wait_timeout", 15)*1000)
-                    except: pass
+                    except Exception: pass
                 if step.get("click_selector"):
                     try:
                         await page.click(step["click_selector"])
                         await page.wait_for_load_state("networkidle", timeout=10000)
-                    except: pass
+                    except Exception: pass
                 if step.get("js_code"):
                     res = await page.evaluate(self._render_string(step["js_code"], context), context)
                     return json.dumps(res)
                 if step.get("type") in ["rss", "json"] and resp:
                     try: return await resp.text()
-                    except: pass
+                    except Exception: pass
                 return await page.content()
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] Browser error: {e}")
                 return None
             finally:
                 try: await page.close()
-                except: pass
-                await browser.close()
+                except Exception: pass
+                try: await browser.close()
+                except Exception: pass
 
     def _extract_rss(self, content: str) -> List[Dict[str, Any]]:
         feed = feedparser.parse(content)
@@ -507,7 +511,7 @@ class Scraper:
     def _render_string(self, s: str, context: dict) -> str:
         if not s or "{{" not in s: return s
         try: return Template(s).render(context)
-        except: return s
+        except Exception: return s
 
     def _update_url_param(self, url: str, param: str, value: Any) -> str:
         parsed = urlparse(url)

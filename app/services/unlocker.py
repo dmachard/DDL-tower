@@ -40,7 +40,7 @@ class LinkUnlocker:
                         try:
                             print(f"[UNLOCKER] Blocked popup window at Chromium level.")
                             await popup.close()
-                        except:
+                        except Exception:
                             pass
                     page.on("popup", handle_popup)
 
@@ -229,7 +229,7 @@ class LinkUnlocker:
                     try:
                         if 'page' in locals() and page:
                             await page.close()
-                    except:
+                    except Exception:
                         pass
                     if attempt < max_attempts:
                         await asyncio.sleep(3)
