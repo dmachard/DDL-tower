@@ -367,7 +367,6 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 
                 # Also check currently active downloads
                 try:
-                    from app.services.downloader import downloader_service
                     for active_group, _ in downloader_service.active_downloads.items():
                         active_parsed = parser_service.parse_filename(active_group)
                         active_norm = normalize_title(active_parsed.get("title", active_group))
