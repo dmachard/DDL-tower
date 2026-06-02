@@ -209,6 +209,8 @@ async def test_run_download_task_size_filtering():
     mock_row_large = MagicMock()
     mock_row_large.url = url_too_large
     mock_row_large.category = "movie"
+    mock_row_large.official_title = None
+    mock_row_large.title_fr = None
     mock_row_large.title = "Large Movie"
     mock_row_large.filename = "Large.Movie.2025.mkv"
     mock_row_large.year = 2025
@@ -231,6 +233,8 @@ async def test_run_download_task_size_filtering():
     mock_row_small = MagicMock()
     mock_row_small.url = url_small_enough
     mock_row_small.category = "movie"
+    mock_row_small.official_title = None
+    mock_row_small.title_fr = None
     mock_row_small.title = "Small Movie"
     mock_row_small.filename = "Small.Movie.2025.mkv"
     mock_row_small.year = 2025

@@ -339,9 +339,10 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                 
                 # Also check physical files in the download directory
                 if os.path.exists(settings.DOWNLOAD_DIR):
+                    valid_exts = tuple(settings.VIDEO_EXTENSIONS + ['.rar', '.zip', '.7z'])
                     for local_item in os.listdir(settings.DOWNLOAD_DIR):
                         local_path = os.path.join(settings.DOWNLOAD_DIR, local_item)
-                        if os.path.isfile(local_path) and local_item.lower().endswith(tuple(settings.VIDEO_EXTENSIONS)):
+                        if os.path.isfile(local_path) and local_item.lower().endswith(valid_exts):
                             local_parsed = parser_service.parse_filename(local_item)
                             local_norm = normalize_title(local_parsed.get("title", local_item))
                             local_year = local_parsed.get("year")
@@ -363,6 +364,34 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
                                             self.audio = p.get("audio")
                                             self.codec = p.get("codec")
                                     existing.append(LocalFileMock(local_parsed))
+                
+                # Also check currently active downloads
+                try:
+                    from app.services.downloader import downloader_service
+                    for active_group, _ in downloader_service.active_downloads.items():
+                        active_parsed = parser_service.parse_filename(active_group)
+                        active_norm = normalize_title(active_parsed.get("title", active_group))
+                        active_year = active_parsed.get("year")
+                        active_season = active_parsed.get("season")
+                        active_episode = active_parsed.get("episode")
+                        
+                        if meta.get("category") == "series":
+                            if str(target_season) != str(active_season) or str(target_episode) != str(active_episode):
+                                continue
+                        
+                        if active_norm == target_norm:
+                            if not target_year or not active_year or str(target_year) == str(active_year):
+                                class ActiveMock:
+                                    def __init__(self, p):
+                                        self.resolution = p.get("resolution")
+                                        self.language = ", ".join(p.get("languages", []))
+                                        self.v_quality = p.get("v_quality")
+                                        self.quality = p.get("quality")
+                                        self.audio = p.get("audio")
+                                        self.codec = p.get("codec")
+                                existing.append(ActiveMock(active_parsed))
+                except Exception as e:
+                    print(f"[API] Error checking active downloads: {e}")
                 
                 if existing:
                     # Check if any existing version is better or equal
