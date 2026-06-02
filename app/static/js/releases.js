@@ -45,6 +45,9 @@ export const createReleaseCard = (rel) => {
                     <button class="rel-p-copy" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].copy_links}">
                         <i class="fas fa-copy"></i>
                     </button>
+                    <button class="rel-p-delete" data-ids="${p.ids.join(',')}" title="${TRANSLATIONS[state.language].btn_delete || 'Delete'}">
+                        <i class="fas fa-trash"></i>
+                    </button>
                     ${(state.config.alldebrid_enabled || state.config.realdebrid_enabled || state.config.bestdebrid_enabled) ? `
                     <button class="rel-p-download" data-urls="${p.urls.join('\n')}" title="${TRANSLATIONS[state.language].download_links}">
                         <i class="fas fa-download"></i>
@@ -184,6 +187,26 @@ export const createReleaseCard = (rel) => {
                 btn.classList.add('error');
             } finally {
                 setTimeout(() => { icon.className = originalClass; btn.classList.remove('success', 'error'); btn.disabled = false; }, 2000);
+            }
+        };
+    });
+
+    card.querySelectorAll('.rel-p-delete').forEach(btn => {
+        btn.onclick = async (e) => {
+            e.stopPropagation();
+            const ids = btn.getAttribute('data-ids').split(',').map(id => parseInt(id));
+            const title = TRANSLATIONS[state.language].btn_delete || 'Delete';
+            const msg = TRANSLATIONS[state.language].confirm_delete_release || 'Are you sure?';
+            
+            if (await showConfirm(title, msg)) {
+                try {
+                    const res = await deleteReleases(ids);
+                    if (res.ok) {
+                        fetchData('releases');
+                    }
+                } catch (err) {
+                    console.error('Failed to delete link:', err);
+                }
             }
         };
     });

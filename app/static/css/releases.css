@@ -269,7 +269,8 @@
 .rel-p-copy-title,
 .rel-p-download,
 .rel-p-identify,
-.rel-p-check {
+.rel-p-check,
+.rel-p-delete {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     color: var(--text-secondary);
@@ -323,7 +324,8 @@
     border-color: transparent !important;
 }
 
-.rel-p-check:hover {
+.rel-p-check:hover,
+.rel-p-delete:hover {
     background: rgba(239, 68, 68, 0.1);
     border-color: var(--error);
     color: var(--error);
