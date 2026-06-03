@@ -157,7 +157,7 @@ class Scraper:
                     prev_content_hash = c_hash
     
                     # 2. Parse
-                    results, page_info = self._parse_results(content, step, ctx, current_page)
+                    results, page_info = self._parse_results(content, step, ctx, current_page, url)
                     if not results:
                         if step.get("type") in ["rss", "json"]: break
                         results = [content]
@@ -229,7 +229,7 @@ class Scraper:
 
         return content
 
-    def _parse_results(self, content: str, step: dict, context: dict, page: int) -> Tuple[List[Any], str]:
+    def _parse_results(self, content: str, step: dict, context: dict, page: int, url: str = "") -> Tuple[List[Any], str]:
         step_type = step.get("type", "html")
         page_info = f" (Page {page})" if step.get("pagination") else ""
         results = []
@@ -262,7 +262,12 @@ class Scraper:
                 if not isinstance(results, list): results = [results]
             except Exception: pass
 
-        if results: print(f"[{self.name}] [{step.get('name') or 'step'}]{page_info} Processing {len(results)} item(s)")
+        if results: 
+            url_info = f" from {url}" if url else ""
+            print(f"[{self.name}] [{step.get('name') or 'step'}]{page_info} Processing {len(results)} item(s){url_info}")
+            for i, r in enumerate(results):
+                r_str = str(r).replace('\n', ' ').replace('\r', '')
+                print(f"  -> Item {i+1}: {r_str[:250]}{'...' if len(r_str) > 250 else ''}")
         return results, page_info
 
     async def _handle_item(self, client, item, step, context, step_idx, url, page_info):
@@ -593,6 +598,7 @@ class Scraper:
         return any(re.search(p, link) for p in patterns) if link and patterns else False
 
     async def _record_scraped(self, url: str, status: str = "success"):
+        print(f"[{self.name}] [DB] Recording URL in database: {url} (status: {status})")
         async with get_db_ctx() as session:
             stmt = select(ScrapedURL).where(ScrapedURL.url == url)
             res = await session.execute(stmt)
