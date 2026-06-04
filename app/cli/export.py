@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db.database import get_db_ctx
 from app.db.models import DownloadLink
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 def clean_filename(filename):
     if not filename:
@@ -97,7 +98,7 @@ class ExportCommands:
         db_links = []
         try:
             async with get_db_ctx() as session:
-                stmt = select(DownloadLink)
+                stmt = select(DownloadLink).options(selectinload(DownloadLink.metadata_rel))
                 res = await session.execute(stmt)
                 db_links = res.scalars().all()
             print(f"Loaded {len(db_links)} link(s) from DDLtower database.")
@@ -121,6 +122,14 @@ class ExportCommands:
             parsed['filename'] = cleaned_filename
             parsed['imdb_id'] = link.imdb_id
             parsed['link_source'] = link.source_name
+            
+            # Add official TMDB/IMDb title and year if available
+            if link.metadata_rel:
+                official_title = link.metadata_rel.title_fr or link.metadata_rel.official_title
+                if official_title:
+                    parsed['official_title'] = official_title
+                if link.metadata_rel.year:
+                    parsed['official_year'] = link.metadata_rel.year
             
             if link.last_checked:
                 lc = link.last_checked
@@ -313,7 +322,7 @@ class ExportCommands:
         
         if export_type in ("all", "data"):
             data_db_path = os.path.join(output_dir, "data.db.gz")
-            keys = ['category', 'title', 'imdb_id', 'year', 'size', 'group', 'date_added', 'quality', 'resolution', 'codec', 'audio', 'season', 'episode', 'episode_name', 'channels', 'network', 'extra', 'filename', 'link_source', 'languages', 'v_quality']
+            keys = ['category', 'title', 'imdb_id', 'year', 'size', 'group', 'date_added', 'quality', 'resolution', 'codec', 'audio', 'season', 'episode', 'episode_name', 'channels', 'network', 'extra', 'filename', 'link_source', 'languages', 'v_quality', 'official_title', 'official_year']
             rows = []
             for item in merged_list:
                 row = [item.get(k) for k in keys]
