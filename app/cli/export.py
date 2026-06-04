@@ -340,7 +340,7 @@ class ExportCommands:
             
         if export_type in ("all", "stats"):
             stats_db_path = os.path.join(output_dir, "stats.db.gz")
-            stats_keys = ['category', 'title', 'imdb_id', 'year', 'size', 'group', 'date_added', 'quality', 'resolution', 'codec', 'audio', 'official_title', 'official_year']
+            stats_keys = ['category', 'title', 'imdb_id', 'year', 'size', 'group', 'date_added', 'quality', 'resolution', 'codec', 'audio', 'v_quality', 'official_title', 'official_year']
             stats_rows = []
             for item in merged_list:
                 row = [item.get(k) for k in stats_keys]
