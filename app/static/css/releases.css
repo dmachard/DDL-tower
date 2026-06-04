@@ -390,6 +390,15 @@
         letter-spacing: 1px;
         backdrop-filter: blur(4px);
     }
+
+    .rel-providers {
+        overflow-x: auto;
+        padding-bottom: 5px;
+    }
+
+    .rel-provider-row {
+        min-width: max-content;
+    }
 }
 
 .mobile-toggle-releases {
