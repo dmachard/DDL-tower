@@ -33,16 +33,16 @@ def clean_filename(filename):
     filename = re.sub(r'\[\s*(www\.)?' + sites_pattern + r'\.[a-z0-9-]+\s*\]', '', filename, flags=re.IGNORECASE)
     
     # Suffix tags (hyphen or underscore followed by site name and tld)
-    filename = re.sub(r'[-_]\s*(www\.)?' + sites_pattern + r'\.[a-z0-9-]+', '', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'[-_]\s*(www\.)?' + sites_pattern + r'\.[a-z]{2,4}\b', '', filename, flags=re.IGNORECASE)
     
     # Suffix tags with dot (e.g. .Loadix.fun before extension or end of string)
-    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z0-9-]+(?=\.|$)', '', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z]{2,4}\b(?=\.|$)', '', filename, flags=re.IGNORECASE)
     
     # In-between dots
-    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z0-9-]+\.', '.', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z]{2,4}\b\.', '.', filename, flags=re.IGNORECASE)
     
     # Standard site names without TLD
-    filename = re.sub(r'[-_]\s*(wawacity|zone-telechargement|loadix)[a-z0-9-]*', '', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'[-_]\s*(wawacity|zone-telechargement|loadix)\b', '', filename, flags=re.IGNORECASE)
 
     # General cleanup
     filename = re.sub(r'\.+', '.', filename)
@@ -51,6 +51,12 @@ def clean_filename(filename):
     filename = re.sub(r'-\.', '-', filename)
     
     filename = filename.strip('. _-')
+    
+    # Nettoyage final de sécurité
+    filename = re.sub(r'[-_.]?(wawacity|zone-telechargement|loadix)[-_.]?', '.', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\.+', '.', filename)
+    filename = filename.strip('. _-')
+    
     return filename
 
 def run_git_cmd(args, cwd):
