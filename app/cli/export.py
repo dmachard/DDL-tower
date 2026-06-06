@@ -32,17 +32,16 @@ def clean_filename(filename):
     # Brackets anywhere
     filename = re.sub(r'\[\s*(www\.)?' + sites_pattern + r'\.[a-z0-9-]+\s*\]', '', filename, flags=re.IGNORECASE)
     
+    ext_lookahead = r'(?=\.(?:mkv|mp4|avi|ts|m4v|wmv|mov|iso|rar|zip)$|$)'
+    
     # Suffix tags (hyphen or underscore followed by site name and tld)
-    filename = re.sub(r'[-_]\s*(www\.)?' + sites_pattern + r'\.[a-z]{2,4}\b', '', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'[-_]\s*(www\.)?' + sites_pattern + r'\.[a-z]{2,20}\b' + ext_lookahead, '', filename, flags=re.IGNORECASE)
     
     # Suffix tags with dot (e.g. .Loadix.fun before extension or end of string)
-    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z]{2,4}\b(?=\.|$)', '', filename, flags=re.IGNORECASE)
-    
-    # In-between dots
-    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z]{2,4}\b\.', '.', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'\.(www\.)?' + sites_pattern + r'\.[a-z]{2,20}\b' + ext_lookahead, '', filename, flags=re.IGNORECASE)
     
     # Standard site names without TLD
-    filename = re.sub(r'[-_]\s*(wawacity|zone-telechargement|loadix)\b', '', filename, flags=re.IGNORECASE)
+    filename = re.sub(r'[-_]\s*(wawacity|zone-telechargement|loadix)\b' + ext_lookahead, '', filename, flags=re.IGNORECASE)
 
     # General cleanup
     filename = re.sub(r'\.+', '.', filename)
