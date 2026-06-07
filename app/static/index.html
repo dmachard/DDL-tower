@@ -34,6 +34,28 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <!-- Live toggle moved to header -->
+                    <div id="live-toggle" class="live-status">
+                        <div class="live-indicator"></div>
+                        <span class="live-label" style="display: none;">LIVE</span>
+                    </div>
+
+                    <!-- Mobile navigation custom select -->
+                    <div class="mobile-nav-switcher">
+                        <div class="custom-select" id="mobile-nav-custom-select">
+                            <div class="select-trigger">
+                                <i class="fas fa-bars"></i>
+                            </div>
+                            <div class="select-options">
+                                <div class="option active" data-value="releases"><i class="fas fa-compass"></i> <span data-i18n="nav_releases">Explorer</span></div>
+                                <div class="option" data-value="downloads"><i class="fas fa-cloud-download-alt"></i> <span data-i18n="nav_downloads">Downloads</span></div>
+                                <div class="option" data-value="quick-scan"><i class="fas fa-bolt"></i> <span data-i18n="nav_quick_scan">Scanner</span></div>
+                                <div class="option" data-value="sources"><i class="fas fa-satellite-dish"></i> <span data-i18n="nav_sources">Sources</span></div>
+                                <div class="option" data-value="errors"><i class="fas fa-exclamation-circle"></i> <span data-i18n="nav_errors">Errors</span></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="language-switcher">
                         <div class="custom-select" id="lang-custom-select">
                             <div class="select-trigger">
@@ -75,12 +97,6 @@
                     <i class="fas fa-exclamation-circle"></i>
                     <span data-i18n="nav_errors">Errors</span>
                 </button>
-
-                <!-- Removed Global Search from Nav -->
-                <div id="live-toggle" class="live-status">
-                    <div class="live-indicator"></div>
-                    <span class="live-label">LIVE</span>
-                </div>
             </nav>
 
             <!-- Releases View -->

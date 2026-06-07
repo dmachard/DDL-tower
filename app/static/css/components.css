@@ -308,16 +308,17 @@
 @media (max-width: 900px) {
     .custom-select .select-options {
         position: fixed;
-        top: 50%;
+        top: 15px;
         left: 50%;
-        transform: translate(-50%, -50%) scale(0.95);
+        transform: translateX(-50%) scale(0.95);
         width: 90vw;
         max-width: 400px;
-        max-height: 80vh;
+        max-height: calc(100vh - 30px);
         z-index: var(--z-modal);
     }
     .custom-select.active .select-options {
-        transform: translate(-50%, -50%) scale(1);
+        transform: translateX(-50%) scale(1);
+        animation: none;
     }
 }
 
