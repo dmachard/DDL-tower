@@ -220,7 +220,7 @@ class Scraper:
                 content = resp.text
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] Error: {e}")
-                return None
+                raise e
 
         if content and step.get("debug"):
             debug_file = f"data/debug/debug_{self.name}_{step_name.replace(' ','_')}_{int(time.time())}.txt"
@@ -490,7 +490,7 @@ class Scraper:
                 return await page.content()
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] Browser error: {e}")
-                return None
+                raise e
             finally:
                 try: await page.close()
                 except Exception: pass
