@@ -19,6 +19,9 @@ def clean_filename(filename):
     if not filename:
         return ""
     
+    # Remove darkino prefix
+    filename = re.sub(r'^darkino\.com-\d+-\s*', '', filename, flags=re.IGNORECASE)
+    
     # Remove trailing size suffixes (e.g., " – 2.0 GB", " - 1.5 Go", " - 800 MB")
     filename = re.sub(r'\s*[–-—]\s*\d+(?:\.\d+)?\s*(?:GB|MB|KB|Go|Mo|Ko|G|M|K)\b.*$', '', filename, flags=re.IGNORECASE)
     
