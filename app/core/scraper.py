@@ -458,44 +458,51 @@ class Scraper:
         from app.services.browser_manager import browser_manager
         step_name = step.get("name", "browser")
         print(f"[{self.name}] [{step_name}] Open page by browser: {url}")
-        async with async_playwright() as p:
-            browser = await browser_manager.get_browser(p, url=url)
-            if not browser: return None
-            if browser.contexts:
-                ctx_pw = browser.contexts[0]
-            else:
-                ctx_pw = await browser.new_context(user_agent=headers.get("User-Agent", self.headers["User-Agent"]), extra_http_headers=headers)
-            page = await ctx_pw.new_page()
-            try:
-                try: resp = await page.goto(url, wait_until=step.get("wait_until", "domcontentloaded"), timeout=self.timeout*1000)
+        
+        max_retries = step.get("retries", 3)
+        for attempt in range(max_retries):
+            async with async_playwright() as p:
+                browser = await browser_manager.get_browser(p, url=url)
+                if not browser: return None
+                if browser.contexts:
+                    ctx_pw = browser.contexts[0]
+                else:
+                    ctx_pw = await browser.new_context(user_agent=headers.get("User-Agent", self.headers["User-Agent"]), extra_http_headers=headers)
+                page = await ctx_pw.new_page()
+                try:
+                    try: resp = await page.goto(url, wait_until=step.get("wait_until", "domcontentloaded"), timeout=self.timeout*1000)
+                    except Exception as e:
+                        if "Download is starting" in str(e):
+                            req = await page.request.get(url)
+                            return await req.text()
+                        raise e
+                    if step.get("wait_for"):
+                        try: await page.wait_for_selector(step["wait_for"], state="attached", timeout=step.get("wait_timeout", 15)*1000)
+                        except Exception: pass
+                    if step.get("click_selector"):
+                        try:
+                            await page.click(step["click_selector"])
+                            await page.wait_for_load_state("networkidle", timeout=10000)
+                        except Exception: pass
+                    if step.get("js_code"):
+                        res = await page.evaluate(self._render_string(step["js_code"], context), context)
+                        return json.dumps(res)
+                    if step.get("type") in ["rss", "json"] and resp:
+                        try: return await resp.text()
+                        except Exception: pass
+                    return await page.content()
                 except Exception as e:
-                    if "Download is starting" in str(e):
-                        req = await page.request.get(url)
-                        return await req.text()
-                    raise e
-                if step.get("wait_for"):
-                    try: await page.wait_for_selector(step["wait_for"], state="attached", timeout=step.get("wait_timeout", 15)*1000)
+                    if attempt < max_retries - 1:
+                        print(f"[{self.name}] [{step_name}] Browser error (attempt {attempt+1}/{max_retries}): {e}. Retrying in 5s...")
+                        await asyncio.sleep(5)
+                    else:
+                        print(f"[{self.name}] [{step_name}] Browser error: {e}")
+                        raise e
+                finally:
+                    try: await page.close()
                     except Exception: pass
-                if step.get("click_selector"):
-                    try:
-                        await page.click(step["click_selector"])
-                        await page.wait_for_load_state("networkidle", timeout=10000)
+                    try: await browser.close()
                     except Exception: pass
-                if step.get("js_code"):
-                    res = await page.evaluate(self._render_string(step["js_code"], context), context)
-                    return json.dumps(res)
-                if step.get("type") in ["rss", "json"] and resp:
-                    try: return await resp.text()
-                    except Exception: pass
-                return await page.content()
-            except Exception as e:
-                print(f"[{self.name}] [{step_name}] Browser error: {e}")
-                raise e
-            finally:
-                try: await page.close()
-                except Exception: pass
-                try: await browser.close()
-                except Exception: pass
 
     def _extract_rss(self, content: str) -> List[Dict[str, Any]]:
         feed = feedparser.parse(content)
