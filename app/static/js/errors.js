@@ -55,6 +55,10 @@ export const initErrors = () => {
                     // or just reload the view by modifying state and calling render.
                     // An easier way is to just clear the DOM immediately and let the next poll fetch it.
                     renderErrors([]);
+                    const countEl = document.getElementById('count-errors');
+                    if (countEl) countEl.textContent = 0;
+                    const mobCountEl = document.getElementById('mobile-count-errors');
+                    if (mobCountEl) mobCountEl.textContent = 0;
                 } catch (e) {
                     console.error('Failed to clear errors', e);
                 }
