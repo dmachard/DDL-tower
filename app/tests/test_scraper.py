@@ -378,3 +378,53 @@ async def test_scraped_url_record_after_yield():
         assert len(results) == 1
         # Verify that _record_scraped was called with the custom scraped_url
         mock_record.assert_awaited_once_with("https://stable.link#Episode-2")
+
+
+@pytest.mark.asyncio
+async def test_unlock_failure_recording():
+    """Test that when unlock fails, the error status is recorded in scraped_urls."""
+    config = {
+        "name": "TestUnlockFailure",
+        "steps": [
+            {
+                "name": "step1",
+                "url": "https://site.com",
+                "unlock_links": True,
+                "yield_links": True
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    
+    # Custom item from JS code
+    item = {
+        "url": "https://volatile.link",
+        "scraped_url": "https://stable.link#Episode-3"
+    }
+    
+    with patch("app.core.scraper.get_db_ctx") as mock_db_ctx, \
+         patch.object(scraper.unlocker, "unlock", new_callable=AsyncMock) as mock_unlock, \
+         patch.object(scraper, "_record_scraped", new_callable=AsyncMock) as mock_record:
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        # Simulate record does NOT exist in DB
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+        
+        # Simulate unlock failure
+        mock_unlock.side_effect = ValueError("Timeout waiting for selector 'text=Mirror links' and no links extracted")
+        
+        results = []
+        async for res in scraper._handle_item(client, item, config["steps"][0], {}, 0, "https://site.com", ""):
+            results.append(res)
+            
+        assert len(results) == 0
+        # Verify that _record_scraped was called with status="failed: ..."
+        mock_record.assert_awaited_once_with(
+            "https://stable.link#Episode-3",
+            status="failed: Timeout waiting for selector 'text=Mirror links' and no links extracted"
+        )
+

@@ -31,6 +31,8 @@ export const fetchData = async (view) => {
 
         const countEl = document.getElementById(`count-${view}`);
         if (countEl) countEl.textContent = data.total;
+        const mobCountEl = document.getElementById(`mobile-count-${view}`);
+        if (mobCountEl) mobCountEl.textContent = data.total;
 
         if (state.currentView === view) {
             if (view === 'releases') renderReleases(data.items);
@@ -56,8 +58,11 @@ export const fetchDownloads = async () => {
         const activeCount = Object.keys(state.downloads.active).length;
         const diskCount = state.downloads.items.filter(f => !state.downloads.active[f.name]).length;
 
+        const totalDownloads = diskCount + activeCount;
         const countEl = document.getElementById('count-downloads');
-        if (countEl) countEl.textContent = diskCount + activeCount;
+        if (countEl) countEl.textContent = totalDownloads;
+        const mobCountEl = document.getElementById('mobile-count-downloads');
+        if (mobCountEl) mobCountEl.textContent = totalDownloads;
 
         if (state.currentView === 'downloads') {
             renderDownloads(state.downloads.items);
@@ -92,6 +97,11 @@ export const fetchErrors = async () => {
     try {
         const res = await fetch('/api/errors');
         const data = await res.json();
+        const errCount = Array.isArray(data) ? data.length : 0;
+        const countEl = document.getElementById('count-errors');
+        if (countEl) countEl.textContent = errCount;
+        const mobCountEl = document.getElementById('mobile-count-errors');
+        if (mobCountEl) mobCountEl.textContent = errCount;
         renderErrors(data);
     } catch (err) {
         console.error('Error fetching errors:', err);

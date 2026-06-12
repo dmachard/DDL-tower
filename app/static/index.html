@@ -47,11 +47,39 @@
                                 <i class="fas fa-bars"></i>
                             </div>
                             <div class="select-options">
-                                <div class="option active" data-value="releases"><i class="fas fa-compass"></i> <span data-i18n="nav_releases">Explorer</span></div>
-                                <div class="option" data-value="downloads"><i class="fas fa-cloud-download-alt"></i> <span data-i18n="nav_downloads">Downloads</span></div>
-                                <div class="option" data-value="quick-scan"><i class="fas fa-bolt"></i> <span data-i18n="nav_quick_scan">Scanner</span></div>
-                                <div class="option" data-value="sources"><i class="fas fa-satellite-dish"></i> <span data-i18n="nav_sources">Sources</span></div>
-                                <div class="option" data-value="errors"><i class="fas fa-exclamation-circle"></i> <span data-i18n="nav_errors">Errors</span></div>
+                                <div class="option active" data-value="releases">
+                                    <span class="option-label-wrapper">
+                                        <i class="fas fa-compass"></i> 
+                                        <span data-i18n="nav_releases">Explorer</span>
+                                    </span>
+                                    <span class="nav-count" id="mobile-count-releases">0</span>
+                                </div>
+                                <div class="option" data-value="downloads">
+                                    <span class="option-label-wrapper">
+                                        <i class="fas fa-cloud-download-alt"></i> 
+                                        <span data-i18n="nav_downloads">Downloads</span>
+                                    </span>
+                                    <span class="nav-count" id="mobile-count-downloads">0</span>
+                                </div>
+                                <div class="option" data-value="quick-scan">
+                                    <span class="option-label-wrapper">
+                                        <i class="fas fa-bolt"></i> 
+                                        <span data-i18n="nav_quick_scan">Scanner</span>
+                                    </span>
+                                </div>
+                                <div class="option" data-value="sources">
+                                    <span class="option-label-wrapper">
+                                        <i class="fas fa-satellite-dish"></i> 
+                                        <span data-i18n="nav_sources">Sources</span>
+                                    </span>
+                                </div>
+                                <div class="option" data-value="errors">
+                                    <span class="option-label-wrapper">
+                                        <i class="fas fa-exclamation-circle"></i> 
+                                        <span data-i18n="nav_errors">Errors</span>
+                                    </span>
+                                    <span class="nav-count" id="mobile-count-errors">0</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -96,6 +124,7 @@
                 <button class="nav-item" data-view="errors">
                     <i class="fas fa-exclamation-circle"></i>
                     <span data-i18n="nav_errors">Errors</span>
+                    <span class="nav-count" id="count-errors">0</span>
                 </button>
             </nav>
 

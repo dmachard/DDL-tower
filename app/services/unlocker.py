@@ -20,11 +20,12 @@ class LinkUnlocker:
         from app.services.browser_manager import browser_manager
         
         final_links = []
+        last_exception = Exception("Unknown unlock error")
         async with async_playwright() as p:
             # Use browser_manager to handle Webtop lifecycle
             browser = await browser_manager.get_browser(p, url=url)
             if not browser:
-                return []
+                raise Exception("Webtop browser container unavailable")
 
             max_attempts = 3
             for attempt in range(1, max_attempts + 1):
@@ -194,12 +195,14 @@ class LinkUnlocker:
                         
                         # Specific wait for final hoster links to load
                         wait_final = matched_unlocker.get("wait_for_final")
+                        wait_final_error = None
                         if wait_final:
                             print(f"[UNLOCKER] Waiting for final hoster links to load: {wait_final}")
                             try:
                                 await page.wait_for_selector(wait_final, timeout=15000)
                                 await asyncio.sleep(3) # Extra stability for dynamic elements
                             except Exception as e:
+                                wait_final_error = e
                                 print(f"[UNLOCKER] Note: Timeout waiting for specific selectors ({e}). Proceeding with current content.")
 
                         content = await page.content()
@@ -219,13 +222,17 @@ class LinkUnlocker:
                         if total_extracted == 0:
                             print(f"[UNLOCKER] WARNING: No links extracted from {page.url}")
                             print(f"[UNLOCKER] Page Title: '{await page.title()}'")
-                            raise ValueError("No links extracted from the final page")
+                            if wait_final_error:
+                                raise ValueError(f"Timeout waiting for selector '{wait_final}' and no links extracted")
+                            else:
+                                raise ValueError("No links extracted from the final page")
                         
                         await page.close()
                         break
                         
                 except Exception as e:
                     print(f"[UNLOCKER] Attempt {attempt} failed: {e}")
+                    last_exception = e
                     try:
                         if 'page' in locals() and page:
                             await page.close()
@@ -234,4 +241,7 @@ class LinkUnlocker:
                     if attempt < max_attempts:
                         await asyncio.sleep(3)
                         
+        if not final_links:
+            raise last_exception
+            
         return sorted(list(set(final_links)))

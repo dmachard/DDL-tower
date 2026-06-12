@@ -323,12 +323,22 @@
 }
 
 .option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     padding: 10px 16px;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
     transition: var(--transition);
+}
+
+.option-label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .option:hover {

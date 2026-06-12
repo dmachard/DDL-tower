@@ -1,6 +1,6 @@
 import { state } from './js/state.js';
 import { debounce } from './js/helpers.js';
-import { fetchData, fetchDownloads, fetchStats, fetchConfig, fetchSources, fetchYears, fetchNetworks } from './js/api.js';
+import { fetchData, fetchDownloads, fetchStats, fetchConfig, fetchSources, fetchYears, fetchNetworks, fetchErrors } from './js/api.js';
 import { loadFilters, updateTagsUI, handleTagClick, initCustomSelect } from './js/filters.js';
 import { setLanguage } from './js/i18n.js';
 import { initModals } from './js/modals.js';
@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['releases'].forEach(v => { loadFilters(v); updateTagsUI(`filter-tags-${v}`, state[v]); });
     ['releases'].forEach(fetchData);
     fetchDownloads();
+    fetchErrors();
     fetchStats();
     initApp();
 

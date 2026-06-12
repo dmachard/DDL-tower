@@ -389,7 +389,13 @@ class Scraper:
                         final.extend(u)
                         # Record success to avoid re-unlocking this specific link
                         await self._record_scraped(db_url)
-                except Exception: pass
+                except Exception as e:
+                    err_msg = str(e).strip() or type(e).__name__
+                    print(f"[{self.name}] [{step_name}] Unlock failed for {h}: {err_msg}")
+                    try:
+                        await self._record_scraped(db_url, status=f"failed: {err_msg[:100]}")
+                    except Exception:
+                        pass
             else: final.append(h)
 
         # 3. Success or Follow
@@ -477,13 +483,10 @@ class Scraper:
                             return await req.text()
                         raise e
                     if step.get("wait_for"):
-                        try: await page.wait_for_selector(step["wait_for"], state="attached", timeout=step.get("wait_timeout", 15)*1000)
-                        except Exception: pass
+                        await page.wait_for_selector(step["wait_for"], state="attached", timeout=step.get("wait_timeout", 15)*1000)
                     if step.get("click_selector"):
-                        try:
-                            await page.click(step["click_selector"])
-                            await page.wait_for_load_state("networkidle", timeout=10000)
-                        except Exception: pass
+                        await page.click(step["click_selector"])
+                        await page.wait_for_load_state("networkidle", timeout=10000)
                     if step.get("js_code"):
                         res = await page.evaluate(self._render_string(step["js_code"], context), context)
                         return json.dumps(res)
