@@ -20,3 +20,5 @@ docker
 jsonpath-ng
 yt-dlp
 releascenify
+numpy
+opencv-python-headless
