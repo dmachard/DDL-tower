@@ -102,3 +102,57 @@ def get_quality_score(resolution: str = None, language: str = None, v_quality: s
     if "265" in c or "hevc" in c: score += 5
     
     return score
+
+async def save_error_dump(url: str, page) -> tuple:
+    """
+    Saves a screenshot and HTML dump of the current playwright page.
+    Returns (screenshot_relative_path, html_relative_path).
+    """
+    import os
+    import time
+    import hashlib
+    import traceback
+    try:
+        os.makedirs("app/static/error_dumps", exist_ok=True)
+        
+        # Unique identifier from URL + timestamp
+        url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()[:10]
+        timestamp = int(time.time() * 1000)
+        filename_base = f"{timestamp}_{url_hash}"
+        
+        screenshot_rel = f"/static/error_dumps/screenshot_{filename_base}.png"
+        html_rel = f"/static/error_dumps/html_{filename_base}.html"
+        
+        screenshot_abs = f"app/static/error_dumps/screenshot_{filename_base}.png"
+        html_abs = f"app/static/error_dumps/html_{filename_base}.html"
+        
+        screenshot_path = None
+        html_path = None
+        
+        # Take screenshot
+        try:
+            await page.screenshot(path=screenshot_abs, full_page=True, timeout=10000)
+            screenshot_path = screenshot_rel
+        except Exception as se:
+            print(f"[ERROR-DUMP] Failed to save full page screenshot: {se}")
+            # Try viewport screenshot as fallback
+            try:
+                await page.screenshot(path=screenshot_abs, full_page=False, timeout=5000)
+                screenshot_path = screenshot_rel
+            except Exception as se2:
+                print(f"[ERROR-DUMP] Failed to save fallback viewport screenshot: {se2}")
+        
+        # Save HTML
+        try:
+            content = await page.content()
+            with open(html_abs, "w", encoding="utf-8") as f:
+                f.write(content)
+            html_path = html_rel
+        except Exception as he:
+            print(f"[ERROR-DUMP] Failed to save HTML: {he}")
+            
+        return screenshot_path, html_path
+    except Exception as e:
+        print(f"[ERROR-DUMP] General failure: {e}")
+        traceback.print_exc()
+        return None, None

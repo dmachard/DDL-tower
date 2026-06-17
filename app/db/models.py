@@ -60,6 +60,8 @@ class ScrapedURL(Base):
     status = Column(String, default="success") # 'success' or 'failed'
     scrape_once = Column(Boolean, default=False)
     duration_ms = Column(Integer, nullable=True)
+    screenshot_path = Column(String, nullable=True)
+    html_path = Column(String, nullable=True)
 class DownloadHistory(Base):
     __tablename__ = "download_history"
 

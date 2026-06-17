@@ -233,6 +233,15 @@ class LinkUnlocker:
                 except Exception as e:
                     print(f"[UNLOCKER] Attempt {attempt} failed: {e}")
                     last_exception = e
+                    if attempt == max_attempts:
+                        try:
+                            if 'page' in locals() and page:
+                                from app.core.utils import save_error_dump
+                                screenshot_path, html_path = await save_error_dump(url, page)
+                                last_exception.screenshot_path = screenshot_path
+                                last_exception.html_path = html_path
+                        except Exception as dump_err:
+                            print(f"[UNLOCKER] Failed to save error dump: {dump_err}")
                     try:
                         if 'page' in locals() and page:
                             await page.close()

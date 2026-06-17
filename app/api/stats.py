@@ -173,13 +173,48 @@ async def get_errors(db: AsyncSession = Depends(get_db)):
         "url": e.url,
         "source": e.source_name,
         "date": e.last_scraped.isoformat(),
-        "error": e.status.replace("failed: ", "") if e.status.startswith("failed: ") else e.status
+        "error": e.status.replace("failed: ", "") if e.status.startswith("failed: ") else e.status,
+        "screenshot_path": e.screenshot_path,
+        "html_path": e.html_path
     } for e in errors]
 
 @router.delete("/errors")
 async def clear_errors(db: AsyncSession = Depends(get_db)):
+    import os
     from sqlalchemy import update
-    stmt = update(ScrapedURL).where(ScrapedURL.status.like("failed%")).values(status="ignored")
+    
+    # 1. Fetch paths first to clean up files on disk
+    stmt_select = select(ScrapedURL).where(ScrapedURL.status.like("failed%"))
+    result = await db.execute(stmt_select)
+    records = result.scalars().all()
+    
+    for r in records:
+        if r.screenshot_path:
+            path = r.screenshot_path.lstrip('/')
+            if path.startswith("static/"):
+                path = "app/" + path
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                print(f"[DB] Error removing screenshot file {path}: {e}")
+                
+        if r.html_path:
+            path = r.html_path.lstrip('/')
+            if path.startswith("static/"):
+                path = "app/" + path
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                print(f"[DB] Error removing HTML dump file {path}: {e}")
+
+    # 2. Mark errors as ignored and clear paths in DB
+    stmt = update(ScrapedURL).where(ScrapedURL.status.like("failed%")).values(
+        status="ignored",
+        screenshot_path=None,
+        html_path=None
+    )
     await db.execute(stmt)
     await db.commit()
     return {"message": "Errors cleared"}

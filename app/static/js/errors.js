@@ -35,6 +35,20 @@ export const renderErrors = (errors) => {
                 <div style="font-size: 12px; color: var(--error); margin-top: 6px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
                     ${err.error === "failed" ? "Unknown error (legacy log)" : err.error}
                 </div>
+                ${(err.screenshot_path || err.html_path) ? `
+                <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+                    ${err.screenshot_path ? `
+                        <a href="${err.screenshot_path}" target="_blank" class="btn-error-dump" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-secondary); font-size: 11px; font-weight: 700; text-decoration: none; text-transform: uppercase; letter-spacing: 0.5px; transition: var(--transition);" onmouseover="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(255,255,255,0.15)'; this.style.color='var(--text-primary)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)'">
+                            <i class="fas fa-camera" style="color: var(--accent);"></i> Screenshot
+                        </a>
+                    ` : ''}
+                    ${err.html_path ? `
+                        <a href="${err.html_path}" target="_blank" class="btn-error-dump" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-secondary); font-size: 11px; font-weight: 700; text-decoration: none; text-transform: uppercase; letter-spacing: 0.5px; transition: var(--transition);" onmouseover="this.style.background='rgba(255,255,255,0.08)'; this.style.borderColor='rgba(255,255,255,0.15)'; this.style.color='var(--text-primary)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)'">
+                            <i class="fas fa-code" style="color: var(--warning);"></i> HTML Dump
+                        </a>
+                    ` : ''}
+                </div>
+                ` : ''}
             </div>
             <div class="col-date" style="text-align: right; white-space: nowrap;">${formatDate(err.date)}</div>
         `;

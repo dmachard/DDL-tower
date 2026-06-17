@@ -113,4 +113,15 @@ async def init_db():
                         print(f"[DB] Migration: Adding '{col}' column to 'download_history' table")
                         sync_conn.connection.execute(f"ALTER TABLE download_history ADD COLUMN {col} TEXT")
 
+            # Add columns to scraped_urls
+            inspector.execute("PRAGMA table_info(scraped_urls)")
+            su_columns = [col[1] for col in inspector.fetchall()]
+            if su_columns:
+                if "screenshot_path" not in su_columns:
+                    print("[DB] Migration: Adding 'screenshot_path' column to 'scraped_urls' table")
+                    sync_conn.connection.execute("ALTER TABLE scraped_urls ADD COLUMN screenshot_path TEXT")
+                if "html_path" not in su_columns:
+                    print("[DB] Migration: Adding 'html_path' column to 'scraped_urls' table")
+                    sync_conn.connection.execute("ALTER TABLE scraped_urls ADD COLUMN html_path TEXT")
+
         await conn.run_sync(migrate)

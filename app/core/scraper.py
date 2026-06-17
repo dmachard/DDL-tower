@@ -7,6 +7,7 @@ import json
 import traceback
 import feedparser
 import httpx
+import hashlib
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple, AsyncGenerator, Union
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -188,8 +189,15 @@ class Scraper:
             except Exception as e:
                 err_msg = str(e).strip() or type(e).__name__
                 print(f"[{self.name}] [{step_name}] URL error ({url}): {err_msg}")
+                screenshot_path = getattr(e, "screenshot_path", None)
+                html_path = getattr(e, "html_path", None)
+                kwargs = {}
+                if screenshot_path is not None:
+                    kwargs["screenshot_path"] = screenshot_path
+                if html_path is not None:
+                    kwargs["html_path"] = html_path
                 try:
-                    await self._record_scraped(url, status=f"failed: {err_msg[:100]}")
+                    await self._record_scraped(url, status=f"failed: {err_msg[:100]}", **kwargs)
                 except RuntimeError:
                     pass
 
@@ -220,6 +228,19 @@ class Scraper:
                 content = resp.text
             except Exception as e:
                 print(f"[{self.name}] [{step_name}] Error: {e}")
+                try:
+                    if 'resp' in locals() and resp is not None:
+                        os.makedirs("app/static/error_dumps", exist_ok=True)
+                        url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()[:10]
+                        timestamp = int(time.time() * 1000)
+                        filename_base = f"{timestamp}_{url_hash}"
+                        html_rel = f"/static/error_dumps/html_{filename_base}.html"
+                        html_abs = f"app/static/error_dumps/html_{filename_base}.html"
+                        with open(html_abs, "w", encoding="utf-8") as f:
+                            f.write(resp.text)
+                        e.html_path = html_rel
+                except Exception as dump_err:
+                    print(f"[{self.name}] Failed to save HTTP response error dump: {dump_err}")
                 raise e
 
         if content and step.get("debug"):
@@ -392,8 +413,15 @@ class Scraper:
                 except Exception as e:
                     err_msg = str(e).strip() or type(e).__name__
                     print(f"[{self.name}] [{step_name}] Unlock failed for {h}: {err_msg}")
+                    screenshot_path = getattr(e, "screenshot_path", None)
+                    html_path = getattr(e, "html_path", None)
+                    kwargs = {}
+                    if screenshot_path is not None:
+                        kwargs["screenshot_path"] = screenshot_path
+                    if html_path is not None:
+                        kwargs["html_path"] = html_path
                     try:
-                        await self._record_scraped(db_url, status=f"failed: {err_msg[:100]}")
+                        await self._record_scraped(db_url, status=f"failed: {err_msg[:100]}", **kwargs)
                     except Exception:
                         pass
             else: final.append(h)
@@ -500,6 +528,14 @@ class Scraper:
                         await asyncio.sleep(5)
                     else:
                         print(f"[{self.name}] [{step_name}] Browser error: {e}")
+                        try:
+                            if 'page' in locals() and page:
+                                from app.core.utils import save_error_dump
+                                screenshot_path, html_path = await save_error_dump(url, page)
+                                e.screenshot_path = screenshot_path
+                                e.html_path = html_path
+                        except Exception as dump_err:
+                            print(f"[{self.name}] Failed to save error dump: {dump_err}")
                         raise e
                 finally:
                     try: await page.close()
@@ -607,7 +643,7 @@ class Scraper:
     def _is_hoster_link(self, link: str, patterns: List[str]) -> bool:
         return any(re.search(p, link) for p in patterns) if link and patterns else False
 
-    async def _record_scraped(self, url: str, status: str = "success"):
+    async def _record_scraped(self, url: str, status: str = "success", screenshot_path: str = None, html_path: str = None):
         print(f"[{self.name}] [DB] Recording URL in database: {url} (status: {status})")
         async with get_db_ctx() as session:
             stmt = select(ScrapedURL).where(ScrapedURL.url == url)
@@ -616,6 +652,16 @@ class Scraper:
             if existing:
                 existing.status = status
                 existing.last_scraped = datetime.now(timezone.utc)
+                if screenshot_path:
+                    existing.screenshot_path = screenshot_path
+                if html_path:
+                    existing.html_path = html_path
             else:
-                session.add(ScrapedURL(url=url, source_name=self.name, status=status))
+                session.add(ScrapedURL(
+                    url=url, 
+                    source_name=self.name, 
+                    status=status,
+                    screenshot_path=screenshot_path,
+                    html_path=html_path
+                ))
             await session.commit()

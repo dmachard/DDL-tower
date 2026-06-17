@@ -209,3 +209,6 @@ __marimo__/
 # ignore container data
 data/
 webtop_data/
+
+# ignore error dumps
+app/static/error_dumps/
