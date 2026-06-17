@@ -43,6 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initQuickScan();
     initErrors();
 
+    document.addEventListener('errors-updated', () => {
+        fetchErrors();
+    });
+
     // ── Filter Tags ───────────────────────────────────────────────────────────
     document.getElementById('filter-tags-releases')?.addEventListener('click', (e) => handleTagClick(e, 'releases'));
 

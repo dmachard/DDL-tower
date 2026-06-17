@@ -161,15 +161,25 @@ async def get_networks(db: AsyncSession = Depends(get_db)):
     return sorted([n for n in networks if n])
 
 @router.get("/errors")
-async def get_errors(db: AsyncSession = Depends(get_db)):
+async def get_errors(page: int = 1, limit: int = 20, db: AsyncSession = Depends(get_db)):
     """
-    Returns the list of scraping errors.
+    Returns the paginated list of scraping errors.
     """
-    stmt = select(ScrapedURL).where(ScrapedURL.status.like("failed%")).order_by(ScrapedURL.last_scraped.desc()).limit(100)
+    # Count total errors in database
+    count_stmt = select(func.count(ScrapedURL.url)).where(ScrapedURL.status.like("failed%"))
+    count_res = await db.execute(count_stmt)
+    total_count = count_res.scalar() or 0
+
+    # Calculate offset and total pages
+    offset = (page - 1) * limit
+    pages = (total_count + limit - 1) // limit if total_count > 0 else 0
+
+    # Retrieve paginated errors for display
+    stmt = select(ScrapedURL).where(ScrapedURL.status.like("failed%")).order_by(ScrapedURL.last_scraped.desc()).offset(offset).limit(limit)
     result = await db.execute(stmt)
     errors = result.scalars().all()
     
-    return [{
+    serialized_errors = [{
         "url": e.url,
         "source": e.source_name,
         "date": e.last_scraped.isoformat(),
@@ -178,13 +188,26 @@ async def get_errors(db: AsyncSession = Depends(get_db)):
         "html_path": e.html_path
     } for e in errors]
 
+    return {
+        "total": total_count,
+        "pages": pages,
+        "page": page,
+        "limit": limit,
+        "items": serialized_errors,
+        "errors": serialized_errors
+    }
+
 @router.delete("/errors")
-async def clear_errors(db: AsyncSession = Depends(get_db)):
+async def clear_errors(url: str = None, db: AsyncSession = Depends(get_db)):
     import os
     from sqlalchemy import update
     
     # 1. Fetch paths first to clean up files on disk
-    stmt_select = select(ScrapedURL).where(ScrapedURL.status.like("failed%"))
+    if url:
+        stmt_select = select(ScrapedURL).where(ScrapedURL.url == url)
+    else:
+        stmt_select = select(ScrapedURL).where(ScrapedURL.status.like("failed%"))
+        
     result = await db.execute(stmt_select)
     records = result.scalars().all()
     
@@ -216,13 +239,20 @@ async def clear_errors(db: AsyncSession = Depends(get_db)):
                         os.remove(p)
                 except Exception as e:
                     print(f"[DB] Error removing HTML dump file {p}: {e}")
-
+ 
     # 2. Mark errors as ignored and clear paths in DB
-    stmt = update(ScrapedURL).where(ScrapedURL.status.like("failed%")).values(
-        status="ignored",
-        screenshot_path=None,
-        html_path=None
-    )
+    if url:
+        stmt = update(ScrapedURL).where(ScrapedURL.url == url).values(
+            status="ignored",
+            screenshot_path=None,
+            html_path=None
+        )
+    else:
+        stmt = update(ScrapedURL).where(ScrapedURL.status.like("failed%")).values(
+            status="ignored",
+            screenshot_path=None,
+            html_path=None
+        )
     await db.execute(stmt)
     await db.commit()
-    return {"message": "Errors cleared"}
+    return {"message": "Errors cleared" if not url else "Error cleared"}

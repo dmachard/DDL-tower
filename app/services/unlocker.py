@@ -238,46 +238,46 @@ class LinkUnlocker:
                             print(f"[UNLOCKER] Button traversal error: {ze}")
                             raise ze
 
-                        # --- Final extraction (Common for all flows) ---
-                        print(f"[UNLOCKER] Reached final page: {page.url}")
-                        
-                        # Specific wait for final hoster links to load
-                        wait_final = matched_unlocker.get("wait_for_final")
-                        wait_final_error = None
-                        if wait_final:
-                            print(f"[UNLOCKER] Waiting for final hoster links to load: {wait_final}")
-                            try:
-                                await page.wait_for_selector(wait_final, timeout=15000)
-                                await asyncio.sleep(3) # Extra stability for dynamic elements
-                            except Exception as e:
-                                wait_final_error = e
-                                print(f"[UNLOCKER] Note: Timeout waiting for specific selectors ({e}). Proceeding with current content.")
+                    # --- Final extraction (Common for all flows) ---
+                    print(f"[UNLOCKER] Reached final page: {page.url}")
+                    
+                    # Specific wait for final hoster links to load
+                    wait_final = matched_unlocker.get("wait_for_final")
+                    wait_final_error = None
+                    if wait_final:
+                        print(f"[UNLOCKER] Waiting for final hoster links to load: {wait_final}")
+                        try:
+                            await page.wait_for_selector(wait_final, timeout=15000)
+                            await asyncio.sleep(3) # Extra stability for dynamic elements
+                        except Exception as e:
+                            wait_final_error = e
+                            print(f"[UNLOCKER] Note: Timeout waiting for specific selectors ({e}). Proceeding with current content.")
 
-                        content = await page.content()
-                        total_extracted = 0
-                        
-                        # 1. Standard pattern matching
-                        patterns_to_check = extra_patterns if extra_patterns else list(settings.DIRECT_SCAN_PATTERNS)
-                        
-                        for pattern in patterns_to_check:
-                            print(f"[UNLOCKER] Checking pattern: {pattern}")
-                            # Use finditer group(0) to correctly handle regex capture groups
-                            found = list(set(m.group(0) for m in re.finditer(pattern, content, re.IGNORECASE)))
-                            if found:
-                                print(f"[UNLOCKER] SUCCESS: {len(found)} link(s) extracted using pattern.")
-                                final_links.extend(found)
-                                total_extracted += len(found)
+                    content = await page.content()
+                    total_extracted = 0
+                    
+                    # 1. Standard pattern matching
+                    patterns_to_check = extra_patterns if extra_patterns else list(settings.DIRECT_SCAN_PATTERNS)
+                    
+                    for pattern in patterns_to_check:
+                        print(f"[UNLOCKER] Checking pattern: {pattern}")
+                        # Use finditer group(0) to correctly handle regex capture groups
+                        found = list(set(m.group(0) for m in re.finditer(pattern, content, re.IGNORECASE)))
+                        if found:
+                            print(f"[UNLOCKER] SUCCESS: {len(found)} link(s) extracted using pattern.")
+                            final_links.extend(found)
+                            total_extracted += len(found)
 
-                        if total_extracted == 0:
-                            print(f"[UNLOCKER] WARNING: No links extracted from {page.url}")
-                            print(f"[UNLOCKER] Page Title: '{await page.title()}'")
-                            if wait_final_error:
-                                raise ValueError(f"Timeout waiting for selector '{wait_final}' and no links extracted")
-                            else:
-                                raise ValueError("No links extracted from the final page")
-                        
-                        await page.close()
-                        break
+                    if total_extracted == 0:
+                        print(f"[UNLOCKER] WARNING: No links extracted from {page.url}")
+                        print(f"[UNLOCKER] Page Title: '{await page.title()}'")
+                        if wait_final_error:
+                            raise ValueError(f"Timeout waiting for selector '{wait_final}' and no links extracted")
+                        else:
+                            raise ValueError("No links extracted from the final page")
+                    
+                    await page.close()
+                    break
                         
                 except Exception as e:
                     print(f"[UNLOCKER] Attempt {attempt} failed: {e}")

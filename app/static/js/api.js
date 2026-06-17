@@ -36,6 +36,10 @@ export const fetchData = async (view) => {
 
         if (state.currentView === view) {
             if (view === 'releases') renderReleases(data.items);
+            else if (view === 'errors') {
+                renderErrors(data.items);
+                renderPagination('errors');
+            }
         }
     } catch (err) {
         console.error(`Error fetching ${view}:`, err);
@@ -94,18 +98,7 @@ export const fetchSourcesDashboard = async () => {
 };
 
 export const fetchErrors = async () => {
-    try {
-        const res = await fetch('/api/errors');
-        const data = await res.json();
-        const errCount = Array.isArray(data) ? data.length : 0;
-        const countEl = document.getElementById('count-errors');
-        if (countEl) countEl.textContent = errCount;
-        const mobCountEl = document.getElementById('mobile-count-errors');
-        if (mobCountEl) mobCountEl.textContent = errCount;
-        renderErrors(data);
-    } catch (err) {
-        console.error('Error fetching errors:', err);
-    }
+    await fetchData('errors');
 };
 
 export const fetchSources = async (loadFilters, updateTagsUI) => {

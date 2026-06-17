@@ -50,9 +50,60 @@ export const renderErrors = (errors) => {
                 </div>
                 ` : ''}
             </div>
-            <div class="col-date" style="text-align: right; white-space: nowrap;">${formatDate(err.date)}</div>
+            <div class="col-date" style="text-align: right; white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; align-self: stretch; justify-content: space-between;">
+                <div>${formatDate(err.date)}</div>
+                <button class="btn-delete-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(239, 68, 68, 0.15)'; this.style.borderColor='rgba(239, 68, 68, 0.3)'; this.style.color='var(--accent-red)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.borderColor='rgba(239, 68, 68, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}">
+                    <i class="fas fa-trash-alt"></i> ${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}
+                </button>
+            </div>
         `;
         container.appendChild(row);
+    });
+
+    // Add click event listeners to each individual delete button
+    container.querySelectorAll('.btn-delete-error').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const targetUrl = decodeURIComponent(btn.getAttribute('data-url'));
+            const confirmMsg = state.language === 'fr' 
+                ? 'Voulez-vous vraiment supprimer cette erreur ?' 
+                : 'Are you sure you want to delete this error?';
+            if (confirm(confirmMsg)) {
+                try {
+                    const res = await fetch(`/api/errors?url=${encodeURIComponent(targetUrl)}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        const row = btn.closest('.error-row');
+                        if (row) {
+                            row.style.opacity = '0';
+                            row.style.transform = 'translateX(20px)';
+                            setTimeout(() => {
+                                row.remove();
+                                // Decrement badges
+                                const countEl = document.getElementById('count-errors');
+                                const mobCountEl = document.getElementById('mobile-count-errors');
+                                if (countEl) {
+                                    const newVal = Math.max(0, parseInt(countEl.textContent || '0') - 1);
+                                    countEl.textContent = newVal;
+                                    if (mobCountEl) mobCountEl.textContent = newVal;
+                                }
+                                // If list becomes empty, show empty state
+                                if (container.querySelectorAll('.error-row').length === 0) {
+                                    container.innerHTML = `
+                                        <div class="empty-state">
+                                            <div class="empty-state-icon"><i class="fas fa-check-circle" style="color: var(--success)"></i></div>
+                                            <div class="empty-state-text">No Errors Found</div>
+                                            <div class="empty-state-subtext">The scraper seems to be running perfectly!</div>
+                                        </div>`;
+                                }
+                                document.dispatchEvent(new CustomEvent('errors-updated'));
+                            }, 300);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to ignore single error', err);
+                }
+            }
+        });
     });
 };
 
@@ -63,16 +114,8 @@ export const initErrors = () => {
             if (confirm('Are you sure you want to clear all errors?')) {
                 try {
                     await fetch('/api/errors', { method: 'DELETE' });
-                    // Trigger a re-fetch of errors by calling fetchErrors from api.js
-                    // Since we have circular dependencies if we import api.js directly here,
-                    // we'll dispatch a custom event that api.js or main app.js can listen to,
-                    // or just reload the view by modifying state and calling render.
-                    // An easier way is to just clear the DOM immediately and let the next poll fetch it.
-                    renderErrors([]);
-                    const countEl = document.getElementById('count-errors');
-                    if (countEl) countEl.textContent = 0;
-                    const mobCountEl = document.getElementById('mobile-count-errors');
-                    if (mobCountEl) mobCountEl.textContent = 0;
+                    state.errors.page = 1;
+                    document.dispatchEvent(new CustomEvent('errors-updated'));
                 } catch (e) {
                     console.error('Failed to clear errors', e);
                 }
