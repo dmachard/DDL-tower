@@ -190,24 +190,32 @@ async def clear_errors(db: AsyncSession = Depends(get_db)):
     
     for r in records:
         if r.screenshot_path:
-            path = r.screenshot_path.lstrip('/')
-            if path.startswith("static/"):
-                path = "app/" + path
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception as e:
-                print(f"[DB] Error removing screenshot file {path}: {e}")
+            path_data = r.screenshot_path.lstrip('/')
+            if path_data.startswith("static/error_dumps/"):
+                path_data = path_data.replace("static/error_dumps/", "data/error_dumps/")
+            path_app = r.screenshot_path.lstrip('/')
+            if path_app.startswith("static/"):
+                path_app = "app/" + path_app
+            for p in (path_data, path_app):
+                try:
+                    if os.path.exists(p):
+                        os.remove(p)
+                except Exception as e:
+                    print(f"[DB] Error removing screenshot file {p}: {e}")
                 
         if r.html_path:
-            path = r.html_path.lstrip('/')
-            if path.startswith("static/"):
-                path = "app/" + path
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception as e:
-                print(f"[DB] Error removing HTML dump file {path}: {e}")
+            path_data = r.html_path.lstrip('/')
+            if path_data.startswith("static/error_dumps/"):
+                path_data = path_data.replace("static/error_dumps/", "data/error_dumps/")
+            path_app = r.html_path.lstrip('/')
+            if path_app.startswith("static/"):
+                path_app = "app/" + path_app
+            for p in (path_data, path_app):
+                try:
+                    if os.path.exists(p):
+                        os.remove(p)
+                except Exception as e:
+                    print(f"[DB] Error removing HTML dump file {p}: {e}")
 
     # 2. Mark errors as ignored and clear paths in DB
     stmt = update(ScrapedURL).where(ScrapedURL.status.like("failed%")).values(

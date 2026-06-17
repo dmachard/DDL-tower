@@ -113,7 +113,7 @@ async def save_error_dump(url: str, page) -> tuple:
     import hashlib
     import traceback
     try:
-        os.makedirs("app/static/error_dumps", exist_ok=True)
+        os.makedirs("data/error_dumps", exist_ok=True)
         
         # Unique identifier from URL + timestamp
         url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()[:10]
@@ -123,8 +123,8 @@ async def save_error_dump(url: str, page) -> tuple:
         screenshot_rel = f"/static/error_dumps/screenshot_{filename_base}.png"
         html_rel = f"/static/error_dumps/html_{filename_base}.html"
         
-        screenshot_abs = f"app/static/error_dumps/screenshot_{filename_base}.png"
-        html_abs = f"app/static/error_dumps/html_{filename_base}.html"
+        screenshot_abs = f"data/error_dumps/screenshot_{filename_base}.png"
+        html_abs = f"data/error_dumps/html_{filename_base}.html"
         
         screenshot_path = None
         html_path = None

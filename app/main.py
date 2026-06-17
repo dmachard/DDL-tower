@@ -23,6 +23,7 @@ async def startup():
     start_scheduler()
 
 app.mount("/posters", StaticFiles(directory=settings.POSTER_DIR), name="posters")
+app.mount("/static/error_dumps", StaticFiles(directory="data/error_dumps"), name="error_dumps")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/")

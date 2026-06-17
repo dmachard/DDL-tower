@@ -230,12 +230,12 @@ class Scraper:
                 print(f"[{self.name}] [{step_name}] Error: {e}")
                 try:
                     if 'resp' in locals() and resp is not None:
-                        os.makedirs("app/static/error_dumps", exist_ok=True)
+                        os.makedirs("data/error_dumps", exist_ok=True)
                         url_hash = hashlib.md5(url.encode("utf-8")).hexdigest()[:10]
                         timestamp = int(time.time() * 1000)
                         filename_base = f"{timestamp}_{url_hash}"
                         html_rel = f"/static/error_dumps/html_{filename_base}.html"
-                        html_abs = f"app/static/error_dumps/html_{filename_base}.html"
+                        html_abs = f"data/error_dumps/html_{filename_base}.html"
                         with open(html_abs, "w", encoding="utf-8") as f:
                             f.write(resp.text)
                         e.html_path = html_rel
