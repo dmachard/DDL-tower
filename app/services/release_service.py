@@ -3,7 +3,7 @@ import math
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from sqlalchemy.future import select
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DownloadLink, MediaMetadata, ScrapedURL
@@ -47,7 +47,8 @@ class ReleaseService:
         network: str = None,
         recent: bool = False,
         hours: int = None,
-        show_all: bool = True # Default to True now
+        show_all: bool = True,
+        local: bool = None
     ):
         """Returns grouped download links (releases) for movies and series."""
         threshold = await ReleaseService.get_threshold(db, recent, hours)
@@ -98,6 +99,19 @@ class ReleaseService:
             stmt = stmt.where(DownloadLink.network == network)
         if recent and threshold:
             stmt = stmt.where(DownloadLink.last_checked >= threshold)
+        if local is not None:
+            if local:
+                stmt = stmt.where(or_(
+                    DownloadLink.imdb_id == None,
+                    DownloadLink.imdb_id == "N/A",
+                    DownloadLink.imdb_id.like("local%")
+                ))
+            else:
+                stmt = stmt.where(and_(
+                    DownloadLink.imdb_id != None,
+                    DownloadLink.imdb_id != "N/A",
+                    ~DownloadLink.imdb_id.like("local%")
+                ))
             
         stmt = stmt.group_by(
             func.coalesce(DownloadLink.imdb_id, func.lower(DownloadLink.title)), 

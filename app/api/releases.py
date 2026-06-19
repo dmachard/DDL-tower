@@ -82,13 +82,14 @@ async def get_releases(
     network: str = Query(None),
     recent: bool = Query(False),
     hours: int = Query(None),
-    show_all: bool = Query(False)
+    show_all: bool = Query(False),
+    local: bool = Query(None)
 ):
     """
     Returns grouped download links (releases) for movies and series.
     """
     return await release_service.get_grouped_releases(
-        db, page, limit, q, category, source, resolution, year, network, recent, hours, show_all
+        db, page, limit, q, category, source, resolution, year, network, recent, hours, show_all, local
     )
 
 class DeleteRequest(BaseModel):
