@@ -27,12 +27,14 @@ class LinkUnlocker:
         min_confidence: float = TEMPLATE_MATCH_MIN_CONFIDENCE,
         max_wait_seconds: int = 25,
         poll_interval: float = 2.0,
+        bypass_selectors: List[str] = None,
     ) -> bool:
         """
         Poll the page with screenshots, locate `template_path` via template
         matching, and click its center once found with sufficient confidence.
+        If a bypass selector is visible, exits early returning True.
 
-        Returns True if a click was performed, False if the template was
+        Returns True if a click or auto-bypass was performed, False if the template was
         never found above `min_confidence` within `max_wait_seconds`.
         """
         start = time.time()
@@ -40,6 +42,18 @@ class LinkUnlocker:
         last_screenshot_bytes = None
 
         while time.time() - start < max_wait_seconds:
+            if bypass_selectors:
+                for selector in bypass_selectors:
+                    try:
+                        if await page.locator(selector).first.is_visible():
+                            print(
+                                f"[UNLOCKER] Bypass selector '{selector}' detected. "
+                                f"Turnstile bypassed automatically."
+                            )
+                            return True
+                    except Exception:
+                        pass
+
             screenshot_bytes = await page.screenshot()
             last_screenshot_bytes = screenshot_bytes
             match = find_template(screenshot_bytes, template_path, min_confidence)
@@ -162,9 +176,31 @@ class LinkUnlocker:
                     if not matched_unlocker.get("skip_turnstile"):
                         already_unlocked = False
                         wait_final = matched_unlocker.get("wait_for_final")
+                        
+                        bypass_selectors = []
                         if wait_final:
+                            bypass_selectors.append(wait_final)
+                        if wait_btn:
+                            bypass_selectors.append(wait_btn)
+
+                        if bypass_selectors:
                             try:
-                                already_unlocked = await page.locator(wait_final).first.is_visible()
+                                print(f"[UNLOCKER] Checking if final page/links or action button are already visible (waiting up to 5s)...")
+                                start_wait = time.time()
+                                while time.time() - start_wait < 5.0:
+                                    found_bypass = False
+                                    for selector in bypass_selectors:
+                                        try:
+                                            if await page.locator(selector).first.is_visible():
+                                                print(f"[UNLOCKER] Detected '{selector}' is visible. Skipping Turnstile check.")
+                                                already_unlocked = True
+                                                found_bypass = True
+                                                break
+                                        except Exception:
+                                            pass
+                                    if found_bypass:
+                                        break
+                                    await asyncio.sleep(0.5)
                             except Exception:
                                 pass
                         
@@ -178,7 +214,12 @@ class LinkUnlocker:
                                 max_wait = 10 if wait_btn else 25
                                 
                                 template_file = matched_unlocker.get("turnstile_template") or TURNSTILE_BUTTON_TEMPLATE
-                                clicked = await self._click_via_template_matching(page, template_path=template_file, max_wait_seconds=max_wait)
+                                clicked = await self._click_via_template_matching(
+                                    page, 
+                                    template_path=template_file, 
+                                    max_wait_seconds=max_wait,
+                                    bypass_selectors=bypass_selectors
+                                )
                                 if clicked:
                                     await asyncio.sleep(3)
                                     # Wait for the navigation triggered by the click to settle
