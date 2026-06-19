@@ -248,6 +248,85 @@ class DownloaderService:
         Downloads a file from a URL to the download directory with resume support and retries.
         Uses a global lock to ensure sequential downloads (one by one).
         """
+        # Save to DB as 'waiting' before entering lock to persist queue state
+        try:
+            fn = filename
+            if not fn:
+                fn = os.path.basename(url.split('?')[0]) or "unknown_file"
+            await self._save_to_db(url, fn, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels, "waiting")
+        except Exception as e:
+            print(f"[DOWNLOADER] Error saving initial waiting state to DB: {e}")
+
+        # Check if we should cancel any currently running lower-quality downloads
+        if title or imdb_id:
+            try:
+                from app.db.database import AsyncSessionLocal
+                from app.db.models import ActiveDownload
+                from sqlalchemy import select
+                from app.core.utils import get_quality_score, normalize_title
+                from app.services.parser_service import parser_service
+
+                current_score = get_quality_score(resolution, language, v_quality, quality, audio, codec)
+
+                async with AsyncSessionLocal() as session:
+                    q = await session.execute(
+                        select(ActiveDownload).where(
+                            ActiveDownload.url != url,
+                            ActiveDownload.status == "downloading"
+                        )
+                    )
+                    downloading_rows = q.scalars().all()
+                    
+                    for row in downloading_rows:
+                        match = False
+                        if imdb_id and row.imdb_id and not imdb_id.startswith("local_") and not row.imdb_id.startswith("local_"):
+                            if imdb_id == row.imdb_id:
+                                if category == "series":
+                                    if row.season == season and row.episode == episode:
+                                        match = True
+                                else:
+                                    match = True
+                        else:
+                            if row.category == category:
+                                if category == "series" and (row.season != season or row.episode != episode):
+                                    continue
+                                
+                                row_parsed = parser_service.parse_filename(row.title or "")
+                                row_clean = row_parsed.get("title", row.title)
+                                row_norm = normalize_title(row_clean)
+                                
+                                target_parsed = parser_service.parse_filename(title)
+                                target_clean = target_parsed.get("title", title)
+                                target_norm = normalize_title(target_clean)
+                                
+                                if row_norm == target_norm:
+                                    row_year = row_parsed.get("year") or row.year
+                                    target_year = target_parsed.get("year") or year
+                                    if target_year and row_year:
+                                        if str(target_year) == str(row_year):
+                                            match = True
+                                    else:
+                                        match = True
+                        
+                        if match:
+                            row_score = get_quality_score(
+                                row.resolution, row.language, row.v_quality, row.quality, row.audio, row.codec
+                            )
+                            if current_score > row_score:
+                                print(f"[DOWNLOADER] Cancelling active lower-quality download {row.filename} (score {row_score}) in favor of better version {fn} (score {current_score})")
+                                # 1. Set status in DB to cancelled / delete it
+                                await self._delete_from_db(row.url)
+                                
+                                # 2. Set status in memory active_downloads to cancelled
+                                r_group_name = self._get_group_name(row.filename)
+                                if r_group_name in self.active_downloads:
+                                    group = self.active_downloads[r_group_name]
+                                    group["status"] = "cancelled"
+                                    if row.filename in group["files"]:
+                                        group["files"][row.filename]["status"] = "cancelled"
+            except Exception as e:
+                print(f"[DOWNLOADER] Error checking/cancelling active lower-quality downloads: {e}")
+
         async with self.lock:
             return await self._do_download(url, filename, category, title, year, is_auto, imdb_id, season, episode, resolution, quality, language, v_quality, codec, network, audio, channels)
 
@@ -278,6 +357,88 @@ class DownloaderService:
 
         file_path = self.download_dir / filename
         group_name = self._get_group_name(filename)
+
+        # Check if there is a better version in active downloads queue
+        if title or imdb_id:
+            from app.db.database import AsyncSessionLocal
+            from app.db.models import ActiveDownload
+            from sqlalchemy import select
+            from app.core.utils import get_quality_score, normalize_title
+            from app.services.parser_service import parser_service
+
+            current_score = get_quality_score(resolution, language, v_quality, quality, audio, codec)
+            
+            async with AsyncSessionLocal() as session:
+                q = await session.execute(
+                    select(ActiveDownload).where(
+                        ActiveDownload.url != url,
+                        ActiveDownload.status.in_(["waiting", "downloading"])
+                    )
+                )
+                active_rows = q.scalars().all()
+                
+                matching_active = []
+                for row in active_rows:
+                    # 1. Match by IMDb ID
+                    if imdb_id and row.imdb_id and not imdb_id.startswith("local_") and not row.imdb_id.startswith("local_"):
+                        if imdb_id == row.imdb_id:
+                            if category == "series":
+                                if row.season == season and row.episode == episode:
+                                    matching_active.append(row)
+                            else:
+                                matching_active.append(row)
+                            continue
+
+                    # 2. Match by title / year / category
+                    if row.category == category:
+                        if category == "series" and (row.season != season or row.episode != episode):
+                            continue
+                        
+                        row_parsed = parser_service.parse_filename(row.title or "")
+                        row_clean = row_parsed.get("title", row.title)
+                        row_norm = normalize_title(row_clean)
+                        
+                        target_parsed = parser_service.parse_filename(title)
+                        target_clean = target_parsed.get("title", title)
+                        target_norm = normalize_title(target_clean)
+                        
+                        if row_norm == target_norm:
+                            row_year = row_parsed.get("year") or row.year
+                            target_year = target_parsed.get("year") or year
+                            if target_year and row_year:
+                                if str(target_year) == str(row_year):
+                                    matching_active.append(row)
+                            else:
+                                matching_active.append(row)
+
+                should_skip = False
+                better_filename = None
+                better_status = None
+                
+                for act in matching_active:
+                    act_score = get_quality_score(
+                        act.resolution, act.language, act.v_quality, act.quality, act.audio, act.codec
+                    )
+                    if act.status == "downloading" and act_score >= current_score:
+                        should_skip = True
+                        better_filename = act.filename
+                        better_status = "downloading"
+                        break
+                    elif act.status == "waiting" and act_score > current_score:
+                        should_skip = True
+                        better_filename = act.filename
+                        better_status = "waiting in queue"
+                        break
+                
+                if should_skip:
+                    print(f"[DOWNLOADER] Skipping download of {filename} (score {current_score}) because a same/better version ({better_filename}) is {better_status}.")
+                    await self._delete_from_db(url)
+                    if group_name in self.active_downloads:
+                        group = self.active_downloads[group_name]
+                        group["files"].pop(filename, None)
+                        if not group["files"]:
+                            self.active_downloads.pop(group_name, None)
+                    return None
 
         # 2. Check if file already exists in download folder or library
         exists_complete = False
@@ -527,11 +688,14 @@ class DownloaderService:
                         
                         mode = "ab" if is_resume else "wb"
                         is_paused = False
+                        is_cancelled = False
                         with open(file_path, mode) as f:
                             async for chunk in response.content.iter_chunked(1024 * 64):
-                                # Check if paused during download
-                                if group.get("status") == "paused" or group["files"].get(filename, {}).get("status") == "paused":
-                                    is_paused = True
+                                # Check if paused or cancelled during download
+                                current_status = group["files"].get(filename, {}).get("status")
+                                if group.get("status") in ["paused", "cancelled"] or current_status in ["paused", "cancelled"]:
+                                    is_paused = (group.get("status") == "paused" or current_status == "paused")
+                                    is_cancelled = (group.get("status") == "cancelled" or current_status == "cancelled")
                                     break
                                 
                                 f.write(chunk)
@@ -553,6 +717,21 @@ class DownloaderService:
                             group["status"] = "paused"
                             group["files"][filename]["status"] = "paused"
                             await self._update_db_status(url, "paused")
+                            return None
+
+                        if is_cancelled:
+                            print(f"[DOWNLOADER] Cancelled download of {filename} (superseded by better version)")
+                            try:
+                                if file_path.exists():
+                                    file_path.unlink()
+                            except Exception as e:
+                                print(f"[DOWNLOADER] Error deleting cancelled file: {e}")
+                            
+                            if group_name in self.active_downloads:
+                                group = self.active_downloads[group_name]
+                                group["files"].pop(filename, None)
+                                if not group["files"]:
+                                    self.active_downloads.pop(group_name, None)
                             return None
 
                         # Success!
