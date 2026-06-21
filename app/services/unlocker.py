@@ -302,8 +302,10 @@ class LinkUnlocker:
                     
                     for pattern in patterns_to_check:
                         print(f"[UNLOCKER] Checking pattern: {pattern}")
-                        # Use finditer group(0) to correctly handle regex capture groups
-                        found = list(set(m.group(0) for m in re.finditer(pattern, content, re.IGNORECASE)))
+                        # Extract the first capture group if the pattern contains capturing groups,
+                        # otherwise default to the entire match.
+                        matches = (m.group(1) if m.groups() else m.group(0) for m in re.finditer(pattern, content, re.IGNORECASE))
+                        found = list(set(val for val in matches if val))
                         if found:
                             print(f"[UNLOCKER] SUCCESS: {len(found)} link(s) extracted using pattern.")
                             final_links.extend(found)

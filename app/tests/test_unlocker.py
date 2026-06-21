@@ -53,3 +53,40 @@ async def test_click_via_template_matching_bypassed_during_polling():
         )
         assert res is True
         assert mock_page.screenshot.call_count == 1
+
+@pytest.mark.asyncio
+async def test_unlock_extracts_using_capture_groups():
+    unlocker = LinkUnlocker()
+    
+    mock_browser = MagicMock()
+    mock_page = MagicMock()
+    mock_page.url = "https://multiup.io/en/mirror/abc"
+    mock_page.title = AsyncMock(return_value="Page Title")
+    mock_page.content = AsyncMock(return_value='<html><body><a href="https://1fichier.com/?abcdef">Link</a></body></html>')
+    mock_page.goto = AsyncMock()
+    mock_page.close = AsyncMock()
+    
+    mock_locator = MagicMock()
+    mock_locator.first = MagicMock()
+    mock_locator.first.is_visible = AsyncMock(return_value=True)
+    mock_locator.first.wait_for = AsyncMock()
+    mock_locator.count = AsyncMock(return_value=0)
+    mock_page.locator.return_value = mock_locator
+    
+    mock_browser.new_page = AsyncMock(return_value=mock_page)
+    mock_browser.is_connected = MagicMock(return_value=True)
+    
+    with patch("app.services.unlocker.async_playwright") as mock_pw, \
+         patch("app.services.browser_manager.browser_manager") as mock_bm:
+         
+        mock_pw_context = MagicMock()
+        mock_pw_context.__aenter__ = AsyncMock(return_value=MagicMock())
+        mock_pw.return_value = mock_pw_context
+        
+        mock_bm.get_browser = AsyncMock(return_value=mock_browser)
+        extra_patterns = [r'href=["\'](https?://(?:www\.)?1fichier\.com/\?[\w-]+)[^"\']*["\']']
+        
+        links = await unlocker.unlock("https://multiup.io/download/abc/file.mkv", extra_patterns=extra_patterns)
+        assert links == ["https://1fichier.com/?abcdef"]
+
+
