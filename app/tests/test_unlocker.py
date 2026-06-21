@@ -66,6 +66,8 @@ async def test_unlock_extracts_using_capture_groups():
     mock_page.goto = AsyncMock()
     mock_page.close = AsyncMock()
     
+    mock_page.screenshot = AsyncMock(return_value=b"")
+    
     mock_locator = MagicMock()
     mock_locator.first = MagicMock()
     mock_locator.first.is_visible = AsyncMock(return_value=True)
@@ -77,13 +79,26 @@ async def test_unlock_extracts_using_capture_groups():
     mock_browser.is_connected = MagicMock(return_value=True)
     
     with patch("app.services.unlocker.async_playwright") as mock_pw, \
-         patch("app.services.browser_manager.browser_manager") as mock_bm:
+         patch("app.services.browser_manager.browser_manager") as mock_bm, \
+         patch("app.services.unlocker.settings") as mock_settings:
          
         mock_pw_context = MagicMock()
         mock_pw_context.__aenter__ = AsyncMock(return_value=MagicMock())
         mock_pw.return_value = mock_pw_context
         
         mock_bm.get_browser = AsyncMock(return_value=mock_browser)
+        
+        # Explicitly configure unlockers for this unit test to run independently of config.yaml
+        mock_settings.UNLOCKERS = [
+            {
+                "name": "MultiUp",
+                "patterns": [r'https?://(?:www\.)?multiup\.(?:io|org)/[^\s"\'<>]+'],
+                "wait_delay": 0,
+                "mirror_selector": 'a[href*="/mirror/"], form[action*="/mirror/"]',
+                "skip_turnstile": False,
+                "wait_for_final": "a[href*='1fichier.com']"
+            }
+        ]
         extra_patterns = [r'href=["\'](https?://(?:www\.)?1fichier\.com/\?[\w-]+)[^"\']*["\']']
         
         links = await unlocker.unlock("https://multiup.io/download/abc/file.mkv", extra_patterns=extra_patterns)
