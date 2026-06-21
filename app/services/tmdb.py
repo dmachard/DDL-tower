@@ -177,7 +177,8 @@ class TMDbService:
                     "plot_en": plot_en,
                     "plot_fr": plot_fr,
                     "rating": str(details.get("vote_average")) if details.get("vote_average") else None,
-                    "imdb_id": imdb_id
+                    "imdb_id": imdb_id,
+                    "tmdb_id": tmdb_id
                 }
 
         except Exception as e:
@@ -234,7 +235,8 @@ class TMDbService:
                     "plot_en": plot_en,
                     "plot_fr": plot_fr,
                     "rating": str(details.get("vote_average")) if details.get("vote_average") else None,
-                    "imdb_id": details.get("external_ids", {}).get("imdb_id") or details.get("imdb_id")
+                    "imdb_id": details.get("external_ids", {}).get("imdb_id") or details.get("imdb_id"),
+                    "tmdb_id": tmdb_id
                 }
 
         except Exception as e:

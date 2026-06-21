@@ -104,13 +104,33 @@ class ReleaseService:
                 stmt = stmt.where(or_(
                     DownloadLink.imdb_id == None,
                     DownloadLink.imdb_id == "N/A",
-                    DownloadLink.imdb_id.like("local%")
+                    and_(
+                        DownloadLink.imdb_id.like("local%"),
+                        or_(
+                            MediaMetadata.plot_fr == "Sortie Locale",
+                            MediaMetadata.plot_fr == None,
+                            MediaMetadata.plot_fr == "",
+                            MediaMetadata.plot_en == "Local Release",
+                            MediaMetadata.plot_en == None,
+                            MediaMetadata.plot_en == ""
+                        )
+                    )
                 ))
             else:
                 stmt = stmt.where(and_(
                     DownloadLink.imdb_id != None,
                     DownloadLink.imdb_id != "N/A",
-                    ~DownloadLink.imdb_id.like("local%")
+                    or_(
+                        ~DownloadLink.imdb_id.like("local%"),
+                        and_(
+                            MediaMetadata.plot_fr != None,
+                            MediaMetadata.plot_fr != "",
+                            MediaMetadata.plot_fr != "Sortie Locale",
+                            MediaMetadata.plot_en != None,
+                            MediaMetadata.plot_en != "",
+                            MediaMetadata.plot_en != "Local Release"
+                        )
+                    )
                 ))
             
         stmt = stmt.group_by(

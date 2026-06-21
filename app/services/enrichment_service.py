@@ -84,8 +84,12 @@ class EnrichmentService:
                 print(f"[ENRICHMENT] ✅ Found match: {official_title} ({res_data.get('year')})")
                 imdb_id = res_data.get("imdb_id")
                 if not imdb_id:
-                    clean_t = re.sub(r'[^a-zA-Z0-9\s]', '', link.title).lower()
-                    imdb_id = f"local_{clean_t.replace(' ', '_')}"[:40]
+                    tmdb_id = res_data.get("tmdb_id")
+                    if tmdb_id:
+                        imdb_id = f"tmdb_{tmdb_id}"
+                    else:
+                        clean_t = re.sub(r'[^a-zA-Z0-9\s]', '', link.title).lower()
+                        imdb_id = f"local_{clean_t.replace(' ', '_')}"[:40]
                 
                 # Check for existing meta with this ID
                 stmt_id = select(MediaMetadata).where(MediaMetadata.imdb_id == imdb_id).limit(1)
