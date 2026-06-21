@@ -428,3 +428,43 @@ async def test_unlock_failure_recording():
             status="failed: Timeout waiting for selector 'text=Mirror links' and no links extracted"
         )
 
+
+@pytest.mark.asyncio
+async def test_scraper_ignore_qualities():
+    """Test that ignore_qualities filters out CAM/TS items correctly."""
+    config = {
+        "name": "TestQualityFilter",
+        "ignore_qualities": ["CAM", "TS"],
+        "steps": [
+            {
+                "name": "step1",
+                "url": "https://site.com",
+                "yield_links": True
+            }
+        ]
+    }
+    scraper = Scraper(config)
+    client = MagicMock()
+    
+    # 1. Test item with CAM quality in title
+    item_cam = {
+        "title": "Movie.2025.1080p.CAM.mkv",
+        "url": "https://site.com/movie_cam"
+    }
+    
+    results = []
+    async for res in scraper._handle_item(client, item_cam, config["steps"][0], {}, 0, "https://site.com", ""):
+        results.append(res)
+    assert len(results) == 0  # Filtered out!
+
+    # 2. Test item with HD quality (should NOT be filtered)
+    item_hd = {
+        "title": "Movie.2025.1080p.BluRay.mkv",
+        "url": "https://site.com/movie_hd"
+    }
+    
+    results = []
+    async for res in scraper._handle_item(client, item_hd, config["steps"][0], {}, 0, "https://site.com", ""):
+        results.append(res)
+    assert len(results) == 1  # Kept!
+

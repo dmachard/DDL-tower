@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     WEBTOP_CONTAINER_NAME: str = _yaml_config.get("webtop_container_name", "ddltower-browser")
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])
     IGNORE_RESOLUTIONS: List[str] = _yaml_config.get("ignore_resolutions", [])
+    IGNORE_QUALITIES: List[str] = _yaml_config.get("ignore_qualities", [])
     AUTO_DOWNLOAD_SERIES_PACKS: bool = _yaml_config.get("auto_download_series_packs", False)
     AUTO_DOWNLOAD_LOWER_THAN: Optional[str] = _yaml_config.get("auto_download_lower_than", None)
     

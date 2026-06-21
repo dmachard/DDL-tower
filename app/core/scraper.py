@@ -32,6 +32,7 @@ class Scraper:
         })
         self.timeout = config.get("timeout", 30)
         self.global_ignore_resolutions = config.get("ignore_resolutions", [])
+        self.global_ignore_qualities = config.get("ignore_qualities", [])
         self.global_hoster_patterns = config.get("hoster_patterns", [
             r'https?://(?:www\.)?1fichier\.com/\?[^\s"\'<>]+',
             r'https?://(?:www\.)?rapidgator\.net/file/[^\s"\'<>]+'
@@ -137,6 +138,15 @@ class Scraper:
                 url_slug = parsed_url.path.split('/')[-1] or (parsed_url.path.split('/')[-2] if '/' in parsed_url.path else "")
                 if any(re.search(rf'[\.\-\_]{re.escape(res)}[\.\-\_]', url_slug, re.I) or re.search(rf'{re.escape(res)}\b', url_slug, re.I) for res in ignore_resolutions):
                     print(f"[{self.name}] [{step_name}] ⏭ Skipping URL (Resolution ignored in slug): {url}")
+                    continue
+
+            # Global ignore qualities check in URL
+            ignore_qualities = list(set(settings.IGNORE_QUALITIES + self.global_ignore_qualities + step.get("ignore_qualities", [])))
+            if ignore_qualities:
+                parsed_url = urlparse(url)
+                url_slug = parsed_url.path.split('/')[-1] or (parsed_url.path.split('/')[-2] if '/' in parsed_url.path else "")
+                if any(re.search(rf'[\.\-\_]{re.escape(q)}[\.\-\_]', url_slug, re.I) or re.search(rf'{re.escape(q)}\b', url_slug, re.I) for q in ignore_qualities):
+                    print(f"[{self.name}] [{step_name}] ⏭ Skipping URL (Quality ignored in slug): {url}")
                     continue
 
             try:
@@ -347,6 +357,15 @@ class Scraper:
                 if re.search(rf'\b{re.escape(res)}\b', target, re.I):
                     display = item_data.get("title") or item_data.get("name") or item_data.get("url") or (text[:100] + "...")
                     print(f"[{self.name}] [{step_name}] Item ignored (Resolution: {res}): {display}")
+                    return
+
+        ignore_q = list(set(settings.IGNORE_QUALITIES + self.global_ignore_qualities + step.get("ignore_qualities", [])))
+        if ignore_q:
+            target = item_data.get("title") or item_data.get("name") or text
+            for q in ignore_q:
+                if re.search(rf'\b{re.escape(q)}\b', target, re.I) or (item_data.get("quality") and item_data.get("quality").lower() == q.lower()):
+                    display = item_data.get("title") or item_data.get("name") or item_data.get("url") or (text[:100] + "...")
+                    print(f"[{self.name}] [{step_name}] Item ignored (Quality: {q}): {display}")
                     return
 
         current_tags = []
