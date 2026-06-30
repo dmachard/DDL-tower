@@ -299,7 +299,10 @@ class ExportCommands:
                 continue
             try:
                 # Re-validate against the current parser rules to prune old junk
-                parse_filename(fname)
+                parsed_val = parse_filename(fname)
+                for k, v in parsed_val.items():
+                    if k not in item or item[k] is None:
+                        item[k] = v
                 valid_existing_releases.append(item)
             except ValueError:
                 print(f"[EXPORT] Excluding invalid/obfuscated existing release from merge: {fname}")
@@ -330,7 +333,7 @@ class ExportCommands:
         
         if export_type in ("all", "data"):
             data_db_path = os.path.join(output_dir, "data.db.gz")
-            keys = ['category', 'title', 'imdb_id', 'year', 'size', 'group', 'date_added', 'quality', 'resolution', 'codec', 'audio', 'season', 'episode', 'episode_name', 'channels', 'network', 'extra', 'filename', 'link_source', 'languages', 'v_quality', 'official_title', 'official_year']
+            keys = ['category', 'title', 'imdb_id', 'year', 'size', 'group', 'date_added', 'quality', 'resolution', 'codec', 'audio', 'season', 'episode', 'episode_name', 'channels', 'network', 'extra', 'filename', 'link_source', 'languages', 'v_quality', 'official_title', 'official_year', 'container']
             rows = []
             for item in merged_list:
                 row = [item.get(k) for k in keys]
