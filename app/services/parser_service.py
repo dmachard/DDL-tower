@@ -120,6 +120,9 @@ class ParserService:
         
         # Aggressive title cleaning if tags leaked into it
         if title:
+            # Replace common ligatures that are not decomposed to ASCII by NFKD
+            for lig, rep in [('œ', 'oe'), ('Œ', 'OE'), ('æ', 'ae'), ('Æ', 'AE')]:
+                title = title.replace(lig, rep)
             import unicodedata
             title = unicodedata.normalize('NFKD', title).encode('ASCII', 'ignore').decode('utf-8')
             

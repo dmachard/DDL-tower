@@ -129,3 +129,18 @@ def test_parse_filename_kaamelott_issue():
     assert res1["title"] == res2["title"]
     assert res1["year"] == 2026
     assert res2["year"] == 2026
+
+
+def test_parse_filename_ligature_issue():
+    """Test that ligatures like œ/Œ are correctly converted to oe/OE instead of being stripped."""
+    f1 = "Coeurs.Perdus.en.Atlantide.2001.FRENCH.1080p.BluRay.x264.mkv"
+    f2 = "Cœurs.Perdus.en.Atlantide.2001.FRENCH.1080p.BluRay.x264.mkv"
+    f3 = "CŒURS.Perdus.en.Atlantide.2001.FRENCH.1080p.BluRay.x264.mkv"
+    
+    res1 = parser_service.parse_filename(f1)
+    res2 = parser_service.parse_filename(f2)
+    res3 = parser_service.parse_filename(f3)
+    
+    assert res1["title"].lower() == "coeurs perdus en atlantide"
+    assert res2["title"].lower() == "coeurs perdus en atlantide"
+    assert res3["title"].lower() == "coeurs perdus en atlantide"
