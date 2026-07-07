@@ -11,6 +11,7 @@ async def test_click_via_template_matching_bypassed_immediately():
     mock_locator = MagicMock()
     mock_locator.first = MagicMock()
     mock_locator.first.is_visible = AsyncMock(return_value=True)
+    mock_locator.first.is_enabled = AsyncMock(return_value=True)
     mock_page.locator.return_value = mock_locator
 
     res = await unlocker._click_via_template_matching(
@@ -36,6 +37,7 @@ async def test_click_via_template_matching_bypassed_during_polling():
     mock_locator.first.is_visible = AsyncMock()
     # Return False on first poll check, then True on second
     mock_locator.first.is_visible.side_effect = [False, True]
+    mock_locator.first.is_enabled = AsyncMock(return_value=True)
     mock_page.locator.return_value = mock_locator
     
     with patch("app.services.unlocker.find_template") as mock_find_template:
@@ -71,6 +73,7 @@ async def test_unlock_extracts_using_capture_groups():
     mock_locator = MagicMock()
     mock_locator.first = MagicMock()
     mock_locator.first.is_visible = AsyncMock(return_value=True)
+    mock_locator.first.is_enabled = AsyncMock(return_value=True)
     mock_locator.first.wait_for = AsyncMock()
     mock_locator.count = AsyncMock(return_value=0)
     mock_page.locator.return_value = mock_locator
@@ -103,5 +106,34 @@ async def test_unlock_extracts_using_capture_groups():
         
         links = await unlocker.unlock("https://multiup.io/download/abc/file.mkv", extra_patterns=extra_patterns)
         assert links == ["https://1fichier.com/?abcdef"]
+
+
+@pytest.mark.asyncio
+async def test_click_via_template_matching_not_bypassed_if_disabled():
+    unlocker = LinkUnlocker()
+    mock_page = MagicMock()
+    
+    mock_locator = MagicMock()
+    mock_locator.first = MagicMock()
+    mock_locator.first.is_visible = AsyncMock(return_value=True)
+    mock_locator.first.is_enabled = AsyncMock(return_value=False)
+    mock_page.locator.return_value = mock_locator
+
+    mock_page.screenshot = AsyncMock(return_value=b"some_bytes")
+
+    with patch("app.services.unlocker.find_template") as mock_find_template:
+        mock_match = MagicMock()
+        mock_match.found = False
+        mock_match.confidence = 0.1
+        mock_find_template.return_value = mock_match
+
+        res = await unlocker._click_via_template_matching(
+            page=mock_page,
+            bypass_selectors=[".success-links"],
+            max_wait_seconds=0.2,
+            poll_interval=0.1
+        )
+        assert res is False
+        assert mock_page.screenshot.call_count >= 1
 
 

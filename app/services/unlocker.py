@@ -45,9 +45,10 @@ class LinkUnlocker:
             if bypass_selectors:
                 for selector in bypass_selectors:
                     try:
-                        if await page.locator(selector).first.is_visible():
+                        loc = page.locator(selector).first
+                        if await loc.is_visible() and await loc.is_enabled():
                             print(
-                                f"[UNLOCKER] Bypass selector '{selector}' detected. "
+                                f"[UNLOCKER] Bypass selector '{selector}' detected and enabled. "
                                 f"Turnstile bypassed automatically."
                             )
                             return True
@@ -191,8 +192,9 @@ class LinkUnlocker:
                                     found_bypass = False
                                     for selector in bypass_selectors:
                                         try:
-                                            if await page.locator(selector).first.is_visible():
-                                                print(f"[UNLOCKER] Detected '{selector}' is visible. Skipping Turnstile check.")
+                                            loc = page.locator(selector).first
+                                            if await loc.is_visible() and await loc.is_enabled():
+                                                print(f"[UNLOCKER] Detected '{selector}' is visible and enabled. Skipping Turnstile check.")
                                                 already_unlocked = True
                                                 found_bypass = True
                                                 break
