@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     IGNORE_QUALITIES: List[str] = _yaml_config.get("ignore_qualities", [])
     AUTO_DOWNLOAD_SERIES_PACKS: bool = _yaml_config.get("auto_download_series_packs", False)
     AUTO_DOWNLOAD_LOWER_THAN: Optional[str] = _yaml_config.get("auto_download_lower_than", None)
+    AUTO_DOWNLOAD_EXCLUDE_GENRES: List[str] = _yaml_config.get("auto_download_exclude_genres", [])
     
     # Scheduler window (Hours when scanning is allowed, e.g. 6 to 0 for 06:00-00:00)
     SCAN_START_HOUR: int = _yaml_config.get("scan_start_hour", 6)

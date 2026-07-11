@@ -150,6 +150,34 @@ async def run_scraper(scraper):
                                     print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: No resolution from {allowed_resolutions} found in release")
                                     should_download = False
                             
+                            # Filter by excluded genres if configured
+                            exclude_genres = settings.AUTO_DOWNLOAD_EXCLUDE_GENRES
+                            if should_download and exclude_genres:
+                                imdb_ids = [link.imdb_id for link in (links_to_enrich or []) if link.imdb_id]
+                                if imdb_ids:
+                                    from app.db.models import MediaMetadata
+                                    meta_stmt = select(MediaMetadata).where(MediaMetadata.imdb_id.in_(imdb_ids))
+                                    meta_res = await db.execute(meta_stmt)
+                                    metadata_items = meta_res.scalars().all()
+                                    
+                                    item_genres = set()
+                                    for meta in metadata_items:
+                                        if meta.genres:
+                                            for g in meta.genres.split(","):
+                                                g_clean = g.strip().lower()
+                                                if g_clean:
+                                                    item_genres.add(g_clean)
+                                    
+                                    excluded_matched = []
+                                    for ex_g in exclude_genres:
+                                        ex_g_clean = str(ex_g).strip().lower()
+                                        if ex_g_clean in item_genres:
+                                            excluded_matched.append(ex_g)
+                                            
+                                    if excluded_matched:
+                                        print(f"[SCHEDULER] [{scraper.name}] ⏭ Auto-download skipped: Excluded genre(s) matched: {excluded_matched}")
+                                        should_download = False
+
                             if should_download:
                                 from app.api.downloads import run_download_task
                                 # We run it in the background as a task to not block the scraper

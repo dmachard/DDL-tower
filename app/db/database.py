@@ -94,6 +94,10 @@ async def init_db():
                 print("[DB] Migration: Adding 'title_fr' column to 'media_metadata' table")
                 sync_conn.connection.execute("ALTER TABLE media_metadata ADD COLUMN title_fr TEXT")
 
+            if columns and "genres" not in columns:
+                print("[DB] Migration: Adding 'genres' column to 'media_metadata' table")
+                sync_conn.connection.execute("ALTER TABLE media_metadata ADD COLUMN genres TEXT")
+
             # Add columns to download_links
             inspector.execute("PRAGMA table_info(download_links)")
             dl_columns = [col[1] for col in inspector.fetchall()]

@@ -169,6 +169,9 @@ class TMDbService:
                 # Priority: original_title as the 'official' reference, title_fr for localized view
                 official_title = details.get("original_title") or details.get("original_name") or details.get("title") or details.get("name")
 
+                genres_list = [g.get("name") for g in details.get("genres", []) if g.get("name")]
+                genres_str = ", ".join(genres_list) if genres_list else None
+
                 return {
                     "official_title": html.unescape(official_title) if official_title else None,
                     "title_fr": html.unescape(title_fr) if title_fr else None,
@@ -178,7 +181,8 @@ class TMDbService:
                     "plot_fr": plot_fr,
                     "rating": str(details.get("vote_average")) if details.get("vote_average") else None,
                     "imdb_id": imdb_id,
-                    "tmdb_id": tmdb_id
+                    "tmdb_id": tmdb_id,
+                    "genres": genres_str
                 }
 
         except Exception as e:
@@ -227,6 +231,9 @@ class TMDbService:
                 found_year = int(res_date[:4]) if res_date else None
                 official_title = details.get("original_title") or details.get("original_name") or details.get("title") or details.get("name")
 
+                genres_list = [g.get("name") for g in details.get("genres", []) if g.get("name")]
+                genres_str = ", ".join(genres_list) if genres_list else None
+
                 return {
                     "official_title": html.unescape(official_title) if official_title else None,
                     "title_fr": html.unescape(title_fr) if title_fr else None,
@@ -236,7 +243,8 @@ class TMDbService:
                     "plot_fr": plot_fr,
                     "rating": str(details.get("vote_average")) if details.get("vote_average") else None,
                     "imdb_id": details.get("external_ids", {}).get("imdb_id") or details.get("imdb_id"),
-                    "tmdb_id": tmdb_id
+                    "tmdb_id": tmdb_id,
+                    "genres": genres_str
                 }
 
         except Exception as e:

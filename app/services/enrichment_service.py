@@ -117,7 +117,8 @@ class EnrichmentService:
                         poster_path=local_path,
                         plot_en=plot_en,
                         plot_fr=plot_fr,
-                        rating=res_data.get("rating")
+                        rating=res_data.get("rating"),
+                        genres=res_data.get("genres")
                     )
                     session.add(existing_meta)
                     await session.flush()
@@ -131,6 +132,7 @@ class EnrichmentService:
                     if not existing_meta.plot_en and plot_en: existing_meta.plot_en = plot_en
                     if not existing_meta.year: existing_meta.year = res_data.get("year")
                     if not existing_meta.rating: existing_meta.rating = res_data.get("rating")
+                    if not existing_meta.genres and res_data.get("genres"): existing_meta.genres = res_data.get("genres")
         
         if existing_meta:
             link.imdb_id = existing_meta.imdb_id

@@ -48,6 +48,7 @@ class MediaMetadata(Base):
     plot_en = Column(String, nullable=True)
     plot_fr = Column(String, nullable=True)
     rating = Column(String, nullable=True)
+    genres = Column(String, nullable=True)
 
     links = relationship("DownloadLink", back_populates="metadata_rel")
 

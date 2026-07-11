@@ -410,3 +410,103 @@ async def test_post_scraping_flow_auto_export():
         mock_enrich.assert_called_once()
         mock_export.assert_called_once_with(export_type="stats")
 
+
+@pytest.mark.asyncio
+async def test_scheduler_auto_download_genre_matched():
+    """Test that when a movie matches the excluded genre, download is skipped."""
+    scraper = MagicMock()
+    scraper.name = "TestAutoDLGenreMatch"
+    
+    async def mock_run():
+        yield {
+            "links": ["https://hoster.com/file1"],
+            "source_url": "https://source.com/page1",
+            "auto_download": True,
+            "override_title": "Scary Movie"
+        }
+    scraper.run = mock_run
+    
+    with patch("app.core.scheduler.settings") as mock_settings, \
+         patch("app.core.scheduler.get_db_ctx") as mock_db_ctx, \
+         patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
+         patch("app.services.enrichment_service.EnrichmentService.enrich_links", new_callable=AsyncMock) as mock_enrich, \
+         patch("app.api.downloads.run_download_task", new_callable=AsyncMock) as mock_dl_task:
+        
+        mock_settings.AUTO_DOWNLOAD_EXCLUDE_GENRES = ["Horror", "Horreur"]
+        
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        mock_link = MagicMock(spec=DownloadLink)
+        mock_link.id = 123
+        mock_link.url = "https://hoster.com/file1"
+        mock_link.imdb_id = "tt12345"
+        mock_check.return_value = [mock_link]
+        
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_link]
+        
+        mock_meta = MagicMock()
+        mock_meta.imdb_id = "tt12345"
+        mock_meta.genres = "Comedy, Horror, Thriller"
+        
+        mock_meta_res = MagicMock()
+        mock_meta_res.scalars.return_value.all.return_value = [mock_meta]
+        
+        mock_session.execute.side_effect = [mock_result, mock_meta_res]
+        
+        await run_scraper(scraper)
+        
+        mock_dl_task.assert_not_called()
+        print("[TEST] Genre-unmatched/excluded auto-download skipping verified.")
+
+
+@pytest.mark.asyncio
+async def test_scheduler_auto_download_genre_not_matched():
+    """Test that when a movie does not match the excluded genre, download is triggered."""
+    scraper = MagicMock()
+    scraper.name = "TestAutoDLGenreNotMatch"
+    
+    async def mock_run():
+        yield {
+            "links": ["https://hoster.com/file1"],
+            "source_url": "https://source.com/page1",
+            "auto_download": True,
+            "override_title": "Funny Movie"
+        }
+    scraper.run = mock_run
+    
+    with patch("app.core.scheduler.settings") as mock_settings, \
+         patch("app.core.scheduler.get_db_ctx") as mock_db_ctx, \
+         patch("app.core.scheduler.LinkManager.check_links", new_callable=AsyncMock) as mock_check, \
+         patch("app.services.enrichment_service.EnrichmentService.enrich_links", new_callable=AsyncMock) as mock_enrich, \
+         patch("app.api.downloads.run_download_task", new_callable=AsyncMock) as mock_dl_task:
+        
+        mock_settings.AUTO_DOWNLOAD_EXCLUDE_GENRES = ["Horror", "Horreur"]
+        
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        
+        mock_link = MagicMock(spec=DownloadLink)
+        mock_link.id = 123
+        mock_link.url = "https://hoster.com/file1"
+        mock_link.imdb_id = "tt12345"
+        mock_check.return_value = [mock_link]
+        
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_link]
+        
+        mock_meta = MagicMock()
+        mock_meta.imdb_id = "tt12345"
+        mock_meta.genres = "Comedy, Romance"
+        
+        mock_meta_res = MagicMock()
+        mock_meta_res.scalars.return_value.all.return_value = [mock_meta]
+        
+        mock_session.execute.side_effect = [mock_result, mock_meta_res]
+        
+        await run_scraper(scraper)
+        
+        mock_dl_task.assert_called_once_with(["https://hoster.com/file1"], is_auto=True)
+        print("[TEST] Genre-matched non-excluded auto-download verified.")
+
