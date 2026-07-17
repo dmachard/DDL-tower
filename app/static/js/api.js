@@ -179,3 +179,9 @@ export const checkUrls = async (urls) => {
         body: JSON.stringify({ urls })
     });
 };
+
+export const rescanError = async (url) => {
+    return fetch(`/api/errors/rescan?url=${encodeURIComponent(url)}`, {
+        method: 'POST'
+    });
+};

@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { formatDate } from './helpers.js';
 import { TRANSLATIONS } from './i18n.js';
+import { rescanError } from './api.js';
 
 export const renderErrors = (errors) => {
     const container = document.getElementById('errors-container');
@@ -52,9 +53,16 @@ export const renderErrors = (errors) => {
             </div>
             <div class="col-date" style="text-align: right; white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; align-self: stretch; justify-content: space-between;">
                 <div>${formatDate(err.date)}</div>
-                <button class="btn-delete-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(239, 68, 68, 0.15)'; this.style.borderColor='rgba(239, 68, 68, 0.3)'; this.style.color='var(--accent-red)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.borderColor='rgba(239, 68, 68, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}">
-                    <i class="fas fa-trash-alt"></i> ${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}
-                </button>
+                <div style="display: flex; gap: 6px;">
+                    ${err.source === 'Hoster-Check' ? `
+                    <button class="btn-rescan-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.color='var(--accent)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.05)'; this.style.borderColor='rgba(59, 130, 246, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}">
+                        <i class="fas fa-sync-alt"></i> ${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}
+                    </button>
+                    ` : ''}
+                    <button class="btn-delete-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(239, 68, 68, 0.15)'; this.style.borderColor='rgba(239, 68, 68, 0.3)'; this.style.color='var(--accent-red)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.borderColor='rgba(239, 68, 68, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}">
+                        <i class="fas fa-trash-alt"></i> ${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}
+                    </button>
+                </div>
             </div>
         `;
         container.appendChild(row);
@@ -102,6 +110,64 @@ export const renderErrors = (errors) => {
                 } catch (err) {
                     console.error('Failed to ignore single error', err);
                 }
+            }
+        });
+    });
+
+    // Add click event listeners to each individual rescan button
+    container.querySelectorAll('.btn-rescan-error').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const targetUrl = decodeURIComponent(btn.getAttribute('data-url'));
+            
+            // Disable button & change icon to spinner to show loading state
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${state.language === 'fr' ? 'Scan...' : 'Scanning...'}`;
+            
+            try {
+                const res = await rescanError(targetUrl);
+                if (res.ok) {
+                    const row = btn.closest('.error-row');
+                    if (row) {
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(20px)';
+                        setTimeout(() => {
+                            row.remove();
+                            // Decrement badges
+                            const countEl = document.getElementById('count-errors');
+                            const mobCountEl = document.getElementById('mobile-count-errors');
+                            if (countEl) {
+                                const newVal = Math.max(0, parseInt(countEl.textContent || '0') - 1);
+                                countEl.textContent = newVal;
+                                if (mobCountEl) mobCountEl.textContent = newVal;
+                            }
+                            // If list becomes empty, show empty state
+                            if (container.querySelectorAll('.error-row').length === 0) {
+                                container.innerHTML = `
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon"><i class="fas fa-check-circle" style="color: var(--success)"></i></div>
+                                        <div class="empty-state-text">No Errors Found</div>
+                                        <div class="empty-state-subtext">The scraper seems to be running perfectly!</div>
+                                    </div>`;
+                            }
+                            document.dispatchEvent(new CustomEvent('errors-updated'));
+                        }, 300);
+                    }
+                } else {
+                    const data = await res.json();
+                    alert((state.language === 'fr' ? 'Échec du scan : ' : 'Scan failed: ') + (data.detail || 'Unknown error'));
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.innerHTML = originalHTML;
+                }
+            } catch (err) {
+                console.error('Failed to rescan error', err);
+                alert(state.language === 'fr' ? 'Une erreur est survenue lors du rescan.' : 'An error occurred during rescan.');
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.innerHTML = originalHTML;
             }
         });
     });

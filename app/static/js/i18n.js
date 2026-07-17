@@ -72,6 +72,7 @@ export const TRANSLATIONS = {
         help_scan_enter: "Press Enter to start crawling",
         modal_view_links_title: "Available Links",
         btn_delete: "Delete",
+        btn_rescan: "Rescan",
         confirm_delete_release: "Are you sure you want to delete this release and all associated links?"
     },
     fr: {
@@ -142,6 +143,7 @@ export const TRANSLATIONS = {
         help_scan_enter: "Appuyez sur Entrée pour lancer le crawl",
         modal_view_links_title: "Liens Disponibles",
         btn_delete: "Supprimer",
+        btn_rescan: "Rescanner",
         confirm_delete_release: "Voulez-vous vraiment supprimer cette release et tous les liens associés ?"
     }
 };

@@ -256,3 +256,112 @@ async def clear_errors(url: str = None, db: AsyncSession = Depends(get_db)):
     await db.execute(stmt)
     await db.commit()
     return {"message": "Errors cleared" if not url else "Error cleared"}
+
+@router.post("/errors/rescan")
+async def rescan_error(url: str, db: AsyncSession = Depends(get_db)):
+    """
+    Rescans/re-checks a failed link from Hoster-Check.
+    """
+    import os
+    from datetime import datetime, timezone
+    from fastapi import HTTPException
+    from sqlalchemy import delete
+    from app.db.models import ScrapedURL, DownloadLink
+    from app.core.link import LinkManager
+    from app.services.enrichment_service import enrichment_service
+
+    # 1. Fetch the scraped URL record
+    stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+    res_scraped = await db.execute(stmt)
+    scraped_entry = res_scraped.scalar_one_or_none()
+
+    if not scraped_entry:
+        raise HTTPException(status_code=404, detail="Error URL not found in database")
+
+    # 2. Get original details to preserve them if we re-insert
+    stmt_dl = select(DownloadLink).where(DownloadLink.url == url)
+    res_dl = await db.execute(stmt_dl)
+    dl = res_dl.scalar_one_or_none()
+
+    orig_source_name = dl.source_name if dl else scraped_entry.source_name
+    if orig_source_name == "Hoster-Check" and dl and dl.source_name:
+        orig_source_name = dl.source_name
+    orig_source_url = dl.source_url if dl else url
+    orig_title = dl.title if dl else None
+    orig_year = dl.year if dl else None
+    orig_category = dl.category if dl else None
+
+    # 3. Delete existing DownloadLink so check_links treats it as new
+    if dl:
+        await db.execute(delete(DownloadLink).where(DownloadLink.url == url))
+        await db.flush()
+
+    # 4. Check the link using LinkManager
+    manager = LinkManager()
+    try:
+        added = await manager.check_links(
+            session=db,
+            raw_links=[url],
+            source_url=orig_source_url,
+            source_name=orig_source_name,
+            override_title=orig_title,
+            override_year=orig_year,
+            category=orig_category
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hoster check error: {str(e)}")
+
+    # 5. Check if it was successfully verified (added with non-error status)
+    # We query the newly created DownloadLink
+    stmt_new = select(DownloadLink).where(DownloadLink.url == url)
+    res_new = await db.execute(stmt_new)
+    new_dl = res_new.scalar_one_or_none()
+
+    if new_dl and new_dl.status != "error":
+        # Enrichment
+        if added:
+            await enrichment_service.enrich_links(db, links=added)
+        
+        # Clean up files on disk
+        if scraped_entry.screenshot_path:
+            path_data = scraped_entry.screenshot_path.lstrip('/')
+            if path_data.startswith("static/error_dumps/"):
+                path_data = path_data.replace("static/error_dumps/", "data/error_dumps/")
+            path_app = scraped_entry.screenshot_path.lstrip('/')
+            if path_app.startswith("static/"):
+                path_app = "app/" + path_app
+            for p in (path_data, path_app):
+                try:
+                    if os.path.exists(p):
+                        os.remove(p)
+                except Exception as e:
+                    print(f"[DB] Error removing screenshot file {p}: {e}")
+
+        if scraped_entry.html_path:
+            path_data = scraped_entry.html_path.lstrip('/')
+            if path_data.startswith("static/error_dumps/"):
+                path_data = path_data.replace("static/error_dumps/", "data/error_dumps/")
+            path_app = scraped_entry.html_path.lstrip('/')
+            if path_app.startswith("static/"):
+                path_app = "app/" + path_app
+            for p in (path_data, path_app):
+                try:
+                    if os.path.exists(p):
+                        os.remove(p)
+                except Exception as e:
+                    print(f"[DB] Error removing HTML dump file {p}: {e}")
+
+        # Mark as success (resolves the error)
+        scraped_entry.status = "success"
+        scraped_entry.screenshot_path = None
+        scraped_entry.html_path = None
+        await db.commit()
+        return {"status": "success", "message": f"Link checked successfully. Status: {new_dl.status}"}
+    else:
+        # It's still an error. Check if ScrapedURL was updated by LinkManager
+        await db.commit()
+        # Fetch the latest error message
+        stmt_latest = select(ScrapedURL).where(ScrapedURL.url == url)
+        latest_scraped = (await db.execute(stmt_latest)).scalar_one_or_none()
+        err_msg = latest_scraped.status if latest_scraped else "Hoster check failed"
+        raise HTTPException(status_code=400, detail=f"Rescan failed: {err_msg}")
