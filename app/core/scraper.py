@@ -89,7 +89,10 @@ class Scraper:
             async with get_db_ctx() as session:
                 if cooldown_hours is not None:
                     from datetime import timedelta
-                    stmt = select(ScrapedURL).where(ScrapedURL.url.in_(all_urls))
+                    stmt = select(ScrapedURL).where(
+                        ScrapedURL.url.in_(all_urls),
+                        ~ScrapedURL.status.like("failed%")
+                    )
                     res = await session.execute(stmt)
                     scraped_records = {r.url: r for r in res.scalars().all()}
                     
@@ -109,7 +112,10 @@ class Scraper:
                                 continue
                         final_list.append(item)
                 else:
-                    stmt = select(ScrapedURL.url).where(ScrapedURL.url.in_(all_urls))
+                    stmt = select(ScrapedURL.url).where(
+                        ScrapedURL.url.in_(all_urls),
+                        ~ScrapedURL.status.like("failed%")
+                    )
                     res = await session.execute(stmt)
                     already_scraped = set(res.scalars().all())
                     
@@ -182,14 +188,14 @@ class Scraper:
                             else:
                                 next_batch_contexts.append(res_or_ctx)
                     
+                    # Cleanup/Record
+                    if step.get("scrape_once") or cooldown_hours is not None:
+                        await self._record_scraped(url)
+    
                     # Recursion in batch
                     if next_batch_contexts:
                         async for b in self._execute_step(client, step_idx + 1, next_batch_contexts):
                             yield b
-    
-                    # Cleanup/Record
-                    if step.get("scrape_once") or cooldown_hours is not None:
-                        await self._record_scraped(url)
     
                     # Next page?
                     if not step.get("pagination"): break

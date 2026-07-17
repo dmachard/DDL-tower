@@ -31,7 +31,12 @@ export const renderErrors = (errors) => {
             <div class="col-content">
                 <span class="download-name" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${err.source || 'Unknown'}</span>
                 <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; word-break: break-all;">
-                    ${err.url.startsWith('source:') ? `<span>${err.url}</span>` : `<a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`}
+                    ${err.url.startsWith('source:') 
+                        ? (err.source_url 
+                            ? `<a href="${err.source_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`
+                            : `<span>${err.url}</span>`)
+                        : `<a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`
+                    }
                 </div>
                 <div style="font-size: 12px; color: var(--error); margin-top: 6px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
                     ${err.error === "failed" ? "Unknown error (legacy log)" : err.error}

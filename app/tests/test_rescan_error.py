@@ -138,7 +138,7 @@ async def test_rescan_error_fail():
 async def test_rescan_error_source_success():
     """Test rescan_error triggers a background scan for a valid source."""
     from unittest.mock import PropertyMock
-    mock_session = MagicMock()
+    mock_session = AsyncMock()
     mock_bg = MagicMock()
     
     mock_sources = [
@@ -166,7 +166,7 @@ async def test_rescan_error_source_success():
 async def test_rescan_error_normal_url_source_success():
     """Test rescan_error triggers a background scan for a normal URL error that belongs to a configured source."""
     from unittest.mock import PropertyMock
-    mock_session = MagicMock()
+    mock_session = AsyncMock()
     mock_bg = MagicMock()
     
     mock_sources = [

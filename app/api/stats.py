@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -78,6 +79,22 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     }
     return stats
 
+def get_source_entry_url(source_name: str) -> Optional[str]:
+    if not source_name:
+        return None
+    for s in settings.SCRAPER_SOURCES:
+        if s.get("name", "").lower() == source_name.lower():
+            if s.get("entry_url"):
+                return s.get("entry_url")
+            steps = s.get("steps", [])
+            if steps:
+                url_field = steps[0].get("url")
+                if isinstance(url_field, list) and url_field:
+                    return url_field[0]
+                elif isinstance(url_field, str):
+                    return url_field
+    return None
+
 @router.get("/sources/dashboard")
 async def get_sources_dashboard(db: AsyncSession = Depends(get_db)):
     """
@@ -100,10 +117,15 @@ async def get_sources_dashboard(db: AsyncSession = Depends(get_db)):
     for name in all_names:
         if name == "Unknown" or not name: continue
         
-        entry_url = configured_sources.get(name)
-        if not entry_url:
-            last_scraped_stmt = select(ScrapedURL.url).where(ScrapedURL.source_name == name).order_by(ScrapedURL.last_scraped.desc()).limit(1)
-            entry_url = (await db.execute(last_scraped_stmt)).scalar()
+        entry_url = get_source_entry_url(name)
+        if not entry_url or entry_url.startswith("source:"):
+            last_scraped_stmt = select(ScrapedURL.url).where(
+                ScrapedURL.source_name == name,
+                ~ScrapedURL.url.like("source:%")
+            ).order_by(ScrapedURL.last_scraped.desc()).limit(1)
+            db_url = (await db.execute(last_scraped_stmt)).scalar()
+            if db_url:
+                entry_url = db_url
 
         last_link_stmt = select(DownloadLink).where(DownloadLink.source_name == name).order_by(DownloadLink.last_checked.desc()).limit(1)
         last_link = (await db.execute(last_link_stmt)).scalar()
@@ -245,14 +267,21 @@ async def get_errors(page: int = 1, limit: int = 20, db: AsyncSession = Depends(
     result = await db.execute(stmt)
     errors = result.scalars().all()
     
-    serialized_errors = [{
-        "url": e.url,
-        "source": e.source_name,
-        "date": e.last_scraped.isoformat(),
-        "error": e.status.replace("failed: ", "") if e.status.startswith("failed: ") else e.status,
-        "screenshot_path": e.screenshot_path,
-        "html_path": e.html_path
-    } for e in errors]
+    serialized_errors = []
+    for e in errors:
+        source_url = None
+        if e.url.startswith("source:"):
+            source_url = get_source_entry_url(e.source_name)
+            
+        serialized_errors.append({
+            "url": e.url,
+            "source": e.source_name,
+            "source_url": source_url,
+            "date": e.last_scraped.isoformat(),
+            "error": e.status.replace("failed: ", "") if e.status.startswith("failed: ") else e.status,
+            "screenshot_path": e.screenshot_path,
+            "html_path": e.html_path
+        })
 
     return {
         "total": total_count,
@@ -368,6 +397,11 @@ async def rescan_error(url: str, background_tasks: BackgroundTasks, db: AsyncSes
         if not enabled:
             raise HTTPException(status_code=400, detail=f"Source '{source_name}' is disabled")
             
+        # Delete specific URL scraper error record so the scraper will not skip it
+        if not url.startswith("source:"):
+            db.delete(scraped_entry)
+            await db.commit()
+
         from app.core.scheduler import run_scrapers
         background_tasks.add_task(run_scrapers, matched_source.get("name"))
         return {
