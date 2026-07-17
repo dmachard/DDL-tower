@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.future import select
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -160,11 +160,77 @@ async def get_networks(db: AsyncSession = Depends(get_db)):
     networks = result.scalars().all()
     return sorted([n for n in networks if n])
 
+async def check_sources_novelty(db: AsyncSession):
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import delete
+    
+    now = datetime.now(timezone.utc)
+    threshold_days = settings.SOURCE_NO_NEW_THRESHOLD_DAYS
+    threshold_time = now - timedelta(days=threshold_days)
+    
+    for source_config in settings.SCRAPER_SOURCES:
+        source_name = source_config.get("name")
+        if not source_name:
+            continue
+            
+        enabled = source_config.get("enable") if source_config.get("enable") is not None else True
+        if not enabled:
+            error_url = f"source:{source_name}"
+            stmt_del = delete(ScrapedURL).where(
+                ScrapedURL.url == error_url,
+                ScrapedURL.status.like("failed: No new items%")
+            )
+            await db.execute(stmt_del)
+            continue
+            
+        stmt = select(func.max(func.coalesce(DownloadLink.created_at, DownloadLink.last_checked))).where(
+            DownloadLink.source_name == source_name
+        )
+        res = await db.execute(stmt)
+        last_new_time = res.scalar()
+        
+        if last_new_time is None:
+            stmt_scraped = select(func.min(ScrapedURL.last_scraped)).where(
+                ScrapedURL.source_name == source_name,
+                ScrapedURL.status == "success"
+            )
+            res_scraped = await db.execute(stmt_scraped)
+            last_new_time = res_scraped.scalar()
+            
+        if last_new_time is not None:
+            if last_new_time.tzinfo is None:
+                last_new_time = last_new_time.replace(tzinfo=timezone.utc)
+                
+            if last_new_time < threshold_time:
+                error_url = f"source:{source_name}"
+                error_status = f"failed: No new items found in {threshold_days} days"
+                stmt_err = select(ScrapedURL).where(ScrapedURL.url == error_url)
+                res_err = await db.execute(stmt_err)
+                existing_err = res_err.scalar_one_or_none()
+                if existing_err:
+                    existing_err.status = error_status
+                    existing_err.last_scraped = now
+                else:
+                    db.add(ScrapedURL(
+                        url=error_url,
+                        source_name=source_name,
+                        status=error_status,
+                        last_scraped=now
+                    ))
+            else:
+                error_url = f"source:{source_name}"
+                stmt_del = delete(ScrapedURL).where(
+                    ScrapedURL.url == error_url,
+                    ScrapedURL.status.like("failed: No new items%")
+                )
+                await db.execute(stmt_del)
+
 @router.get("/errors")
 async def get_errors(page: int = 1, limit: int = 20, db: AsyncSession = Depends(get_db)):
     """
     Returns the paginated list of scraping errors.
     """
+    await check_sources_novelty(db)
     # Count total errors in database
     count_stmt = select(func.count(ScrapedURL.url)).where(ScrapedURL.status.like("failed%"))
     count_res = await db.execute(count_stmt)
@@ -258,9 +324,9 @@ async def clear_errors(url: str = None, db: AsyncSession = Depends(get_db)):
     return {"message": "Errors cleared" if not url else "Error cleared"}
 
 @router.post("/errors/rescan")
-async def rescan_error(url: str, db: AsyncSession = Depends(get_db)):
+async def rescan_error(url: str, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
-    Rescans/re-checks a failed link from Hoster-Check.
+    Rescans/re-checks a failed link from Hoster-Check or triggers manual source scan.
     """
     import os
     from datetime import datetime, timezone
@@ -269,6 +335,25 @@ async def rescan_error(url: str, db: AsyncSession = Depends(get_db)):
     from app.db.models import ScrapedURL, DownloadLink
     from app.core.link import LinkManager
     from app.services.enrichment_service import enrichment_service
+
+    if url.startswith("source:"):
+        source_name = url.split(":", 1)[1]
+        matched_source = None
+        for s in settings.SCRAPER_SOURCES:
+            if s.get("name", "").lower() == source_name.lower():
+                matched_source = s
+                break
+                
+        if not matched_source:
+            raise HTTPException(status_code=404, detail=f"Source '{source_name}' not found in configuration")
+            
+        enabled = matched_source.get("enable") if matched_source.get("enable") is not None else True
+        if not enabled:
+            raise HTTPException(status_code=400, detail=f"Source '{source_name}' is disabled")
+            
+        from app.core.scheduler import run_scrapers
+        background_tasks.add_task(run_scrapers, matched_source.get("name"))
+        return {"ok": True, "message": f"Manual scan triggered for source: {matched_source.get('name')}"}
 
     # 1. Fetch the scraped URL record
     stmt = select(ScrapedURL).where(ScrapedURL.url == url)

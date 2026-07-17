@@ -193,6 +193,8 @@ async def post_scraping_flow():
     print(f"[SCHEDULER] [{datetime_now()}] Triggering categorization/enrichment...")
     async with get_db_ctx() as db:
         await enrichment_service.enrich_links(db)
+        from app.api.stats import check_sources_novelty
+        await check_sources_novelty(db)
         
     if settings.AUTO_EXPORT_ENABLED:
         print(f"[SCHEDULER] [{datetime_now()}] Auto-export triggered (Type: {settings.AUTO_EXPORT_TYPE})")

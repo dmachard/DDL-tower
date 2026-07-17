@@ -31,7 +31,7 @@ export const renderErrors = (errors) => {
             <div class="col-content">
                 <span class="download-name" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${err.source || 'Unknown'}</span>
                 <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; word-break: break-all;">
-                    <a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>
+                    ${err.url.startsWith('source:') ? `<span>${err.url}</span>` : `<a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`}
                 </div>
                 <div style="font-size: 12px; color: var(--error); margin-top: 6px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
                     ${err.error === "failed" ? "Unknown error (legacy log)" : err.error}
@@ -54,7 +54,7 @@ export const renderErrors = (errors) => {
             <div class="col-date" style="text-align: right; white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; align-self: stretch; justify-content: space-between;">
                 <div>${formatDate(err.date)}</div>
                 <div style="display: flex; gap: 6px;">
-                    ${err.source === 'Hoster-Check' ? `
+                    ${(err.source === 'Hoster-Check' || err.url.startsWith('source:')) ? `
                     <button class="btn-rescan-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.color='var(--accent)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.05)'; this.style.borderColor='rgba(59, 130, 246, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}">
                         <i class="fas fa-sync-alt"></i> ${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}
                     </button>
@@ -129,6 +129,13 @@ export const renderErrors = (errors) => {
             try {
                 const res = await rescanError(targetUrl);
                 if (res.ok) {
+                    if (targetUrl.startsWith('source:')) {
+                        alert(state.language === 'fr' ? 'Scan de la source lancé en arrière-plan.' : 'Source scan triggered in background.');
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.innerHTML = originalHTML;
+                        return;
+                    }
                     const row = btn.closest('.error-row');
                     if (row) {
                         row.style.opacity = '0';

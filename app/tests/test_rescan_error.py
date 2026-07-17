@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 from app.api.stats import rescan_error
 from app.db.models import ScrapedURL, DownloadLink
 
@@ -13,7 +13,7 @@ async def test_rescan_error_not_found():
     mock_session.execute.return_value = mock_scraped_res
 
     with pytest.raises(HTTPException) as exc_info:
-        await rescan_error(url="https://hoster.com/nonexistent", db=mock_session)
+        await rescan_error(url="https://hoster.com/nonexistent", background_tasks=MagicMock(), db=mock_session)
 
     assert exc_info.value.status_code == 404
     assert "not found" in exc_info.value.detail
@@ -65,7 +65,7 @@ async def test_rescan_error_success():
 
         mock_check.return_value = [mock_new_dl]
 
-        response = await rescan_error(url="https://hoster.com/file1", db=mock_session)
+        response = await rescan_error(url="https://hoster.com/file1", background_tasks=MagicMock(), db=mock_session)
 
         assert response["status"] == "success"
         assert "checked successfully" in response["message"]
@@ -129,7 +129,76 @@ async def test_rescan_error_fail():
         mock_check.return_value = [] # no new successful links
 
         with pytest.raises(HTTPException) as exc_info:
-            await rescan_error(url="https://hoster.com/file1", db=mock_session)
+            await rescan_error(url="https://hoster.com/file1", background_tasks=MagicMock(), db=mock_session)
 
         assert exc_info.value.status_code == 400
         assert "new hoster error" in exc_info.value.detail
+
+@pytest.mark.asyncio
+async def test_rescan_error_source_success():
+    """Test rescan_error triggers a background scan for a valid source."""
+    from unittest.mock import PropertyMock
+    mock_session = AsyncMock()
+    mock_bg = MagicMock()
+    
+    mock_sources = [
+        {"name": "TestScraper", "enable": True}
+    ]
+    
+    with patch("app.core.config.Settings.SCRAPER_SOURCES", new_callable=PropertyMock) as mock_prop:
+        mock_prop.return_value = mock_sources
+        response = await rescan_error(url="source:TestScraper", background_tasks=mock_bg, db=mock_session)
+        assert response["ok"] is True
+        assert "Manual scan triggered" in response["message"]
+        mock_bg.add_task.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_check_sources_novelty_stagnant():
+    """Test check_sources_novelty flags stagnant sources and cleans up disabled ones."""
+    from app.api.stats import check_sources_novelty
+    from datetime import datetime, timezone, timedelta
+    from unittest.mock import PropertyMock
+    
+    mock_session = AsyncMock()
+    
+    # 2 sources: Test1 (enabled, stagnant), Test2 (disabled)
+    mock_sources = [
+        {"name": "Test1", "enable": True},
+        {"name": "Test2", "enable": False}
+    ]
+    
+    stagnant_time = datetime.now(timezone.utc) - timedelta(days=5)
+    
+    # Query mock results
+    mock_link_res = MagicMock()
+    mock_link_res.scalar.return_value = stagnant_time # 5 days ago (threshold is 2 days)
+    mock_session.execute.return_value = mock_link_res
+    
+    # Existing err mock (none exists initially)
+    mock_err_res = MagicMock()
+    mock_err_res.scalar_one_or_none.return_value = None
+    
+    # Set mock_session.execute to return appropriate results based on query pattern
+    async def mock_execute(query, *args, **kwargs):
+        query_str = str(query)
+        res = MagicMock()
+        if "max(coalesce" in query_str:
+            res.scalar.return_value = stagnant_time
+        elif "FROM scraped_urls" in query_str:
+            res.scalar_one_or_none.return_value = None
+        return res
+        
+    mock_session.execute.side_effect = mock_execute
+    
+    with patch("app.core.config.Settings.SCRAPER_SOURCES", new_callable=PropertyMock) as mock_prop, \
+         patch("app.core.config.settings.SOURCE_NO_NEW_THRESHOLD_DAYS", 2):
+        mock_prop.return_value = mock_sources
+        await check_sources_novelty(mock_session)
+        
+        # Verify db.add was called for the stagnant source
+        assert mock_session.add.call_count == 1
+        added_obj = mock_session.add.call_args[0][0]
+        assert added_obj.source_name == "Test1"
+        assert "No new items found" in added_obj.status
+        assert added_obj.url == "source:Test1"
+
