@@ -319,7 +319,8 @@ async def test_scheduler_enable_flag():
     
     with patch("app.core.scheduler.get_scrapers", new_callable=AsyncMock) as mock_get_scrapers, \
          patch("app.core.scheduler.run_scraper", new_callable=AsyncMock) as mock_run_scraper, \
-         patch("app.core.scheduler.enrichment_service.enrich_links", new_callable=AsyncMock):
+         patch("app.core.scheduler.enrichment_service.enrich_links", new_callable=AsyncMock), \
+         patch("app.api.stats.check_sources_novelty", new_callable=AsyncMock):
         
         mock_get_scrapers.return_value = [scraper_enabled, scraper_disabled]
         
@@ -394,7 +395,8 @@ async def test_post_scraping_flow_auto_export():
     
     with patch("app.core.scheduler.settings") as mock_settings, \
          patch("app.core.scheduler.enrichment_service.enrich_links", new_callable=AsyncMock) as mock_enrich, \
-         patch("app.cli.export.ExportCommands.run_export", new_callable=AsyncMock) as mock_export:
+         patch("app.cli.export.ExportCommands.run_export", new_callable=AsyncMock) as mock_export, \
+         patch("app.api.stats.check_sources_novelty", new_callable=AsyncMock):
          
         # Case 1: Disabled
         mock_settings.AUTO_EXPORT_ENABLED = False
