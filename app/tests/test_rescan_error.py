@@ -138,17 +138,55 @@ async def test_rescan_error_fail():
 async def test_rescan_error_source_success():
     """Test rescan_error triggers a background scan for a valid source."""
     from unittest.mock import PropertyMock
-    mock_session = AsyncMock()
+    mock_session = MagicMock()
     mock_bg = MagicMock()
     
     mock_sources = [
         {"name": "TestScraper", "enable": True}
     ]
     
+    # Mock ScrapedURL query
+    mock_scraped = MagicMock(spec=ScrapedURL)
+    mock_scraped.url = "source:TestScraper"
+    mock_scraped.source_name = "TestScraper"
+    
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = mock_scraped
+    mock_session.execute = AsyncMock(return_value=mock_res)
+    
     with patch("app.core.config.Settings.SCRAPER_SOURCES", new_callable=PropertyMock) as mock_prop:
         mock_prop.return_value = mock_sources
         response = await rescan_error(url="source:TestScraper", background_tasks=mock_bg, db=mock_session)
-        assert response["ok"] is True
+        assert response["status"] == "success"
+        assert response.get("source_trigger") is True
+        assert "Manual scan triggered" in response["message"]
+        mock_bg.add_task.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_rescan_error_normal_url_source_success():
+    """Test rescan_error triggers a background scan for a normal URL error that belongs to a configured source."""
+    from unittest.mock import PropertyMock
+    mock_session = MagicMock()
+    mock_bg = MagicMock()
+    
+    mock_sources = [
+        {"name": "TestScraper", "enable": True}
+    ]
+    
+    # Mock ScrapedURL query
+    mock_scraped = MagicMock(spec=ScrapedURL)
+    mock_scraped.url = "https://example.com/failed-page"
+    mock_scraped.source_name = "TestScraper"
+    
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = mock_scraped
+    mock_session.execute = AsyncMock(return_value=mock_res)
+    
+    with patch("app.core.config.Settings.SCRAPER_SOURCES", new_callable=PropertyMock) as mock_prop:
+        mock_prop.return_value = mock_sources
+        response = await rescan_error(url="https://example.com/failed-page", background_tasks=mock_bg, db=mock_session)
+        assert response["status"] == "success"
+        assert response.get("source_trigger") is True
         assert "Manual scan triggered" in response["message"]
         mock_bg.add_task.assert_called_once()
 

@@ -336,8 +336,25 @@ async def rescan_error(url: str, background_tasks: BackgroundTasks, db: AsyncSes
     from app.core.link import LinkManager
     from app.services.enrichment_service import enrichment_service
 
+    # 1. Fetch the scraped URL record
+    stmt = select(ScrapedURL).where(ScrapedURL.url == url)
+    res_scraped = await db.execute(stmt)
+    scraped_entry = res_scraped.scalar_one_or_none()
+
+    if not scraped_entry:
+        raise HTTPException(status_code=404, detail="Error URL not found in database")
+
+    # Check if this error belongs to a configured scraper source
+    source_name = None
     if url.startswith("source:"):
         source_name = url.split(":", 1)[1]
+    elif scraped_entry.source_name:
+        for s in settings.SCRAPER_SOURCES:
+            if s.get("name", "").lower() == scraped_entry.source_name.lower():
+                source_name = s.get("name")
+                break
+
+    if source_name:
         matched_source = None
         for s in settings.SCRAPER_SOURCES:
             if s.get("name", "").lower() == source_name.lower():
@@ -353,15 +370,11 @@ async def rescan_error(url: str, background_tasks: BackgroundTasks, db: AsyncSes
             
         from app.core.scheduler import run_scrapers
         background_tasks.add_task(run_scrapers, matched_source.get("name"))
-        return {"ok": True, "message": f"Manual scan triggered for source: {matched_source.get('name')}"}
-
-    # 1. Fetch the scraped URL record
-    stmt = select(ScrapedURL).where(ScrapedURL.url == url)
-    res_scraped = await db.execute(stmt)
-    scraped_entry = res_scraped.scalar_one_or_none()
-
-    if not scraped_entry:
-        raise HTTPException(status_code=404, detail="Error URL not found in database")
+        return {
+            "status": "success",
+            "message": f"Manual scan triggered for source: {matched_source.get('name')}",
+            "source_trigger": True
+        }
 
     # 2. Get original details to preserve them if we re-insert
     stmt_dl = select(DownloadLink).where(DownloadLink.url == url)
