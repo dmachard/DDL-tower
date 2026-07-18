@@ -228,7 +228,15 @@ class Scraper:
         if delay is None and (step_idx > 0 or step.get("type") in ["rss", "json"]): delay = 1.0
         if delay:
             elapsed = time.time() - self._last_request_time
-            target = delay + random.uniform(-delay*0.2, delay*0.2)
+            if isinstance(delay, list) and len(delay) == 2:
+                target = random.uniform(float(delay[0]), float(delay[1]))
+            elif isinstance(delay, (int, float)):
+                target = delay + random.uniform(-delay*0.2, delay*0.2)
+            else:
+                try:
+                    target = float(delay) + random.uniform(-float(delay)*0.2, float(delay)*0.2)
+                except (ValueError, TypeError):
+                    target = 1.0
             if elapsed < target: await asyncio.sleep(target - elapsed)
 
         self._last_request_time = time.time()
