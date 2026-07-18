@@ -237,7 +237,12 @@ class Scraper:
                     target = float(delay) + random.uniform(-float(delay)*0.2, float(delay)*0.2)
                 except (ValueError, TypeError):
                     target = 1.0
-            if elapsed < target: await asyncio.sleep(target - elapsed)
+            if elapsed < target:
+                sleep_time = target - elapsed
+                print(f"[{self.name}] [{step_name}] Waiting {sleep_time:.2f}s before request (item_delay: {delay}, target: {target:.2f}s)")
+                await asyncio.sleep(sleep_time)
+            if elapsed >= target and step.get("item_delay"):
+                print(f"[{self.name}] [{step_name}] No delay needed (elapsed: {elapsed:.2f}s >= target: {target:.2f}s, item_delay: {delay})")
 
         self._last_request_time = time.time()
         headers = {**self.headers, **step.get("headers", {})}

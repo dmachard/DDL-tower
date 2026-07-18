@@ -639,3 +639,40 @@
     color: var(--text-dim);
     font-size: 12px;
 }
+
+@media (max-width: 600px) {
+    .error-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+        padding: 12px 15px !important;
+    }
+    
+    .error-row .col-status {
+        display: none !important;
+    }
+    
+    .error-row .col-content {
+        width: 100% !important;
+    }
+    
+    .error-row .col-date {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        margin-top: 8px !important;
+        padding-top: 10px !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        text-align: left !important;
+    }
+    
+    .error-row .btn-text {
+        display: none !important;
+    }
+    
+    .error-row button {
+        padding: 8px 12px !important;
+    }
+}

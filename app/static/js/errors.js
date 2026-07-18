@@ -61,11 +61,11 @@ export const renderErrors = (errors) => {
                 <div style="display: flex; gap: 6px;">
                     ${(err.source && err.source !== 'Unknown') ? `
                     <button class="btn-rescan-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(59, 130, 246, 0.15)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.color='var(--accent)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.05)'; this.style.borderColor='rgba(59, 130, 246, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}">
-                        <i class="fas fa-sync-alt"></i> ${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}
+                        <i class="fas fa-sync-alt"></i> <span class="btn-text">${TRANSLATIONS[state.language]?.btn_rescan || 'Rescan'}</span>
                     </button>
                     ` : ''}
                     <button class="btn-delete-error" data-url="${encodeURIComponent(err.url)}" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); font-weight: 700; font-family: inherit;" onmouseover="this.style.background='rgba(239, 68, 68, 0.15)'; this.style.borderColor='rgba(239, 68, 68, 0.3)'; this.style.color='var(--accent-red)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.05)'; this.style.borderColor='rgba(239, 68, 68, 0.15)'; this.style.color='var(--text-secondary)'" title="${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}">
-                        <i class="fas fa-trash-alt"></i> ${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}
+                        <i class="fas fa-trash-alt"></i> <span class="btn-text">${TRANSLATIONS[state.language]?.btn_delete || 'Delete'}</span>
                     </button>
                 </div>
             </div>
