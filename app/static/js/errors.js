@@ -6,9 +6,9 @@ import { rescanError } from './api.js';
 export const renderErrors = (errors) => {
     const container = document.getElementById('errors-container');
     if (!container) return;
-    
+
     container.innerHTML = '';
-    
+
     if (!errors || errors.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
@@ -18,12 +18,12 @@ export const renderErrors = (errors) => {
             </div>`;
         return;
     }
-    
+
     errors.forEach((err, index) => {
         const row = document.createElement('div');
         row.className = 'error-row';
         row.style.animationDelay = `${index * 0.05}s`;
-        
+
         row.innerHTML = `
             <div class="col-status">
                 <i class="fas fa-exclamation-triangle" style="font-size: 1.2rem; color: var(--accent-red)"></i>
@@ -31,12 +31,12 @@ export const renderErrors = (errors) => {
             <div class="col-content">
                 <span class="download-name" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${err.source || 'Unknown'}</span>
                 <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px; word-break: break-all;">
-                    ${err.url.startsWith('source:') 
-                        ? (err.source_url 
-                            ? `<a href="${err.source_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`
-                            : `<span>${err.url}</span>`)
-                        : `<a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`
-                    }
+                    ${err.url.startsWith('source:')
+                ? (err.source_url
+                    ? `<a href="${err.source_url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`
+                    : `<span>${err.url}</span>`)
+                : `<a href="${err.url}" target="_blank" style="color: var(--accent); text-decoration: none;">${err.url}</a>`
+            }
                 </div>
                 <div style="font-size: 12px; color: var(--error); margin-top: 6px; font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
                     ${err.error === "failed" ? "Unknown error (legacy log)" : err.error}
@@ -78,8 +78,8 @@ export const renderErrors = (errors) => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const targetUrl = decodeURIComponent(btn.getAttribute('data-url'));
-            const confirmMsg = state.language === 'fr' 
-                ? 'Voulez-vous vraiment supprimer cette erreur ?' 
+            const confirmMsg = state.language === 'fr'
+                ? 'Voulez-vous vraiment supprimer cette erreur ?'
                 : 'Are you sure you want to delete this error?';
             if (confirm(confirmMsg)) {
                 try {
@@ -124,13 +124,13 @@ export const renderErrors = (errors) => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const targetUrl = decodeURIComponent(btn.getAttribute('data-url'));
-            
+
             // Disable button & change icon to spinner to show loading state
             const originalHTML = btn.innerHTML;
             btn.disabled = true;
             btn.style.opacity = '0.7';
             btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${state.language === 'fr' ? 'Scan...' : 'Scanning...'}`;
-            
+
             try {
                 const res = await rescanError(targetUrl);
                 if (res.ok) {
