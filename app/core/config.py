@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     SCAN_NOVELTY_MULTIPLIER: int = _yaml_config.get("scan_novelty_multiplier", 2)
     CONCURRENT_HOSTER_CHECKS: int = _yaml_config.get("concurrent_hoster_checks", 10)
     SOURCE_NO_NEW_THRESHOLD_DAYS: int = _yaml_config.get("source_no_new_threshold_days", 2)
+    TEMPLATE_MATCH_MIN_CONFIDENCE: float = float(_yaml_config.get("template_match_min_confidence", 0.50))
     BROWSER_URL: Optional[str] = _yaml_config.get("browser_url", None)
     WEBTOP_CONTAINER_NAME: str = _yaml_config.get("webtop_container_name", "ddltower-browser")
     DIRECT_SCAN_PATTERNS: List[str] = _yaml_config.get("direct_scan_patterns", [])

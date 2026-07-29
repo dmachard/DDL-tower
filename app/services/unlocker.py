@@ -9,7 +9,6 @@ from app.core.template_matcher import find_template, save_debug_match
 # Path to the reference button image used for template matching.
 # Single template shared across all unlocker configs.
 TURNSTILE_BUTTON_TEMPLATE = "data/templates/button.png"
-TEMPLATE_MATCH_MIN_CONFIDENCE = 0.55
 
 
 class LinkUnlocker:
@@ -24,7 +23,7 @@ class LinkUnlocker:
         self,
         page,
         template_path: str = TURNSTILE_BUTTON_TEMPLATE,
-        min_confidence: float = TEMPLATE_MATCH_MIN_CONFIDENCE,
+        min_confidence: float = None,
         max_wait_seconds: int = 25,
         poll_interval: float = 2.0,
         bypass_selectors: List[str] = None,
@@ -37,6 +36,8 @@ class LinkUnlocker:
         Returns True if a click or auto-bypass was performed, False if the template was
         never found above `min_confidence` within `max_wait_seconds`.
         """
+        if min_confidence is None:
+            min_confidence = getattr(settings, "TEMPLATE_MATCH_MIN_CONFIDENCE", 0.50)
         start = time.time()
         last_match = None
         last_screenshot_bytes = None
