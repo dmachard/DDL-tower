@@ -9,6 +9,43 @@ import { initScanner } from './js/scanner.js';
 import { initQuickScan } from './js/quick-scan.js';
 import { initErrors } from './js/errors.js';
 
+// ─── Splash Screen Controller ────────────────────────────────────────────────
+const splash = {
+    el: null,
+    bar: null,
+    status: null,
+    total: 0,
+    done: 0,
+    lang: (localStorage.getItem('ddlt_lang') || 'fr'),
+    labels: {
+        fr: { loading: 'Chargement...', ready: 'Prêt !', config: 'Configuration chargée', configDefault: 'Configuration (défaut)', releases: 'Releases chargées', downloads: 'Downloads chargés', errors: 'Erreurs chargées', stats: 'Statistiques chargées' },
+        en: { loading: 'Loading...', ready: 'Ready!', config: 'Config loaded', configDefault: 'Config (default)', releases: 'Releases loaded', downloads: 'Downloads loaded', errors: 'Errors loaded', stats: 'Stats loaded' }
+    },
+    t(key) { return (this.labels[this.lang] || this.labels.fr)[key] || key; },
+    init(totalSteps) {
+        this.el = document.getElementById('loading-splash');
+        this.bar = document.getElementById('splash-progress-bar');
+        this.status = document.getElementById('splash-status');
+        this.total = totalSteps;
+        this.done = 0;
+        if (this.status) this.status.textContent = this.t('loading');
+    },
+    step(key) {
+        this.done++;
+        const pct = Math.round((this.done / this.total) * 100);
+        if (this.bar) this.bar.style.width = `${pct}%`;
+        if (this.status) this.status.textContent = this.t(key);
+        if (this.done >= this.total) this.hide();
+    },
+    hide() {
+        if (this.status) this.status.textContent = this.t('ready');
+        if (this.bar) this.bar.style.width = '100%';
+        setTimeout(() => {
+            if (this.el) this.el.classList.add('hidden');
+        }, 400);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // Reset browser-persisted inputs
@@ -73,9 +110,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initCustomSelect();
     initModals();
 
+    // ── Initial Data Load with Splash Progress ────────────────────────────────
+    splash.init(5); // 5 steps: config, releases, downloads, errors, stats
+
+    ['releases'].forEach(v => { loadFilters(v); updateTagsUI(`filter-tags-${v}`, state[v]); });
+
     const initApp = async () => {
         try {
             const cfg = await fetchConfig();
+            splash.step('config');
+
             const savedLang = localStorage.getItem('ddlt_lang');
             setLanguage(savedLang || cfg.default_language || 'fr');
             fetchSources(loadFilters, updateTagsUI);
@@ -84,14 +128,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Failed to load init config:', err);
             setLanguage('fr');
+            splash.step('configDefault');
         }
     };
 
-    ['releases'].forEach(v => { loadFilters(v); updateTagsUI(`filter-tags-${v}`, state[v]); });
-    ['releases'].forEach(fetchData);
-    fetchDownloads();
-    fetchErrors();
-    fetchStats();
+    // Launch all fetches in parallel, track progress
+    Promise.resolve(fetchData('releases')).then(() => splash.step('releases'));
+    Promise.resolve(fetchDownloads()).then(() => splash.step('downloads'));
+    Promise.resolve(fetchErrors()).then(() => splash.step('errors'));
+    Promise.resolve(fetchStats()).then(() => splash.step('stats'));
     initApp();
 
     // ── Polling Intervals ─────────────────────────────────────────────────────
@@ -111,3 +156,4 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasActive && state.currentView === 'downloads' && document.visibilityState === 'visible') fetchDownloads();
     }, 2000);
 });
+
