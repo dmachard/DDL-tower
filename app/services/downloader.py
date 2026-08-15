@@ -6,6 +6,7 @@ from typing import List, Optional
 from pathlib import Path
 from app.core.config import settings
 from app.services.extraction import extraction_service
+from app.db.database import get_db_ctx
 
 class DownloaderService:
     def __init__(self, download_dir: str = settings.DOWNLOAD_DIR):
@@ -56,11 +57,10 @@ class DownloaderService:
                 }
 
     async def _save_to_db(self, url: str, filename: str, category: str, title: str, year: int, is_auto: bool, imdb_id: str, season: str, episode: str, resolution: str, quality: str, language: str, v_quality: str, codec: str, network: str, audio: str, channels: str, status: str):
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload).where(ActiveDownload.url == url))
             existing = q.scalar_one_or_none()
             if existing:
@@ -92,11 +92,10 @@ class DownloaderService:
             await session.commit()
 
     async def _update_db_status(self, url: str, status: str, error_msg: str = None):
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload).where(ActiveDownload.url == url))
             existing = q.scalar_one_or_none()
             if existing:
@@ -105,11 +104,10 @@ class DownloaderService:
             await session.commit()
 
     async def _delete_from_db(self, url: str):
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload).where(ActiveDownload.url == url))
             existing = q.scalar_one_or_none()
             if existing:
@@ -123,11 +121,10 @@ class DownloaderService:
             for fn in group["files"]:
                 group["files"][fn]["status"] = "paused"
 
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload))
             rows = q.scalars().all()
             for row in rows:
@@ -136,11 +133,10 @@ class DownloaderService:
             await session.commit()
 
     async def resume_group(self, group_name: str):
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload))
             rows = q.scalars().all()
             group_rows = [row for row in rows if self._get_group_name(row.filename) == group_name]
@@ -176,11 +172,10 @@ class DownloaderService:
             for fn in self.active_downloads[group_name]["files"]:
                 self.active_downloads[group_name]["files"][fn]["status"] = "paused"
 
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload))
             rows = q.scalars().all()
             for row in rows:
@@ -191,11 +186,10 @@ class DownloaderService:
         self.active_downloads.pop(group_name, None)
 
     async def resume_active_downloads(self):
-        from app.db.database import AsyncSessionLocal
         from app.db.models import ActiveDownload
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with get_db_ctx() as session:
             q = await session.execute(select(ActiveDownload))
             rows = q.scalars().all()
             
@@ -260,7 +254,6 @@ class DownloaderService:
         # Check if we should cancel any currently running lower-quality downloads
         if title or imdb_id:
             try:
-                from app.db.database import AsyncSessionLocal
                 from app.db.models import ActiveDownload
                 from sqlalchemy import select
                 from app.core.utils import get_quality_score, normalize_title
@@ -268,7 +261,7 @@ class DownloaderService:
 
                 current_score = get_quality_score(resolution, language, v_quality, quality, audio, codec)
 
-                async with AsyncSessionLocal() as session:
+                async with get_db_ctx() as session:
                     q = await session.execute(
                         select(ActiveDownload).where(
                             ActiveDownload.url != url,
@@ -360,7 +353,6 @@ class DownloaderService:
 
         # Check if there is a better version in active downloads queue
         if title or imdb_id:
-            from app.db.database import AsyncSessionLocal
             from app.db.models import ActiveDownload
             from sqlalchemy import select
             from app.core.utils import get_quality_score, normalize_title
@@ -368,7 +360,7 @@ class DownloaderService:
 
             current_score = get_quality_score(resolution, language, v_quality, quality, audio, codec)
             
-            async with AsyncSessionLocal() as session:
+            async with get_db_ctx() as session:
                 q = await session.execute(
                     select(ActiveDownload).where(
                         ActiveDownload.url != url,
@@ -467,12 +459,11 @@ class DownloaderService:
 
         # B. Check by metadata (Same content, different filename)
         if not exists_complete and (title or imdb_id):
-            from app.db.database import AsyncSessionLocal
             from app.db.models import DownloadHistory
             from sqlalchemy import select, or_, and_, func
             from app.core.utils import get_quality_score
             
-            async with AsyncSessionLocal() as session:
+            async with get_db_ctx() as session:
                 if imdb_id:
                     h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
                 else:
@@ -782,11 +773,10 @@ class DownloaderService:
                     # Record in history for each promoted video file
                     for p_file in (promoted_files or [filename]):
                         try:
-                            from app.db.database import AsyncSessionLocal
                             from app.db.models import DownloadHistory
                             from sqlalchemy import select
                             from datetime import datetime, timezone
-                            async with AsyncSessionLocal() as session:
+                            async with get_db_ctx() as session:
                                 stmt = select(DownloadHistory).where(DownloadHistory.filename == p_file)
                                 res = await session.execute(stmt)
                                 existing_hist = res.scalars().first()
@@ -860,11 +850,10 @@ class DownloaderService:
                  if file_path.exists():
                      old_filenames = []
                      try:
-                          from app.db.database import AsyncSessionLocal
                           from app.db.models import DownloadHistory
                           from sqlalchemy import select, and_
                           from app.core.utils import normalize_title
-                          async with AsyncSessionLocal() as session:
+                          async with get_db_ctx() as session:
                               if imdb_id:
                                   h_stmt = select(DownloadHistory).where(DownloadHistory.imdb_id == imdb_id)
                               else:
@@ -895,11 +884,10 @@ class DownloaderService:
 
             # Record in history
             try:
-                from app.db.database import AsyncSessionLocal
                 from app.db.models import DownloadHistory
                 from sqlalchemy import select
                 from datetime import datetime, timezone
-                async with AsyncSessionLocal() as session:
+                async with get_db_ctx() as session:
                     stmt = select(DownloadHistory).where(DownloadHistory.filename == filename)
                     res = await session.execute(stmt)
                     existing_hist = res.scalars().first()

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     
     # Database Settings
     DATABASE_URL: str = _yaml_config.get("database_url", "sqlite+aiosqlite:///./data/ddl.db")
+    DB_POOL_SIZE: int = int(_yaml_config.get("db_pool_size", 20))
+    DB_MAX_OVERFLOW: int = int(_yaml_config.get("db_max_overflow", 20))
+    DB_POOL_TIMEOUT: int = int(_yaml_config.get("db_pool_timeout", 60))
     
     # Downloader API Settings (Environment variable takes priority)
     _yaml_downloader = _yaml_config.get("downloader", {})

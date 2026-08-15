@@ -230,8 +230,9 @@ async def check_sources_novelty(db: AsyncSession):
                 res_err = await db.execute(stmt_err)
                 existing_err = res_err.scalar_one_or_none()
                 if existing_err:
-                    existing_err.status = error_status
-                    existing_err.last_scraped = now
+                    if existing_err.status != "ignored":
+                        existing_err.status = error_status
+                        existing_err.last_scraped = now
                 else:
                     db.add(ScrapedURL(
                         url=error_url,
@@ -399,7 +400,7 @@ async def rescan_error(url: str, background_tasks: BackgroundTasks, db: AsyncSes
             
         # Delete specific URL scraper error record so the scraper will not skip it
         if not url.startswith("source:"):
-            db.delete(scraped_entry)
+            await db.delete(scraped_entry)
             await db.commit()
 
         from app.core.scheduler import run_scrapers

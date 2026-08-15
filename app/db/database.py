@@ -21,7 +21,11 @@ connect_args = {
 engine = create_async_engine(
     DATABASE_URL, 
     echo=False, 
-    connect_args=connect_args
+    connect_args=connect_args,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
+    pool_pre_ping=True
 )
 
 @event.listens_for(engine.sync_engine, "connect")
