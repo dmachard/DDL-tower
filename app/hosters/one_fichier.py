@@ -66,7 +66,36 @@ class OneFichierService:
                         await page.close()
                         return {"status": "dead", "host": "1fichier.com"}
 
-                    # Look for the premium table which contains file info
+                    # 1. New 1fichier layout (.tier-name, .tier-feat)
+                    tier_name_el = page.locator('.tier-name').first
+                    tier_feat_el = page.locator('.tier-feat').first
+                    if await tier_name_el.count() > 0:
+                        name = (await tier_name_el.inner_text()).strip()
+                        size_str = (await tier_feat_el.inner_text()).strip() if await tier_feat_el.count() > 0 else ""
+                        if name:
+                            await page.close()
+                            return {
+                                "status": "alive",
+                                "filename": name,
+                                "size": parse_size(size_str),
+                                "host": "1fichier.com"
+                            }
+
+                    # Fallback regex on HTML content for new layout
+                    name_match = re.search(r'class="tier-name"[^>]*>([^<]+)</span>', content, re.IGNORECASE)
+                    size_match = re.search(r'class="tier-feat"[^>]*>([^<]+)</span>', content, re.IGNORECASE)
+                    if name_match:
+                        name = name_match.group(1).strip()
+                        size_str = size_match.group(1).strip() if size_match else ""
+                        await page.close()
+                        return {
+                            "status": "alive",
+                            "filename": name,
+                            "size": parse_size(size_str),
+                            "host": "1fichier.com"
+                        }
+
+                    # 2. Legacy premium table which contains file info
                     premium_table = page.locator('table.premium').first
                     if await premium_table.count() > 0:
                         html = await premium_table.inner_html()
