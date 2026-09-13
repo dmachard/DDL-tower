@@ -33,16 +33,11 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=60000")  # 60s busy timeout
     cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
     cursor.execute("PRAGMA temp_store=MEMORY")
     cursor.execute("PRAGMA mmap_size=268435456") # 256MB mmap
     cursor.close()
-
-@event.listens_for(engine.sync_engine, "begin")
-def do_begin(conn):
-    # This forces a write lock at the start of the transaction 
-    # to avoid 'database is locked' during concurrent writes
-    conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 AsyncSessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
@@ -51,31 +46,17 @@ AsyncSessionLocal = sessionmaker(
 Base = declarative_base()
 
 async def get_db():
-    """Provides a transactional database session with retry logic for SQLite locks."""
-    max_retries = 5
-    retry_delay = 2
-    
-    for attempt in range(max_retries):
-        async with AsyncSessionLocal() as session:
-            try:
-                # BEGIN IMMEDIATE is already handled by the @event listener
-                yield session
-                await session.commit()
-                return # Success
-            except OperationalError as e:
-                await session.rollback()
-                if "database is locked" in str(e) and attempt < max_retries - 1:
-                    print(f"[DB] Database is locked, retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
-                    await asyncio.sleep(retry_delay)
-                    continue
-                raise
-            except (GeneratorExit, asyncio.CancelledError):
-                # Critical: do not retry if the generator is being closed or task cancelled
-                await session.rollback()
-                raise
-            except Exception:
-                await session.rollback()
-                raise
+    """Provides a transactional database session."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except (GeneratorExit, asyncio.CancelledError):
+            await session.rollback()
+            raise
+        except Exception:
+            await session.rollback()
+            raise
 
 get_db_ctx = asynccontextmanager(get_db)
 
