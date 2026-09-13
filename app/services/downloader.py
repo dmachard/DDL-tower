@@ -507,9 +507,13 @@ class DownloaderService:
                                 
                             if lib_path and lib_path.exists():
                                 print(f"[DOWNLOADER] Content '{title}' already exists in library with same/better quality ({ex.filename}). skipping.")
-                                # Mark as complete for the UI but don't create a new file/link to avoid redundant entries
-                                exists_complete = True
-                                break
+                                await self._delete_from_db(url)
+                                if group_name in self.active_downloads:
+                                    group = self.active_downloads[group_name]
+                                    group["files"].pop(filename, None)
+                                    if not group["files"]:
+                                        self.active_downloads.pop(group_name, None)
+                                return None
 
         # Ensure group entry exists for UI reporting
         if group_name not in self.active_downloads:

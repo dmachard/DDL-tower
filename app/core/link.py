@@ -1,3 +1,4 @@
+import asyncio
 import math
 import re
 from datetime import datetime, timezone
@@ -146,58 +147,70 @@ class LinkManager:
                 except Exception:
                     pass
 
-            try:
-                # Use a nested transaction (savepoint) so we can gracefully recover from IntegrityError
-                async with session.begin_nested():
-                    # Double-check if the link was added by another task while we were awaiting hoster
-                    q = await session.execute(select(DownloadLink).where(DownloadLink.url == link))
-                    existing = q.scalar_one_or_none()
-                    
-                    if existing:
-                        existing.status = status
-                        existing.filename = final_filename
-                        # Only update titles if we have a new override, or if they were empty
-                        if override_title:
-                            existing.title = override_title
+            inserted = False
+            for attempt in range(5):
+                try:
+                    # Use a nested transaction (savepoint) so we can gracefully recover from IntegrityError
+                    async with session.begin_nested():
+                        # Double-check if the link was added by another task while we were awaiting hoster
+                        q = await session.execute(select(DownloadLink).where(DownloadLink.url == link))
+                        existing = q.scalar_one_or_none()
                         
-                        # Determine best raw_title for tooltips
-                        existing.raw_title = self._get_best_raw_title(override_title, final_filename, link)
+                        if existing:
+                            existing.status = status
+                            existing.filename = final_filename
+                            # Only update titles if we have a new override, or if they were empty
+                            if override_title:
+                                existing.title = override_title
+                            
+                            # Determine best raw_title for tooltips
+                            existing.raw_title = self._get_best_raw_title(override_title, final_filename, link)
+                            
+                            if category:
+                                existing.category = category
+                            existing.year = override_year
+                            existing.size = format_size(info.get('size', 0))
+                            existing.size_bytes = info.get('size', 0)
+                            existing.last_checked = datetime.now(timezone.utc)
+                            existing.source_name = source_name
+                            existing.source_url = source_url
+                            existing.language = ", ".join(tags) if tags else None
+                            added_links.append(existing)
+                        else:
+                            new_db_link = DownloadLink(
+                                url=link,
+                                hoster=info.get('host', 'unknown'),
+                                status=status,
+                                filename=final_filename,
+                                title=override_title, 
+                                raw_title=self._get_best_raw_title(override_title, final_filename, link),
+                                year=override_year,
+                                category=category,
+                                size=format_size(info.get('size', 0)),
+                                size_bytes=info.get('size', 0),
+                                last_checked=datetime.now(timezone.utc),
+                                source_name=source_name,
+                                source_url=source_url,
+                                language=", ".join(tags) if tags else None
+                            )
+                            session.add(new_db_link)
+                            added_links.append(new_db_link)
                         
-                        if category:
-                            existing.category = category
-                        existing.year = override_year
-                        existing.size = format_size(info.get('size', 0))
-                        existing.size_bytes = info.get('size', 0)
-                        existing.last_checked = datetime.now(timezone.utc)
-                        existing.source_name = source_name
-                        existing.source_url = source_url
-                        existing.language = ", ".join(tags) if tags else None
-                        added_links.append(existing)
+                        # Flush immediately so any IntegrityError is raised inside the savepoint block
+                        await session.flush()
+                        print(f"[LINK] Added/Updated link: {final_filename or link}")
+                    inserted = True
+                    break
+                except sqlalchemy.exc.IntegrityError:
+                    print(f"[LINK] Race condition inserting {link}, skipped.")
+                    inserted = True
+                    break
+                except sqlalchemy.exc.OperationalError as oe:
+                    if "locked" in str(oe).lower() and attempt < 4:
+                        print(f"[LINK] Database locked while inserting {link}, retrying in {(attempt + 1) * 0.5}s...")
+                        await asyncio.sleep((attempt + 1) * 0.5)
                     else:
-                        new_db_link = DownloadLink(
-                            url=link,
-                            hoster=info.get('host', 'unknown'),
-                            status=status,
-                            filename=final_filename,
-                            title=override_title, 
-                            raw_title=self._get_best_raw_title(override_title, final_filename, link),
-                            year=override_year,
-                            category=category,
-                            size=format_size(info.get('size', 0)),
-                            size_bytes=info.get('size', 0),
-                            last_checked=datetime.now(timezone.utc),
-                            source_name=source_name,
-                            source_url=source_url,
-                            language=", ".join(tags) if tags else None
-                        )
-                        session.add(new_db_link)
-                        added_links.append(new_db_link)
-                    
-                    # Flush immediately so any IntegrityError is raised inside the savepoint block
-                    await session.flush()
-                    print(f"[LINK] Added/Updated link: {final_filename or link}")
-            except sqlalchemy.exc.IntegrityError:
-                print(f"[LINK] Race condition inserting {link}, skipped.")
+                        raise
         
         # Final flush for this batch
         await session.flush()
