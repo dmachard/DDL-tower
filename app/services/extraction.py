@@ -14,6 +14,14 @@ class ExtractionService:
         """Checks if a file is a RAR archive."""
         return file_path.lower().endswith('.rar')
 
+    def is_zip(self, file_path: str) -> bool:
+        """Checks if a file is a ZIP archive."""
+        return file_path.lower().endswith('.zip')
+
+    def is_archive(self, file_path: str) -> bool:
+        """Checks if a file is an archive supported for extraction (RAR or ZIP)."""
+        return self.is_rar(file_path) or self.is_zip(file_path)
+
     def get_rar_parts(self, file_path: str) -> List[str]:
         """
         If it's a multi-part RAR, returns the list of all parts.
@@ -66,12 +74,16 @@ class ExtractionService:
     def should_extract(self, file_path: str, active_downloads: dict = None) -> bool:
         """
         Determines if this file should trigger an extraction.
-        If it's a multi-part RAR, it only triggers if all parts are present on disk
+        For ZIP archives, returns True immediately.
+        For multi-part RAR, only triggers if all parts are present on disk
         and no other parts are currently downloading for the same group.
         """
         path = Path(file_path)
         name = path.name
         
+        if self.is_zip(file_path):
+            return True
+
         if not self.is_rar(file_path):
             return False
             
@@ -98,7 +110,6 @@ class ExtractionService:
         
         return True
 
-
     def get_first_part(self, file_path: str) -> str:
         """Finds the first volume of a multi-part archive."""
         parts = self.get_rar_parts(file_path)
@@ -108,15 +119,117 @@ class ExtractionService:
         parts.sort()
         return parts[0]
 
+    def _cleanup_and_promote(self, dest_dir: Path, archive_parts: List[str], parent_dir: Path, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> List[str]:
+        """Shared cleanup of archive parts, non-video files, and promotion of video files."""
+        from app.services.library_service import library_service
+
+        # 1. Cleanup: Delete archive parts
+        if settings.DELETE_RAR_AFTER_EXTRACTION:
+            for part in archive_parts:
+                try:
+                    if os.path.exists(part):
+                        os.remove(part)
+                        print(f"[EXTRACTION] Deleted archive part: {Path(part).name}")
+                except Exception as e:
+                    print(f"[EXTRACTION] Could not delete {part}: {e}")
+        
+        # 2. Cleanup: Delete everything that is NOT a video file
+        video_files = []
+        print(f"[EXTRACTION] Cleaning up non-video files in {dest_dir}...")
+        for root, dirs, files in os.walk(dest_dir, topdown=False):
+            for file in files:
+                file_p = Path(root) / file
+                if file_p.suffix.lower() in settings.VIDEO_EXTENSIONS:
+                    video_files.append(file_p)
+                else:
+                    try:
+                        file_p.unlink()
+                        print(f"[EXTRACTION] Deleted non-video: {file}")
+                    except Exception as e:
+                        print(f"[EXTRACTION] Could not delete {file_p}: {e}")
+            
+            # Remove empty subdirectories
+            for d in dirs:
+                dir_path = Path(root) / d
+                try:
+                    if dir_path.exists() and not any(dir_path.iterdir()):
+                        dir_path.rmdir()
+                except:
+                    pass
+        
+        # 3. Promote video file to root and remove empty folder
+        promoted_files = []
+        if video_files:
+            for video_p in video_files:
+                new_path = parent_dir / video_p.name
+                try:
+                    if not new_path.exists():
+                        shutil.move(str(video_p), str(new_path))
+                        print(f"[EXTRACTION] Promoted {video_p.name} to {parent_dir}")
+                        promoted_files.append(video_p.name)
+                        
+                        # Library Organization (Movies & Series)
+                        if category in ["movie", "series"]:
+                            library_service.organize_file(str(new_path), category, title=title, year=year, season=season, episode=episode)
+                    else:
+                        print(f"[EXTRACTION] {video_p.name} already exists in destination, skipping move.")
+                        promoted_files.append(video_p.name)
+                except Exception as e:
+                    print(f"[EXTRACTION] Could not move {video_p.name}: {e}")
+            
+            # Finally remove the folder if empty or if we decided so
+            try:
+                if dest_dir.exists():
+                    shutil.rmtree(dest_dir)
+                    print(f"[EXTRACTION] Removed temporary folder {dest_dir}")
+            except Exception as e:
+                print(f"[EXTRACTION] Could not remove folder {dest_dir}: {e}")
+
+        return promoted_files
+
+    async def extract_zip(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> tuple:
+        """
+        Extracts a ZIP archive using Python's zipfile module.
+        Returns a tuple: (success: bool, promoted_files: List[str])
+        """
+        import asyncio
+        import zipfile
+
+        path = Path(file_path)
+        folder_name = re.sub(r'\.zip$', '', path.name, flags=re.I)
+        dest_dir = path.parent / folder_name
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"[EXTRACTION] Starting ZIP extraction from {path.name} to {dest_dir}...")
+
+        def _unzip():
+            with zipfile.ZipFile(path, 'r') as zip_ref:
+                zip_ref.extractall(dest_dir)
+
+        try:
+            await asyncio.to_thread(_unzip)
+            print(f"[EXTRACTION] Successfully extracted ZIP {path.name}")
+            promoted_files = self._cleanup_and_promote(
+                dest_dir=dest_dir,
+                archive_parts=[str(path)],
+                parent_dir=path.parent,
+                category=category,
+                title=title,
+                year=year,
+                season=season,
+                episode=episode
+            )
+            return True, promoted_files
+        except Exception as e:
+            print(f"[EXTRACTION] Exception during ZIP extraction of {path.name}: {str(e)}")
+            return False, []
+
     async def extract_rar(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> tuple:
         """
         Extracts a RAR archive using the system unrar command.
         Ensures extraction starts from the first volume.
         Returns a tuple: (success: bool, promoted_files: List[str])
         """
-        # We need to import library_service here to avoid circular imports if any
-        from app.services.library_service import library_service
-        
         if not self.should_extract(file_path, active_downloads):
             return False, []
 
@@ -134,9 +247,6 @@ class ExtractionService:
         print(f"[EXTRACTION] Starting extraction from {first_part_path.name} to {dest_dir}...")
         
         try:
-            # -o+ : overwrite existing files
-            # -y : assume yes on all queries
-            # x : eXtract with full paths
             import asyncio
             proc = await asyncio.create_subprocess_exec(
                 "unrar", "x", "-o+", "-y", str(first_part_path), str(dest_dir),
@@ -147,71 +257,17 @@ class ExtractionService:
             
             if proc.returncode == 0:
                 print(f"[EXTRACTION] Successfully extracted {path.name}")
-                
-                # 1. Cleanup: Delete RAR parts
-                if settings.DELETE_RAR_AFTER_EXTRACTION:
-                    parts = self.get_rar_parts(file_path)
-                    for part in parts:
-                        try:
-                            if os.path.exists(part):
-                                os.remove(part)
-                                print(f"[EXTRACTION] Deleted archive part: {Path(part).name}")
-                        except Exception as e:
-                            print(f"[EXTRACTION] Could not delete {part}: {e}")
-                
-                # 2. Cleanup: Delete everything that is NOT a video file
-                video_files = []
-                print(f"[EXTRACTION] Cleaning up non-video files in {dest_dir}...")
-                for root, dirs, files in os.walk(dest_dir, topdown=False):
-                    for file in files:
-                        file_p = Path(root) / file
-                        if file_p.suffix.lower() in settings.VIDEO_EXTENSIONS:
-                            video_files.append(file_p)
-                        else:
-                            try:
-                                file_p.unlink()
-                                print(f"[EXTRACTION] Deleted non-video: {file}")
-                            except Exception as e:
-                                print(f"[EXTRACTION] Could not delete {file_p}: {e}")
-                    
-                    # Remove empty subdirectories
-                    for d in dirs:
-                        dir_path = Path(root) / d
-                        try:
-                            if dir_path.exists() and not any(dir_path.iterdir()):
-                                dir_path.rmdir()
-                        except:
-                            pass
-                
-                # 3. Promote video file to root and remove empty folder
-                promoted_files = []
-                if video_files:
-                    # If multiple video files, we move all of them to parent
-                    for video_p in video_files:
-                        new_path = path.parent / video_p.name
-                        try:
-                            if not new_path.exists():
-                                shutil.move(str(video_p), str(new_path))
-                                print(f"[EXTRACTION] Promoted {video_p.name} to {path.parent}")
-                                promoted_files.append(video_p.name)
-                                
-                                # Library Organization (Movies & Series)
-                                if category in ["movie", "series"]:
-                                    library_service.organize_file(str(new_path), category, title=title, year=year, season=season, episode=episode)
-                            else:
-                                print(f"[EXTRACTION] {video_p.name} already exists in destination, skipping move.")
-                                promoted_files.append(video_p.name)
-                        except Exception as e:
-                            print(f"[EXTRACTION] Could not move {video_p.name}: {e}")
-                    
-                    # Finally remove the folder if empty or if we decided so
-                    try:
-                        if dest_dir.exists():
-                            shutil.rmtree(dest_dir)
-                            print(f"[EXTRACTION] Removed temporary folder {dest_dir}")
-                    except Exception as e:
-                        print(f"[EXTRACTION] Could not remove folder {dest_dir}: {e}")
-
+                parts = self.get_rar_parts(file_path)
+                promoted_files = self._cleanup_and_promote(
+                    dest_dir=dest_dir,
+                    archive_parts=parts,
+                    parent_dir=path.parent,
+                    category=category,
+                    title=title,
+                    year=year,
+                    season=season,
+                    episode=episode
+                )
                 return True, promoted_files
             else:
                 stderr_dec = stderr.decode('utf-8', errors='replace')
@@ -221,6 +277,12 @@ class ExtractionService:
         except Exception as e:
             print(f"[EXTRACTION] Exception during extraction of {path.name}: {str(e)}")
             return False, []
+
+    async def extract_archive(self, file_path: str, active_downloads: dict = None, category: str = None, title: str = None, year: int = None, season: str = None, episode: str = None) -> tuple:
+        """Dispatches extraction to extract_zip or extract_rar based on file extension."""
+        if self.is_zip(file_path):
+            return await self.extract_zip(file_path, active_downloads, category, title, year, season, episode)
+        return await self.extract_rar(file_path, active_downloads, category, title, year, season, episode)
 
 
 extraction_service = ExtractionService()

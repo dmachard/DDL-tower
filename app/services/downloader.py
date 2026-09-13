@@ -751,15 +751,15 @@ class DownloaderService:
         group = self.active_downloads.get(group_name)
         if not group: return str(file_path)
 
-        is_rar_file = extraction_service.is_rar(str(file_path))
+        is_archive_file = extraction_service.is_archive(str(file_path))
 
-        if settings.EXTRACT_RAR and is_rar_file and not group.get("extraction_triggered"):
+        if settings.EXTRACT_RAR and is_archive_file and not group.get("extraction_triggered"):
             if extraction_service.should_extract(str(file_path), self.active_downloads):
                 group["extraction_triggered"] = True
                 group["status"] = "extracting"
                 group["progress"] = 100
                 
-                success, promoted_files = await extraction_service.extract_rar(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
+                success, promoted_files = await extraction_service.extract_archive(str(file_path), self.active_downloads, category=category, title=title, year=year, season=season, episode=episode)
                 if not success:
                     group["status"] = "error"
                     group["error"] = "Extraction failed"
@@ -817,12 +817,12 @@ class DownloaderService:
                                     session.add(history)
                                 await session.commit()
                         except Exception as he:
-                            print(f"[DOWNLOADER] Error saving RAR extraction history: {he}")
+                            print(f"[DOWNLOADER] Error saving archive extraction history: {he}")
                     
                     self.active_downloads.pop(group_name, None)
                     return str(file_path)
             else:
-                # RAR part, but not all parts are finished yet (or some parts are missing).
+                # Archive part, but not all parts are finished yet (or some parts are missing).
                 # Check if all files in the group are finished downloading.
                 all_finished = True
                 for fn, info in group.get("files", {}).items():
@@ -840,9 +840,9 @@ class DownloaderService:
                         print(f"[DOWNLOADER] Group {group_name} marked as error because of missing parts: {missing_parts}")
                 return str(file_path)
         
-        # If not RAR or extraction not triggered
+        # If not archive or extraction not triggered
         if group["status"] != "error":
-            if category in ["movie", "series"] and not extraction_service.is_rar(str(file_path)):
+            if category in ["movie", "series"] and not extraction_service.is_archive(str(file_path)):
                  if file_path.exists():
                      old_filenames = []
                      try:
@@ -932,7 +932,7 @@ class DownloaderService:
             except Exception as he:
                 print(f"[DOWNLOADER] Error saving history: {he}")
 
-            # Only pop the file if it's NOT a rar file.
+            # Only pop the file if it's NOT a multipart rar file.
             # If it IS a rar file, we must keep it in the active_downloads group
             # so that when the FINAL part finishes, should_extract knows all parts exist.
             if not extraction_service.is_rar(str(file_path)):

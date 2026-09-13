@@ -115,3 +115,34 @@ async def test_debrid_service_unlock_retry():
         assert res["status"] == "success"
         assert res["data"]["link"] == "http://ok.com/file.mkv"
         assert mock_client.unlock_link.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_extract_zip(tmp_path):
+    import zipfile
+    svc = ExtractionService(download_dir=str(tmp_path))
+    
+    # Create zip file with video and non-video files
+    zip_path = tmp_path / "MyMovie.2024.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("MyMovie.2024/MyMovie.2024.mkv", b"fake video content")
+        zf.writestr("MyMovie.2024/sample.nfo", b"some info")
+
+    assert svc.is_zip(str(zip_path)) is True
+    assert svc.is_archive(str(zip_path)) is True
+    assert svc.should_extract(str(zip_path)) is True
+
+    with patch("app.services.library_service.library_service.organize_file") as mock_org:
+        success, promoted = await svc.extract_archive(
+            str(zip_path), category="movie", title="MyMovie", year=2024
+        )
+        assert success is True
+        assert "MyMovie.2024.mkv" in promoted
+        # Promoted file exists at root
+        assert (tmp_path / "MyMovie.2024.mkv").exists()
+        # Non-video file should not be promoted
+        assert not (tmp_path / "sample.nfo").exists()
+        # Original zip should be deleted per settings.DELETE_RAR_AFTER_EXTRACTION
+        assert not zip_path.exists()
+        mock_org.assert_called_once()
+

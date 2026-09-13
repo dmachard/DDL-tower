@@ -104,7 +104,7 @@
 .group-title { font-size: 18px; font-weight: 800; color: var(--text-pure); }
 .group-poster {
     width: 140px; height: 210px; border-radius: 12px;
-    background: rgba(255, 255, 255, 0.05) url('../../img/no-poster.svg') no-repeat center;
+    background: rgba(255, 255, 255, 0.05) url('../img/no-poster.svg') no-repeat center;
     background-size: cover; border: none !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
     flex-shrink: 0; position: relative !important;
