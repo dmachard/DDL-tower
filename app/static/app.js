@@ -1,14 +1,14 @@
-import { state } from './js/state.js?v=7';
-import { debounce } from './js/helpers.js?v=7';
-import { fetchData, fetchDownloads, fetchStats, fetchConfig, fetchSources, fetchYears, fetchNetworks, fetchErrors } from './js/api.js?v=7';
-import { loadFilters, updateTagsUI, handleTagClick, initCustomSelect } from './js/filters.js?v=7';
-import { setLanguage } from './js/i18n.js?v=7';
-import { initModals } from './js/modals.js?v=7';
-import { initNavigation } from './js/navigation.js?v=7';
-import { initScanner } from './js/scanner.js?v=7';
-import { initQuickScan } from './js/quick-scan.js?v=7';
-import { initErrors } from './js/errors.js?v=7';
-import { initDownloads } from './js/downloads.js?v=7';
+import { state } from './js/state.js';
+import { debounce } from './js/helpers.js';
+import { fetchData, fetchDownloads, fetchStats, fetchConfig, fetchSources, fetchYears, fetchNetworks, fetchErrors } from './js/api.js';
+import { loadFilters, updateTagsUI, handleTagClick, initCustomSelect } from './js/filters.js';
+import { setLanguage } from './js/i18n.js';
+import { initModals } from './js/modals.js';
+import { initNavigation } from './js/navigation.js';
+import { initScanner } from './js/scanner.js';
+import { initQuickScan } from './js/quick-scan.js';
+import { initErrors } from './js/errors.js';
+import { initDownloads } from './js/downloads.js';
 
 // ─── Splash Screen Controller ────────────────────────────────────────────────
 const splash = {
@@ -65,15 +65,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const handleSearch = debounce((e) => {
-        const query = e.target.value.toLowerCase();
+        const query = (e.target.value || '').trim().toLowerCase();
         const view = e.target.id === 'target-search' ? 'releases' : e.target.id.replace('search-', '');
         if (state[view]) {
             state[view].query = query;
             state[view].page = 1;
+            if (view === 'releases' && state.currentView !== 'releases' && query) {
+                document.querySelector('.nav-item[data-view="releases"]')?.click();
+            }
             fetchData(view);
         }
-    }, 400);
+    }, 300);
     targetSearch?.addEventListener('input', handleSearch);
+    targetSearch?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = (targetSearch.value || '').trim().toLowerCase();
+            state.releases.query = query;
+            state.releases.page = 1;
+            if (state.currentView !== 'releases') {
+                document.querySelector('.nav-item[data-view="releases"]')?.click();
+            }
+            fetchData('releases');
+        }
+    });
 
     // ── Navigation & Scanner ──────────────────────────────────────────────────
     initNavigation();

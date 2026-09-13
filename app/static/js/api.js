@@ -20,8 +20,8 @@ export const fetchData = async (view) => {
         if (view === 'releases' && viewState.year) url.searchParams.append('year', viewState.year);
         if (view === 'releases' && viewState.network) url.searchParams.append('network', viewState.network);
         if (view === 'releases' && viewState.local) url.searchParams.append('local', viewState.local);
-        if (viewState.recent) url.searchParams.append('recent', 'true');
-        if (viewState.hours) url.searchParams.append('hours', viewState.hours);
+        if (viewState.recent && !viewState.query) url.searchParams.append('recent', 'true');
+        if (viewState.hours && !viewState.query) url.searchParams.append('hours', viewState.hours);
 
         const res = await fetch(url);
         const data = await res.json();

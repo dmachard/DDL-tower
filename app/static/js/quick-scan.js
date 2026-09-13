@@ -1,5 +1,5 @@
-import { state } from './state.js?v=7';
-import { fetchData, fetchDownloads, fetchStats, extractText } from './api.js?v=7';
+import { state } from './state.js';
+import { fetchData, fetchDownloads, fetchStats, extractText } from './api.js';
 
 export function initQuickScan() {
     const textarea = document.getElementById('quick-scan-textarea');
