@@ -1,4 +1,4 @@
-import { fetchData, startDirectScan, extractText } from './api.js';
+import { fetchData, startDirectScan, extractText } from './api.js?v=7';
 
 export const initScanner = () => {
     const directScanInput = document.getElementById('direct-scan-input');

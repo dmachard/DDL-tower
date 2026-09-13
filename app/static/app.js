@@ -1,13 +1,13 @@
-import { state } from './js/state.js';
-import { debounce } from './js/helpers.js';
-import { fetchData, fetchDownloads, fetchStats, fetchConfig, fetchSources, fetchYears, fetchNetworks, fetchErrors } from './js/api.js';
-import { loadFilters, updateTagsUI, handleTagClick, initCustomSelect } from './js/filters.js';
-import { setLanguage } from './js/i18n.js';
-import { initModals } from './js/modals.js';
-import { initNavigation } from './js/navigation.js';
-import { initScanner } from './js/scanner.js';
-import { initQuickScan } from './js/quick-scan.js';
-import { initErrors } from './js/errors.js';
+import { state } from './js/state.js?v=7';
+import { debounce } from './js/helpers.js?v=7';
+import { fetchData, fetchDownloads, fetchStats, fetchConfig, fetchSources, fetchYears, fetchNetworks, fetchErrors } from './js/api.js?v=7';
+import { loadFilters, updateTagsUI, handleTagClick, initCustomSelect } from './js/filters.js?v=7';
+import { setLanguage } from './js/i18n.js?v=7';
+import { initModals } from './js/modals.js?v=7';
+import { initNavigation } from './js/navigation.js?v=7';
+import { initScanner } from './js/scanner.js?v=7';
+import { initQuickScan } from './js/quick-scan.js?v=7';
+import { initErrors } from './js/errors.js?v=7';
 
 // ─── Splash Screen Controller ────────────────────────────────────────────────
 const splash = {

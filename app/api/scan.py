@@ -53,6 +53,7 @@ async def extract_text(request: ExtractRequest):
     """
     Extracts links from raw text and processes them immediately.
     """
+    print(f"[SCAN-API] extract_text called: force={request.force}")
     scanner = DirectScanner()
     result = await scanner.scan_text(request.text, force=request.force)
     
