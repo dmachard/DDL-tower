@@ -19,25 +19,49 @@ export const createReleaseCard = (rel) => {
             const h = p.hoster || 'Unknown';
             const cleanName = beautifyHoster(h);
             if (!providers[cleanName]) {
-                providers[cleanName] = { name: cleanName, partsCount: 0, totalBytes: 0, urls: [], ids: [] };
+                providers[cleanName] = { name: cleanName, partsCount: 0, totalBytes: 0, urls: [], ids: [], statuses: [] };
             }
             providers[cleanName].partsCount++;
             providers[cleanName].totalBytes += (p.size_bytes || 0);
             providers[cleanName].urls.push(p.url);
             providers[cleanName].ids.push(p.id);
+            if (p.status) providers[cleanName].statuses.push(p.status);
         });
 
-        const providerRows = Object.values(providers).map(p => `
-            <div class="rel-provider-row ${sub.is_new ? 'is-new' : ''}" title="${sub.raw_title || sub.title || sub.filename}">
-                <span class="rel-p-name">${p.name}</span>
+        const providerRows = Object.values(providers).map(p => {
+            const hasDead = p.statuses.includes('dead');
+            const hasError = p.statuses.includes('error');
+
+            let rowExtraClass = '';
+            let rowStyle = '';
+            let checkIconClass = 'fa-heartbeat';
+            let checkIconStyle = '';
+            let checkTitle = 'Check links';
+
+            if (hasDead) {
+                rowExtraClass = 'is-dead';
+                rowStyle = 'opacity: 0.5; border-left: 3px solid var(--accent-red);';
+                checkIconClass = 'fa-heart-broken';
+                checkIconStyle = 'color: var(--accent-red);';
+                checkTitle = 'Dead link(s)';
+            } else if (hasError) {
+                rowStyle = 'border-left: 3px solid var(--warning);';
+                checkIconClass = 'fa-exclamation-triangle';
+                checkIconStyle = 'color: var(--warning);';
+                checkTitle = 'Hoster error';
+            }
+
+            return `
+            <div class="rel-provider-row ${sub.is_new ? 'is-new' : ''} ${rowExtraClass}" style="${rowStyle}" title="${sub.raw_title || sub.title || sub.filename}">
+                <span class="rel-p-name">${p.name} ${hasError ? '<i class="fas fa-exclamation-circle" style="color: var(--warning); font-size: 11px; margin-left: 4px;" title="Hoster check error"></i>' : ''}</span>
                 <span class="rel-p-count">${p.partsCount}F</span>
                 <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
                 <div class="rel-p-actions">
                     <button class="rel-p-identify" data-ids="${p.ids.join(',')}" data-title="${sub.title || sub.filename}" title="${TRANSLATIONS[state.language].modal_identify_title}">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="rel-p-check" data-urls="${p.urls.join('\n')}" title="Check links">
-                        <i class="fas fa-heartbeat"></i>
+                    <button class="rel-p-check" data-urls="${p.urls.join('\n')}" style="${checkIconStyle}" title="${checkTitle}">
+                        <i class="fas ${checkIconClass}"></i>
                     </button>
                     <button class="rel-p-copy-title" data-title="${sub.raw_title || sub.title || sub.filename}" title="${TRANSLATIONS[state.language].copy_release_name || 'Copy release name'}">
                         <i class="fas fa-tag"></i>
@@ -54,7 +78,8 @@ export const createReleaseCard = (rel) => {
                     </button>` : ''}
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         return `<div class="sub-release-block">${providerRows}</div>`;
     }).join('');

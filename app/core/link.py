@@ -97,8 +97,11 @@ class LinkManager:
             
             final_filename = override_filename if override_filename else h_filename
             
-            if status == "error":
+            if status == "error" or bool(info.get("error")):
+                status = "error"
                 err_msg = info.get("error", "Unknown hoster error").strip() or "Hoster check failed"
+                screenshot_path = info.get("screenshot_path")
+                html_path = info.get("html_path")
                 try:
                     from app.db.models import ScrapedURL
                     async with session.begin_nested():
@@ -109,8 +112,18 @@ class LinkManager:
                             scraped_existing.status = f"failed: {err_msg[:100]}"
                             scraped_existing.last_scraped = datetime.now(timezone.utc)
                             scraped_existing.source_name = "Hoster-Check"
+                            if screenshot_path:
+                                scraped_existing.screenshot_path = screenshot_path
+                            if html_path:
+                                scraped_existing.html_path = html_path
                         else:
-                            session.add(ScrapedURL(url=link, source_name="Hoster-Check", status=f"failed: {err_msg[:100]}"))
+                            session.add(ScrapedURL(
+                                url=link,
+                                source_name="Hoster-Check",
+                                status=f"failed: {err_msg[:100]}",
+                                screenshot_path=screenshot_path,
+                                html_path=html_path
+                            ))
                         await session.flush()
                 except Exception as e:
                     print(f"[LINK] Failed to record hoster error for {link}: {e}")

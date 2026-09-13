@@ -67,7 +67,7 @@ class RapidgatorService:
                         return {"status": "alive", "host": "rapidgator.net"}
                         
                     if "challenges.cloudflare.com" in html or "turnstile" in html:
-                        return {"status": "unknown", "host": "rapidgator.net", "error": "Cloudflare Challenge"}
+                        return {"status": "error", "host": "rapidgator.net", "error": "Cloudflare Challenge"}
 
                 return {"status": "unknown", "host": "rapidgator.net"}
         except Exception as e:

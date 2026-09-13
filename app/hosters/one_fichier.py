@@ -85,16 +85,33 @@ class OneFichierService:
                                 "host": "1fichier.com"
                             }
                     
+                    from app.core.utils import save_error_dump
+                    screenshot_path, html_path = await save_error_dump(target_url, page)
                     await page.close()
-                    return {"status": "unknown", "host": "1fichier.com", "error": "Info table not found after bypass"}
+                    return {
+                        "status": "error",
+                        "host": "1fichier.com",
+                        "error": "Info table not found after bypass",
+                        "screenshot_path": screenshot_path,
+                        "html_path": html_path
+                    }
 
                 except Exception as e:
-                    # We don't close the browser here anymore, just let the context exit
-                    # or close the page if it exists
+                    screenshot_path, html_path = None, None
                     try:
-                        if 'page' in locals() and page: await page.close()
+                        if 'page' in locals() and page:
+                            from app.core.utils import save_error_dump
+                            screenshot_path, html_path = await save_error_dump(target_url, page)
+                            await page.close()
                     except: pass
-                    raise e
+                    print(f"[1FICHIER] Browser Error: {str(e)}")
+                    return {
+                        "status": "error",
+                        "host": "1fichier.com",
+                        "error": str(e),
+                        "screenshot_path": screenshot_path,
+                        "html_path": html_path
+                    }
 
         except Exception as e:
             print(f"[1FICHIER] Browser Error: {str(e)}")

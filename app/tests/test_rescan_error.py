@@ -240,3 +240,45 @@ async def test_check_sources_novelty_stagnant():
         assert "No new items found" in added_obj.status
         assert added_obj.url == "source:Test1"
 
+@pytest.mark.asyncio
+async def test_link_manager_records_hoster_error():
+    from app.core.link import LinkManager
+    from app.db.models import ScrapedURL, DownloadLink
+
+    mock_session = AsyncMock()
+    mock_session.begin_nested = MagicMock()
+
+    async def mock_execute(query, *args, **kwargs):
+        res = MagicMock()
+        res.scalar_one_or_none.return_value = None
+        return res
+
+    mock_session.execute.side_effect = mock_execute
+
+    lm = LinkManager()
+    with patch.object(lm.hoster, "check_links", new_callable=AsyncMock) as mock_hoster_check:
+        mock_hoster_check.return_value = {
+            "https://1fichier.com/?test123": {
+                "status": "error",
+                "host": "1fichier.com",
+                "error": "Info table not found after bypass",
+                "screenshot_path": "/static/error_dumps/screenshot_123.png",
+                "html_path": "/static/error_dumps/html_123.html"
+            }
+        }
+        added = await lm.check_links(
+            session=mock_session,
+            raw_links=["https://1fichier.com/?test123"],
+            source_url="https://source.com",
+            source_name="TestScraper"
+        )
+        assert len(added) == 1
+        assert added[0].status == "error"
+
+        scraped_added = [args[0][0] for args in mock_session.add.call_args_list if isinstance(args[0][0], ScrapedURL)]
+        assert len(scraped_added) == 1
+        assert scraped_added[0].source_name == "Hoster-Check"
+        assert "Info table not found after bypass" in scraped_added[0].status
+        assert scraped_added[0].screenshot_path == "/static/error_dumps/screenshot_123.png"
+        assert scraped_added[0].html_path == "/static/error_dumps/html_123.html"
+
