@@ -18,7 +18,8 @@ export function initQuickScan() {
         btnScan.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Extracting...';
 
         try {
-            const response = await extractText(text);
+            const force = document.getElementById('quick-scan-force')?.checked || false;
+            const response = await extractText(text, force);
             const data = await response.json();
             
             // Show results
@@ -26,9 +27,9 @@ export function initQuickScan() {
             messageSpan.innerText = data.message;
             
             // Reset state
-            if (data.new > 0) {
+            if (data.new > 0 || force) {
                 textarea.value = '';
-                // Refresh data if we added something
+                // Refresh data if we added or updated something
                 fetchData('releases');
                 fetchDownloads();
                 fetchStats();

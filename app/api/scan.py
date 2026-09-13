@@ -8,9 +8,11 @@ router = APIRouter()
 
 class ScanRequest(BaseModel):
     urls: List[str]
+    force: bool = False
 
 class ExtractRequest(BaseModel):
     text: str
+    force: bool = False
 
 @router.post("/scan/force")
 async def force_scan(background_tasks: BackgroundTasks):
@@ -25,7 +27,7 @@ async def direct_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     """
     scanner = DirectScanner()
     if len(request.urls) == 1:
-        results = await scanner.scan_urls(request.urls)
+        results = await scanner.scan_urls(request.urls, force=request.force)
         if results and "error" not in results[0]:
             res = results[0]
             return {
@@ -37,7 +39,7 @@ async def direct_scan(request: ScanRequest, background_tasks: BackgroundTasks):
             return {"message": f"Scan failed: {results[0]['error']}", "total": 0, "new": 0}
         return {"message": "No links found on this page.", "total": 0, "new": 0}
     
-    background_tasks.add_task(scanner.scan_urls, request.urls)
+    background_tasks.add_task(scanner.scan_urls, request.urls, request.force)
     return {"message": f"Scanning {len(request.urls)} URLs in background..."}
 
 @router.post("/scan/categories")
@@ -52,7 +54,7 @@ async def extract_text(request: ExtractRequest):
     Extracts links from raw text and processes them immediately.
     """
     scanner = DirectScanner()
-    result = await scanner.scan_text(request.text)
+    result = await scanner.scan_text(request.text, force=request.force)
     
     if not result:
         return {"message": "No links found in the text.", "total": 0, "new": 0}

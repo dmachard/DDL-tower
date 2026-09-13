@@ -73,6 +73,8 @@ export const TRANSLATIONS = {
         modal_view_links_title: "Available Links",
         btn_delete: "Delete",
         btn_rescan: "Rescan",
+        btn_scan: "Scan",
+        force_rescan: "Force rescan",
         confirm_delete_release: "Are you sure you want to delete this release and all associated links?"
     },
     fr: {
@@ -144,6 +146,8 @@ export const TRANSLATIONS = {
         modal_view_links_title: "Liens Disponibles",
         btn_delete: "Supprimer",
         btn_rescan: "Rescanner",
+        btn_scan: "Scanner",
+        force_rescan: "Forcer le re-scan",
         confirm_delete_release: "Voulez-vous vraiment supprimer cette release et tous les liens associés ?"
     }
 };

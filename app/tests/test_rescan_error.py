@@ -282,3 +282,50 @@ async def test_link_manager_records_hoster_error():
         assert scraped_added[0].screenshot_path == "/static/error_dumps/screenshot_123.png"
         assert scraped_added[0].html_path == "/static/error_dumps/html_123.html"
 
+@pytest.mark.asyncio
+async def test_link_manager_force_rescan_rechecks_known_link():
+    from app.core.link import LinkManager
+    from app.db.models import DownloadLink
+
+    mock_session = AsyncMock()
+    mock_session.begin_nested = MagicMock()
+
+    existing_dl = DownloadLink(
+        url="https://1fichier.com/?known123",
+        status="error",
+        filename="old_name.mkv"
+    )
+
+    async def mock_execute(query, *args, **kwargs):
+        res = MagicMock()
+        q_str = str(query)
+        if "FROM download_links" in q_str:
+            res.scalar_one_or_none.return_value = existing_dl
+        else:
+            res.scalar_one_or_none.return_value = None
+        return res
+
+    mock_session.execute.side_effect = mock_execute
+
+    lm = LinkManager()
+    with patch.object(lm.hoster, "check_links", new_callable=AsyncMock) as mock_hoster_check:
+        mock_hoster_check.return_value = {
+            "https://1fichier.com/?known123": {
+                "status": "alive",
+                "filename": "new_name.mkv",
+                "size": 1024,
+                "host": "1fichier.com"
+            }
+        }
+        added = await lm.check_links(
+            session=mock_session,
+            raw_links=["https://1fichier.com/?known123"],
+            source_url="https://source.com",
+            source_name="Direct-Scan",
+            force=True
+        )
+        assert len(added) == 1
+        assert added[0].status == "alive"
+        assert added[0].filename == "new_name.mkv"
+        mock_hoster_check.assert_called_once_with(["https://1fichier.com/?known123"])
+

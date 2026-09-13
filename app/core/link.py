@@ -42,7 +42,7 @@ class LinkManager:
 
     async def check_links(self, session: AsyncSession, raw_links: List[str], source_url: str, source_name: str, 
                           override_filename: str = None, override_title: str = None, override_year: int = None, 
-                          tags: List[str] = None, category: str = None) -> List[DownloadLink]:
+                          tags: List[str] = None, category: str = None, force: bool = False) -> List[DownloadLink]:
         """
         Manages link verification and database insertion with duplicate prevention.
         """
@@ -68,23 +68,26 @@ class LinkManager:
             await session.rollback()
             raise
 
-        q_links = await session.execute(
-            select(DownloadLink.url).where(DownloadLink.url.in_(raw_links))
-        )
-        known_urls = {r[0] for r in q_links.all()}
-        
-        # Also check links currently pending in the session to avoid double-adding in same batch
-        for obj in session.new:
-            if isinstance(obj, DownloadLink):
-                known_urls.add(obj.url)
+        if not force:
+            q_links = await session.execute(
+                select(DownloadLink.url).where(DownloadLink.url.in_(raw_links))
+            )
+            known_urls = {r[0] for r in q_links.all()}
+            
+            # Also check links currently pending in the session to avoid double-adding in same batch
+            for obj in session.new:
+                if isinstance(obj, DownloadLink):
+                    known_urls.add(obj.url)
 
-        new_links = [l for l in raw_links if l not in known_urls]
+            new_links = [l for l in raw_links if l not in known_urls]
+        else:
+            new_links = raw_links
         
         if not new_links:
             print(f"[LINK] No new links for {source_name} in this batch.")
             return []
 
-        print(f"[LINK] Verifying {len(new_links)} new links via hoster...")
+        print(f"[LINK] Verifying {len(new_links)} {'(forced)' if force else 'new'} links via hoster...")
         hv_results = await self.hoster.check_links(new_links)
         
         added_links = []
@@ -127,6 +130,21 @@ class LinkManager:
                         await session.flush()
                 except Exception as e:
                     print(f"[LINK] Failed to record hoster error for {link}: {e}")
+            else:
+                try:
+                    from app.db.models import ScrapedURL
+                    async with session.begin_nested():
+                        q_scraped = await session.execute(
+                            select(ScrapedURL).where(ScrapedURL.url == link, ScrapedURL.source_name == "Hoster-Check")
+                        )
+                        scraped_existing = q_scraped.scalar_one_or_none()
+                        if scraped_existing:
+                            scraped_existing.status = "success"
+                            scraped_existing.screenshot_path = None
+                            scraped_existing.html_path = None
+                            await session.flush()
+                except Exception:
+                    pass
 
             try:
                 # Use a nested transaction (savepoint) so we can gracefully recover from IntegrityError

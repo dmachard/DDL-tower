@@ -228,6 +228,15 @@
                                 <input type="text" id="direct-scan-input" placeholder="https://...">
                                 <div id="scan-indicator" class="scan-indicator hidden"></div>
                             </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+                                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer;">
+                                    <input type="checkbox" id="direct-scan-force">
+                                    <span data-i18n="force_rescan">Force rescan</span>
+                                </label>
+                                <button id="btn-direct-scan" class="btn btn-primary" style="padding: 6px 16px; font-size: 13px; border-radius: 8px;">
+                                    <i class="fas fa-search"></i> <span data-i18n="btn_scan">Scan</span>
+                                </button>
+                            </div>
                             <div id="direct-scan-results" class="quick-scan-results hidden mt-1">
                                 <div class="success-alert">
                                     <span id="direct-scan-message"></span>
@@ -241,13 +250,19 @@
                         <h2 data-i18n="quick_scan_title">Quick Extract</h2>
                         <div class="card">
                             <textarea id="quick-scan-textarea"></textarea>
-                            <div class="quick-scan-actions">
-                                <button id="btn-quick-scan-clear" class="btn-secondary">
-                                    <span data-i18n="btn_clear">Clear</span>
-                                </button>
-                                <button id="btn-quick-scan" class="btn-primary btn-lg">
-                                    <span data-i18n="btn_extract">Extract & Add</span>
-                                </button>
+                            <div class="quick-scan-actions" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; margin-right: auto;">
+                                    <input type="checkbox" id="quick-scan-force">
+                                    <span data-i18n="force_rescan">Force rescan</span>
+                                </label>
+                                <div style="display: flex; gap: 10px;">
+                                    <button id="btn-quick-scan-clear" class="btn-secondary">
+                                        <span data-i18n="btn_clear">Clear</span>
+                                    </button>
+                                    <button id="btn-quick-scan" class="btn-primary btn-lg">
+                                        <span data-i18n="btn_extract">Extract & Add</span>
+                                    </button>
+                                </div>
                             </div>
                             <div id="quick-scan-results" class="quick-scan-results hidden mt-1">
                                 <div class="success-alert">

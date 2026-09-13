@@ -18,7 +18,7 @@ class DirectScanner:
         # Use explicit patterns from config
         self.target_patterns = settings.DIRECT_SCAN_PATTERNS
 
-    async def scan_urls(self, urls: List[str]):
+    async def scan_urls(self, urls: List[str], force: bool = False):
         """
         Processes a list of URLs and returns stats.
         """
@@ -75,7 +75,8 @@ class DirectScanner:
                             session=session,
                             raw_links=list(found_links),
                             source_url=url,
-                            source_name="Direct-Scan"
+                            source_name="Direct-Scan",
+                            force=force
                         )
                         new_added = len(new_links) if new_links else 0
                         await session.commit()
@@ -95,7 +96,7 @@ class DirectScanner:
             await browser.close()
         return results
 
-    async def scan_text(self, text: str):
+    async def scan_text(self, text: str, force: bool = False):
         """
         Extracts links from raw text using configured patterns and processes them.
         Supports both direct hoster links and unlocker links (e.g. MultiUp).
@@ -139,7 +140,8 @@ class DirectScanner:
                 session=session,
                 raw_links=list(found_links),
                 source_url="manual-paste",
-                source_name="Quick-Scan"
+                source_name="Quick-Scan",
+                force=force
             )
             await session.commit()
 

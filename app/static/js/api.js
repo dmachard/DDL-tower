@@ -140,19 +140,19 @@ export const fetchConfig = async () => {
     return cfg;
 };
 
-export const startDirectScan = async (url) => {
+export const startDirectScan = async (url, force = false) => {
     return fetch('/api/scan/direct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls: [url] })
+        body: JSON.stringify({ urls: [url], force })
     });
 };
 
-export const extractText = async (text) => {
+export const extractText = async (text, force = false) => {
     return fetch('/api/scan/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, force })
     });
 };
 
