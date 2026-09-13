@@ -450,10 +450,6 @@ class DownloaderService:
                 on_disk_size = lib_path.stat().st_size
                 if is_youtube or (total_size > 0 and on_disk_size == total_size):
                     print(f"[DOWNLOADER] {filename} found in library ({lib_path}). Skipping download.")
-                    # Re-create symlink if missing in download dir to keep it visible
-                    if not file_path.exists():
-                        try: os.symlink(str(lib_path), str(file_path))
-                        except: pass
                     exists_complete = True
                     await self._delete_from_db(url)
 

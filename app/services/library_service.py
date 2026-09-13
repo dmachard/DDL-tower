@@ -145,15 +145,10 @@ class LibraryService:
                 print(f"[LIBRARY] Skipping: {src.name} already exists in library ({dest})")
                 return False
 
-            print(f"[LIBRARY] Moving {src.name} to {target_base_dir}...")
-            
-            # 1. Move the real file to the library
+            # Move the real file to the library
             shutil.move(str(src), str(dest))
             
-            # 2. Create a symlink in the original location pointing to the library
-            os.symlink(str(dest), str(src))
-            
-            print(f"[LIBRARY] Successfully organized {category} {src.name} (Linked to {dest})")
+            print(f"[LIBRARY] Successfully organized {category} {src.name} to {dest}")
             return True
 
         except Exception as e:

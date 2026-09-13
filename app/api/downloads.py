@@ -3,14 +3,18 @@ import shutil
 from typing import List
 from pathlib import Path
 from datetime import datetime, timezone
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import FileResponse
+from sqlalchemy import select, delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.utils import format_size, get_quality_score
 from app.services.downloader import downloader_service
+from app.services.library_service import library_service
 from app.debrid.debrid import debrid_service
-from app.db.database import AsyncSessionLocal
+from app.db.database import get_db, AsyncSessionLocal
+from app.db.models import DownloadHistory
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -50,72 +54,118 @@ async def resume_active_download(group_name: str):
     return {"status": "success"}
 
 @router.get("/downloads")
-async def get_downloads():
+async def get_downloads(db: AsyncSession = Depends(get_db)):
     """
-    Lists files in the download directory, filtering for video files only.
+    Lists completed downloads from DownloadHistory and current download directory.
     """
-    download_dir = Path(settings.DOWNLOAD_DIR)
-    if not download_dir.exists():
-        return []
-    
-    files = []
-    for item in download_dir.iterdir():
-        try:
-            if item.is_dir():
-                continue
-            if item.suffix.lower() not in settings.VIDEO_EXTENSIONS:
-                continue
-                
-            stats = item.stat()
-            files.append({
-                "name": item.name,
-                "is_dir": item.is_dir(),
-                "size": format_size(stats.st_size),
-                "size_bytes": stats.st_size,
-                "modified": datetime.fromtimestamp(stats.st_mtime, tz=timezone.utc).isoformat()
-            })
-        except FileNotFoundError:
-            # File was deleted during iteration or is a broken symlink
+    files_dict = {}
+
+    # 1. From database history (completed downloads)
+    stmt = select(DownloadHistory).order_by(DownloadHistory.download_date.desc()).limit(200)
+    result = await db.execute(stmt)
+    history_items = result.scalars().all()
+
+    for h in history_items:
+        if not h.filename or h.filename in files_dict:
             continue
-    
+
+        file_path = Path(settings.DOWNLOAD_DIR) / h.filename
+        if not file_path.exists():
+            file_path = library_service.find_in_library(h.filename)
+
+        size_bytes = 0
+        if file_path and file_path.exists():
+            try:
+                size_bytes = file_path.stat().st_size
+            except OSError:
+                pass
+
+        mod_time = h.download_date.isoformat() if h.download_date else datetime.now(timezone.utc).isoformat()
+        files_dict[h.filename] = {
+            "name": h.filename,
+            "is_dir": False,
+            "size": format_size(size_bytes),
+            "size_bytes": size_bytes,
+            "modified": mod_time
+        }
+
+    # 2. From download directory (files in-transit, YouTube, unorganized, etc.)
+    download_dir = Path(settings.DOWNLOAD_DIR)
+    if download_dir.exists():
+        for item in download_dir.iterdir():
+            if item.name in files_dict:
+                continue
+            try:
+                if item.is_dir():
+                    continue
+                if item.suffix.lower() not in settings.VIDEO_EXTENSIONS:
+                    continue
+                stats = item.stat()
+                files_dict[item.name] = {
+                    "name": item.name,
+                    "is_dir": False,
+                    "size": format_size(stats.st_size),
+                    "size_bytes": stats.st_size,
+                    "modified": datetime.fromtimestamp(stats.st_mtime, tz=timezone.utc).isoformat()
+                }
+            except (FileNotFoundError, OSError):
+                continue
+
     # Sort by date desc
-    return sorted(files, key=lambda x: x["modified"], reverse=True)
+    return sorted(files_dict.values(), key=lambda x: x["modified"], reverse=True)
 
 @router.delete("/downloads/{filename}")
-async def delete_download(filename: str):
+async def delete_download(filename: str, db: AsyncSession = Depends(get_db)):
     """
-    Deletes a file or directory from the download directory.
+    Deletes a download from history / interface.
+    Does NOT delete the organized media file from library.
+    Removes from download_history and cleans leftover in download dir if any.
     """
+    # 1. Remove from download_history
+    stmt = delete(DownloadHistory).where(DownloadHistory.filename == filename)
+    await db.execute(stmt)
+
+    # 2. If present in download directory, remove from download dir
     path = Path(settings.DOWNLOAD_DIR) / filename
-    if not path.exists():
-        return {"status": "error", "message": "File not found"}
-    
     try:
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink()
-        return {"status": "success"}
+        if path.exists() or path.is_symlink():
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        print(f"[DOWNLOADS] Error unlinking {path}: {e}")
+
+    return {"status": "success"}
 
 @router.get("/downloads/file/{filename}")
 async def download_file_to_pc(filename: str):
     """
-    Serves a file from the download directory to the client PC.
+    Serves a file from the download directory or library to the client PC.
     """
     path = Path(settings.DOWNLOAD_DIR) / filename
-    
+    allowed_dirs = [
+        Path(settings.DOWNLOAD_DIR).resolve(),
+        Path(settings.LIBRARY_MOVIES_DIR).resolve(),
+        Path(settings.LIBRARY_SERIES_DIR).resolve(),
+        Path(settings.LIBRARY_YOUTUBE_DIR).resolve()
+    ]
+
     if not path.exists():
-         raise HTTPException(status_code=404, detail="File not found")
-    
+        lib_path = library_service.find_in_library(filename)
+        if lib_path and lib_path.exists():
+            path = lib_path
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
+
     if path.is_dir():
-         raise HTTPException(status_code=400, detail="Cannot download a directory. Please extract it first.")
-    
-    try:
-        path.resolve().relative_to(Path(settings.DOWNLOAD_DIR).resolve())
-    except ValueError:
+        raise HTTPException(status_code=400, detail="Cannot download a directory. Please extract it first.")
+
+    resolved_path = path.resolve()
+    if not any(resolved_path.is_relative_to(allowed_dir) for allowed_dir in allowed_dirs):
         raise HTTPException(status_code=403, detail="Access denied")
+
+    return FileResponse(str(path), filename=filename)
 
 
 async def run_download_task(urls: List[str], is_auto: bool = False):
