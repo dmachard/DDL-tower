@@ -114,6 +114,29 @@ async def get_downloads(db: AsyncSession = Depends(get_db)):
     # Sort by date desc
     return sorted(files_dict.values(), key=lambda x: x["modified"], reverse=True)
 
+@router.delete("/downloads")
+async def clear_all_downloads(db: AsyncSession = Depends(get_db)):
+    """
+    Clears all completed download records from history and cleans leftover files in download directory.
+    Does NOT delete files in the library (films/series/youtube).
+    """
+    # 1. Clear DownloadHistory
+    await db.execute(delete(DownloadHistory))
+
+    # 2. Clean download directory
+    download_dir = Path(settings.DOWNLOAD_DIR)
+    if download_dir.exists():
+        for item in download_dir.iterdir():
+            try:
+                if item.is_dir() and not item.is_symlink():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+            except Exception as e:
+                print(f"[DOWNLOADS] Error clearing {item}: {e}")
+
+    return {"status": "success", "message": "All downloads cleared from interface"}
+
 @router.delete("/downloads/{filename}")
 async def delete_download(filename: str, db: AsyncSession = Depends(get_db)):
     """

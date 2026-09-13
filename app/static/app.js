@@ -8,6 +8,7 @@ import { initNavigation } from './js/navigation.js?v=7';
 import { initScanner } from './js/scanner.js?v=7';
 import { initQuickScan } from './js/quick-scan.js?v=7';
 import { initErrors } from './js/errors.js?v=7';
+import { initDownloads } from './js/downloads.js?v=7';
 
 // ─── Splash Screen Controller ────────────────────────────────────────────────
 const splash = {
@@ -79,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initScanner();
     initQuickScan();
     initErrors();
+    initDownloads();
 
     document.addEventListener('errors-updated', () => {
         fetchErrors();

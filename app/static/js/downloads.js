@@ -230,3 +230,23 @@ export const renderDownloads = async (files) => {
 
     renderActiveDownloads();
 };
+
+export const initDownloads = () => {
+    const clearBtn = document.getElementById('clear-downloads-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+            const title = state.language === 'fr' ? 'Effacer les téléchargements' : 'Clear Downloads';
+            const msg = state.language === 'fr'
+                ? 'Voulez-vous effacer la liste des téléchargements de l\'interface ? (Vos fichiers dans la bibliothèque films/séries ne seront PAS supprimés du disque).'
+                : 'Do you want to clear the downloads list from the interface? (Your files in the films/series library will NOT be deleted from disk).';
+            if (await showConfirm(title, msg)) {
+                try {
+                    await fetch('/api/downloads', { method: 'DELETE' });
+                    fetchDownloads();
+                } catch (e) {
+                    console.error('Failed to clear downloads:', e);
+                }
+            }
+        });
+    }
+};
