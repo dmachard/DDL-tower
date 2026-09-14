@@ -15,7 +15,7 @@ jobs:
 
     - name: Build the Docker image
       run: |
-        docker build . --file Dockerfile -t ddl-tower
+        docker build --build-arg APP_VERSION=${{ github.event.release.tag_name }} . --file Dockerfile -t ddl-tower
 
     - name: Tag image
       run: |

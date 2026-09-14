@@ -18,9 +18,27 @@ if CONFIG_FILE.exists():
     except Exception as e:
         print(f"Error loading config.yaml: {e}")
 
+def _detect_version() -> str:
+    env_ver = os.getenv("APP_VERSION")
+    if env_ver and env_ver.strip():
+        return env_ver.strip()
+    try:
+        import subprocess
+        ver = subprocess.check_output(
+            ["git", "describe", "--tags", "--always"],
+            stderr=subprocess.DEVNULL,
+            cwd=Path(__file__).parent
+        ).decode().strip()
+        if ver:
+            return ver
+    except Exception:
+        pass
+    return "v0.147.0"
+
 class Settings(BaseSettings):
     # App General Settings
     APP_NAME: str = _yaml_config.get("app_name", "DDL Tower")
+    APP_VERSION: str = os.getenv("APP_VERSION", _detect_version())
     DEBUG: bool = _yaml_config.get("debug", True)
     DEFAULT_LANGUAGE: str = _yaml_config.get("default_language", "fr")
     

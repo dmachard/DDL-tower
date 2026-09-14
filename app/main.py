@@ -1,6 +1,7 @@
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.db.database import init_db
 from app.core.scheduler import start_scheduler
@@ -26,13 +27,39 @@ import os
 os.makedirs(settings.POSTER_DIR, exist_ok=True)
 os.makedirs("data/error_dumps", exist_ok=True)
 
+@app.get("/")
+async def read_root():
+    return FileResponse(
+        "app/static/index.html",
+        headers={"Cache-Control": "no-cache, must-revalidate"}
+    )
+
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse("app/static/manifest.json", media_type="application/manifest+json")
+
+@app.get("/sw.js")
+@app.get("/static/sw.js")
+async def service_worker():
+    sw_file = Path("app/static/sw.js")
+    if not sw_file.exists():
+        return Response(status_code=404)
+    content = sw_file.read_text(encoding="utf-8")
+    content = content.replace("{{CACHE_VERSION}}", settings.APP_VERSION)
+    return Response(
+        content=content,
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Service-Worker-Allowed": "/"
+        }
+    )
+
 app.mount("/posters", StaticFiles(directory=settings.POSTER_DIR), name="posters")
 app.mount("/static/error_dumps", StaticFiles(directory="data/error_dumps"), name="error_dumps")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-@app.get("/")
-async def read_root():
-    return FileResponse("app/static/index.html")
+
 
 # Include API routes
 app.include_router(config.router, prefix="/api", tags=["config"])

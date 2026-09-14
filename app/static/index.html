@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DDL Tower</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f111a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DDL Tower">
     <link rel="stylesheet" href="static/style.css?v=1.0.4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +30,7 @@
                 <div id="splash-progress-bar" class="splash-progress-bar"></div>
             </div>
             <p class="splash-status" id="splash-status">...</p>
+            <button id="splash-retry-btn" class="btn btn-secondary hidden" style="margin-top: 10px; padding: 6px 14px; font-size: 12px; cursor: pointer;">Recharger</button>
         </div>
     </div>
 
@@ -395,7 +402,7 @@
     </div>
 
 
-    <script type="module" src="static/app.js?v=9"></script>
+    <script type="module" src="static/app.js?v=10"></script>
 </body>
 
 </html>

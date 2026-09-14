@@ -11,25 +11,44 @@ import { initErrors } from './js/errors.js';
 import { initDownloads } from './js/downloads.js';
 
 // ─── Splash Screen Controller ────────────────────────────────────────────────
+let initialLang = 'fr';
+try { initialLang = localStorage.getItem('ddlt_lang') || 'fr'; } catch (e) {}
+
 const splash = {
     el: null,
     bar: null,
     status: null,
+    retryBtn: null,
     total: 0,
     done: 0,
-    lang: (localStorage.getItem('ddlt_lang') || 'fr'),
+    safetyTimer: null,
+    lang: initialLang,
     labels: {
-        fr: { loading: 'Chargement...', ready: 'Prêt !', config: 'Configuration chargée', configDefault: 'Configuration (défaut)', releases: 'Releases chargées', downloads: 'Downloads chargés', errors: 'Erreurs chargées', stats: 'Statistiques chargées' },
-        en: { loading: 'Loading...', ready: 'Ready!', config: 'Config loaded', configDefault: 'Config (default)', releases: 'Releases loaded', downloads: 'Downloads loaded', errors: 'Errors loaded', stats: 'Stats loaded' }
+        fr: { loading: 'Chargement...', ready: 'Prêt !', config: 'Configuration chargée', configDefault: 'Configuration (défaut)', releases: 'Releases chargées', downloads: 'Downloads chargés', errors: 'Erreurs chargées', stats: 'Statistiques chargées', error: 'Erreur au chargement' },
+        en: { loading: 'Loading...', ready: 'Ready!', config: 'Config loaded', configDefault: 'Config (default)', releases: 'Releases loaded', downloads: 'Downloads loaded', errors: 'Errors loaded', stats: 'Stats loaded', error: 'Loading error' }
     },
     t(key) { return (this.labels[this.lang] || this.labels.fr)[key] || key; },
     init(totalSteps) {
         this.el = document.getElementById('loading-splash');
         this.bar = document.getElementById('splash-progress-bar');
         this.status = document.getElementById('splash-status');
+        this.retryBtn = document.getElementById('splash-retry-btn');
         this.total = totalSteps;
         this.done = 0;
         if (this.status) this.status.textContent = this.t('loading');
+
+        if (this.retryBtn) {
+            this.retryBtn.addEventListener('click', () => window.location.reload(true));
+        }
+
+        // Safety fallback: auto-dismiss splash after 6s even if an API call hangs
+        clearTimeout(this.safetyTimer);
+        this.safetyTimer = setTimeout(() => {
+            if (this.el && !this.el.classList.contains('hidden')) {
+                console.warn('[PWA] Splash timeout reached, auto-dismissing.');
+                this.hide();
+            }
+        }, 6000);
     },
     step(key) {
         this.done++;
@@ -38,7 +57,12 @@ const splash = {
         if (this.status) this.status.textContent = this.t(key);
         if (this.done >= this.total) this.hide();
     },
+    error(msg) {
+        if (this.status) this.status.textContent = msg || this.t('error');
+        if (this.retryBtn) this.retryBtn.classList.remove('hidden');
+    },
     hide() {
+        clearTimeout(this.safetyTimer);
         if (this.status) this.status.textContent = this.t('ready');
         if (this.bar) this.bar.style.width = '100%';
         setTimeout(() => {
@@ -46,6 +70,12 @@ const splash = {
         }, 400);
     }
 };
+
+// Global error catcher during boot
+window.addEventListener('error', (e) => {
+    console.error('[BOOT ERROR]', e.message);
+    splash.error(splash.t('error'));
+}, { once: true });
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -149,12 +179,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Launch all fetches in parallel, track progress
-    Promise.resolve(fetchData('releases')).then(() => splash.step('releases'));
-    Promise.resolve(fetchDownloads()).then(() => splash.step('downloads'));
-    Promise.resolve(fetchErrors()).then(() => splash.step('errors'));
-    Promise.resolve(fetchStats()).then(() => splash.step('stats'));
+    // Launch all fetches in parallel, track progress (finally ensures step advances even on failure)
+    Promise.resolve(fetchData('releases')).finally(() => splash.step('releases'));
+    Promise.resolve(fetchDownloads()).finally(() => splash.step('downloads'));
+    Promise.resolve(fetchErrors()).finally(() => splash.step('errors'));
+    Promise.resolve(fetchStats()).finally(() => splash.step('stats'));
     initApp();
+
+    // ── Service Worker Registration (PWA) ─────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then((registration) => {
+                    // Check for updates periodically and on load
+                    registration.update();
+                })
+                .catch((err) => {
+                    console.debug('[PWA] ServiceWorker registration skipped/failed:', err);
+                });
+        });
+    }
 
     // ── Polling Intervals ─────────────────────────────────────────────────────
     setInterval(() => {
@@ -173,4 +217,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasActive && state.currentView === 'downloads' && document.visibilityState === 'visible') fetchDownloads();
     }, 2000);
 });
+
 
