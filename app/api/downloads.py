@@ -122,6 +122,7 @@ async def clear_all_downloads(db: AsyncSession = Depends(get_db)):
     """
     # 1. Clear DownloadHistory
     await db.execute(delete(DownloadHistory))
+    await db.commit()
 
     # 2. Clean download directory
     download_dir = Path(settings.DOWNLOAD_DIR)
@@ -147,6 +148,7 @@ async def delete_download(filename: str, db: AsyncSession = Depends(get_db)):
     # 1. Remove from download_history
     stmt = delete(DownloadHistory).where(DownloadHistory.filename == filename)
     await db.execute(stmt)
+    await db.commit()
 
     # 2. If present in download directory, remove from download dir
     path = Path(settings.DOWNLOAD_DIR) / filename

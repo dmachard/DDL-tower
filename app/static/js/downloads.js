@@ -219,7 +219,7 @@ export const renderDownloads = async (files) => {
                 if (await showConfirm(title, msg)) {
                     try {
                         await Promise.all(group.parts.map(fn => fetch(`/api/downloads/${encodeURIComponent(fn)}`, { method: 'DELETE' })));
-                        fetchDownloads();
+                        await fetchDownloads();
                     } catch (err) { console.error('Delete failed:', err); }
                 }
             };
@@ -242,7 +242,9 @@ export const initDownloads = () => {
             if (await showConfirm(title, msg)) {
                 try {
                     await fetch('/api/downloads', { method: 'DELETE' });
-                    fetchDownloads();
+                    state.downloads.items = [];
+                    renderDownloads([]);
+                    await fetchDownloads();
                 } catch (e) {
                     console.error('Failed to clear downloads:', e);
                 }
