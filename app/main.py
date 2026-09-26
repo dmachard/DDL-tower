@@ -45,8 +45,15 @@ os.makedirs("data/error_dumps", exist_ok=True)
 
 @app.get("/")
 async def read_root():
-    return FileResponse(
-        "app/static/index.html",
+    index_file = Path("app/static/index.html")
+    if not index_file.exists():
+        return Response(status_code=404)
+    content = index_file.read_text(encoding="utf-8")
+    version_str = f"v{settings.APP_VERSION}" if settings.APP_VERSION else ""
+    content = content.replace("{{APP_VERSION}}", version_str)
+    return Response(
+        content=content,
+        media_type="text/html",
         headers={"Cache-Control": "no-cache, must-revalidate"}
     )
 

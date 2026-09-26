@@ -165,6 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const initApp = async () => {
         try {
             const cfg = await fetchConfig();
+            const verEl = document.getElementById('splash-version');
+            if (verEl && cfg.app_version) {
+                verEl.textContent = `v${cfg.app_version}`;
+            }
             splash.step('config');
 
             const savedLang = localStorage.getItem('ddlt_lang');

@@ -221,6 +221,26 @@
         padding: 14px 12px 12px 12px;
         gap: 10px;
     }
+
+    .view-header {
+        padding: 0;
+        margin-bottom: 15px;
+        gap: 8px;
+    }
+
+    .view-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .view-header .header-actions {
+        flex-shrink: 0;
+    }
+
+    .view-header .header-actions .btn {
+        padding: 8px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
 }
 
 .view-header {
