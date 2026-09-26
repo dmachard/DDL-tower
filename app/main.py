@@ -49,7 +49,8 @@ async def read_root():
     if not index_file.exists():
         return Response(status_code=404)
     content = index_file.read_text(encoding="utf-8")
-    version_str = f"v{settings.APP_VERSION}" if settings.APP_VERSION else ""
+    ver = settings.APP_VERSION.strip() if settings.APP_VERSION else ""
+    version_str = ver if ver.startswith("v") else f"v{ver}" if ver else ""
     content = content.replace("{{APP_VERSION}}", version_str)
     return Response(
         content=content,

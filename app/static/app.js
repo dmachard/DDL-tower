@@ -167,7 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const cfg = await fetchConfig();
             const verEl = document.getElementById('splash-version');
             if (verEl && cfg.app_version) {
-                verEl.textContent = `v${cfg.app_version}`;
+                const ver = String(cfg.app_version).trim();
+                verEl.textContent = ver.startsWith('v') ? ver : `v${ver}`;
             }
             splash.step('config');
 
