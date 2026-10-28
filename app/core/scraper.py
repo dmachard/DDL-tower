@@ -640,6 +640,8 @@ class Scraper:
             if '1fichier.com' in url and '?' in url:
                 # For 1fichier, the ID is in the query, keep only the first part of it
                 base = url.split('?')[0] + '?' + url.split('?')[1].split('&')[0]
+            elif 'idrix.fr' in url:
+                base = url
             else:
                 # For others, remove query parameters entirely
                 base = url.split('?')[0]

@@ -19,13 +19,24 @@ async def add_pna_and_cors_headers(request: Request, call_next):
     else:
         response = await call_next(request)
 
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
     origin = request.headers.get("origin")
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
+    host = request.headers.get("host")
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    allow_origin = origin or (f"{proto}://{host}" if host else "*")
+
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    response.headers["Access-Control-Allow-Origin"] = allow_origin
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+
+    req_headers = request.headers.get("access-control-request-headers")
+    if req_headers:
+        response.headers["Access-Control-Allow-Headers"] = req_headers
+    else:
+        response.headers["Access-Control-Allow-Headers"] = "*"
+
+    if allow_origin != "*":
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = request.headers.get("access-control-request-headers", "*")
+    response.headers["Access-Control-Max-Age"] = "86400"
     return response
 
 @app.on_event("startup")

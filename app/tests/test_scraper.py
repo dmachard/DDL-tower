@@ -289,12 +289,16 @@ def test_deduplicate_links(scraper):
         "https://rapidgator.net/file/4bc1a631/file.part1.rar.html",
         "https://rapidgator.net/file/4bc1a631/file.part1.rar",
         "https://1fichier.com/?abc123def&html=1",
-        "https://1fichier.com/?abc123def"
+        "https://1fichier.com/?abc123def",
+        "https://bin.idrix.fr/?58ec6ab#FGx8W38S8bQJztsrrPg4BgVdrQBNhBGSZtDUjRDjCE1t",
+        "https://bin.idrix.fr/?53d5089#GpT85wtTbXzPWYagY6DtVQENe6yAfbarJbfnYTaCrceG",
     ]
     cleaned = scraper._deduplicate_links(links)
-    assert len(cleaned) == 2
+    assert len(cleaned) == 4
     assert "https://rapidgator.net/file/4bc1a631/file.part1.rar" in cleaned
     assert "https://1fichier.com/?abc123def" in cleaned
+    assert "https://bin.idrix.fr/?58ec6ab#FGx8W38S8bQJztsrrPg4BgVdrQBNhBGSZtDUjRDjCE1t" in cleaned
+    assert "https://bin.idrix.fr/?53d5089#GpT85wtTbXzPWYagY6DtVQENe6yAfbarJbfnYTaCrceG" in cleaned
     assert not any(l.endswith(".html") for l in cleaned)
 
 @pytest.mark.asyncio
