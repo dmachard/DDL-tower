@@ -379,7 +379,8 @@ class ExportCommands:
             
             # Setup repo
             auth_url = get_authenticated_url(settings.GIT_REPO_URL, settings.GIT_USERNAME, settings.GIT_TOKEN)
-            if not os.path.exists(os.path.join(clone_dir, ".git")):
+            git_dir = os.path.join(clone_dir, ".git")
+            if not os.path.exists(git_dir):
                 print(f"[GIT] Cloning default branch from remote...")
                 if os.path.exists(clone_dir) and os.listdir(clone_dir):
                     print(f"[GIT] Cleaning clone directory {clone_dir}...")
@@ -387,6 +388,17 @@ class ExportCommands:
                     os.makedirs(clone_dir, exist_ok=True)
                 run_git_cmd(["git", "clone", auth_url, "."], cwd=clone_dir)
             else:
+                # Clean up any stale lock files from previous interrupted runs
+                for root, _, files in os.walk(git_dir):
+                    for file in files:
+                        if file.endswith(".lock"):
+                            lock_path = os.path.join(root, file)
+                            try:
+                                os.remove(lock_path)
+                                print(f"[GIT] Removed stale lock file: {lock_path}")
+                            except Exception as e:
+                                print(f"[GIT] Warning: could not remove {lock_path}: {e}")
+
                 print(f"[GIT] Updating remote URL and fetching...")
                 run_git_cmd(["git", "remote", "set-url", "origin", auth_url], cwd=clone_dir)
                 run_git_cmd(["git", "fetch", "--prune", "origin"], cwd=clone_dir)
