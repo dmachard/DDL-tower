@@ -108,3 +108,43 @@ async def test_export_prunes_invalid_existing_releases():
         assert "Avatar.2009.mkv" in written_filenames
         assert "MDMN65M4.rar" not in written_filenames
 
+
+@pytest.mark.asyncio
+async def test_export_cleans_stale_git_locks(tmp_path):
+    """Test that export automatically cleans up stale .lock files in .git directory."""
+    clone_dir = tmp_path / "git_export"
+    git_dir = clone_dir / ".git"
+    git_dir.mkdir(parents=True)
+    
+    # Create fake stale locks
+    head_lock = git_dir / "HEAD.lock"
+    head_lock.write_text("lock")
+    index_lock = git_dir / "index.lock"
+    index_lock.write_text("lock")
+    
+    with patch("app.cli.export.get_db_ctx") as mock_db_ctx, \
+         patch("app.cli.export.run_git_cmd") as mock_git_cmd, \
+         patch("app.cli.export.check_needs_push", return_value=False), \
+         patch("app.cli.export.settings") as mock_settings:
+         
+        mock_settings.DATA_EXPORT_DIR = str(tmp_path / "export")
+        mock_settings.GIT_ENABLED = True
+        mock_settings.GIT_REPO_URL = "https://github.com/user/repo"
+        mock_settings.GIT_BRANCH = "data"
+        mock_settings.GIT_CLONE_DIR = str(clone_dir)
+        mock_settings.GIT_EXPORT_TYPE = "all"
+        mock_settings.GIT_USERNAME = None
+        mock_settings.GIT_EMAIL = None
+        
+        mock_session = AsyncMock()
+        mock_db_ctx.return_value.__aenter__.return_value = mock_session
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_session.execute.return_value = mock_result
+        
+        await ExportCommands.run_export(export_type="all")
+        
+        assert not head_lock.exists()
+        assert not index_lock.exists()
+
+
