@@ -1,5 +1,5 @@
 # Use Python Slim as base
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 # Set environment variables
 ARG APP_VERSION=dev
