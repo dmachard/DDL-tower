@@ -76,7 +76,13 @@ export const TRANSLATIONS = {
         btn_rescan: "Rescan",
         btn_scan: "Scan",
         force_rescan: "Force rescan",
-        confirm_delete_release: "Are you sure you want to delete this release and all associated links?"
+        confirm_delete_release: "Are you sure you want to delete this release and all associated links?",
+        btn_see_all: "See all",
+        btn_back_all_sources: "All sources",
+        tab_new_links: "New links",
+        tab_all_links: "All links",
+        badge_new: "NEW",
+        no_new_links: "No new links in this period"
     },
     fr: {
         nav_releases: "Explorer",
@@ -150,7 +156,13 @@ export const TRANSLATIONS = {
         btn_rescan: "Rescanner",
         btn_scan: "Scanner",
         force_rescan: "Forcer le re-scan",
-        confirm_delete_release: "Voulez-vous vraiment supprimer cette release et tous les liens associés ?"
+        confirm_delete_release: "Voulez-vous vraiment supprimer cette release et tous les liens associés ?",
+        btn_see_all: "Tout voir",
+        btn_back_all_sources: "Toutes les sources",
+        tab_new_links: "Nouveautés",
+        tab_all_links: "Tous les liens",
+        badge_new: "NOUVEAU",
+        no_new_links: "Aucune nouveauté sur cette période"
     }
 };
 

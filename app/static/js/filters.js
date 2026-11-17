@@ -15,6 +15,11 @@ export const updateTagsUI = (containerId, viewState) => {
         else isActive = (String(viewState[type]) === String(val));
         tag.classList.toggle('active', isActive);
     });
+    if (containerId === 'filter-tags-releases') {
+        document.querySelectorAll('.sidebar-cat-btn').forEach(btn => {
+            btn.classList.toggle('active', String(viewState.category) === String(btn.getAttribute('data-cat')));
+        });
+    }
 };
 
 export const handleTagClick = (e, view) => {

@@ -92,6 +92,25 @@ async def get_releases(
         db, page, limit, q, category, source, resolution, year, network, recent, hours, show_all, local
     )
 
+@router.get("/releases/by-source")
+async def get_releases_by_source(
+    db: AsyncSession = Depends(get_db),
+    limit_per_source: int = Query(20, ge=1, le=50),
+    category: str = Query(None),
+    resolution: str = Query(None),
+    year: int = Query(None),
+    network: str = Query(None),
+    recent: bool = Query(False),
+    hours: int = Query(None),
+    local: bool = Query(None)
+):
+    """
+    Returns grouped releases organized by source for horizontal carousel rows.
+    """
+    return await release_service.get_releases_by_source(
+        db, limit_per_source, category, resolution, year, network, recent, hours, local
+    )
+
 class DeleteRequest(BaseModel):
     ids: List[int]
 

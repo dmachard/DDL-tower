@@ -283,4 +283,83 @@ class ReleaseService:
             "pages": math.ceil(total / limit) if limit > 0 else 0
         }
 
+    @staticmethod
+    async def get_releases_by_source(
+        db: AsyncSession,
+        limit_per_source: int = 20,
+        category: str = None,
+        resolution: str = None,
+        year: int = None,
+        network: str = None,
+        recent: bool = True,
+        hours: int = None,
+        local: bool = None
+    ):
+        """Returns grouped releases organized by source for horizontal carousel rows."""
+        threshold = await ReleaseService.get_threshold(db, recent, hours)
+
+        src_stmt = select(
+            DownloadLink.source_name,
+            DownloadLink.category,
+            func.max(DownloadLink.last_checked).label("latest")
+        ).where(
+            DownloadLink.status == "alive",
+            DownloadLink.source_name != None,
+            DownloadLink.source_name != ""
+        )
+
+        if category:
+            src_stmt = src_stmt.where(DownloadLink.category == category)
+        if resolution:
+            if resolution == "2160p":
+                src_stmt = src_stmt.where(
+                    DownloadLink.resolution.ilike("2160p") |
+                    DownloadLink.resolution.ilike("4K") |
+                    DownloadLink.resolution.ilike("4Klight") |
+                    DownloadLink.resolution.ilike("4KLIGHT")
+                )
+            else:
+                src_stmt = src_stmt.where(DownloadLink.resolution == resolution)
+        if network:
+            src_stmt = src_stmt.where(DownloadLink.network == network)
+        if recent and threshold:
+            src_stmt = src_stmt.where(DownloadLink.last_checked >= threshold)
+        if year:
+            src_stmt = src_stmt.outerjoin(MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id)
+            src_stmt = src_stmt.where(or_(DownloadLink.year == year, MediaMetadata.year == year))
+
+        src_stmt = src_stmt.group_by(
+            DownloadLink.source_name,
+            DownloadLink.category
+        ).order_by(func.max(DownloadLink.last_checked).desc())
+        src_result = await db.execute(src_stmt)
+        source_cats = [(row[0], row[1]) for row in src_result.all() if row[0]]
+
+        rows = []
+        total_items = 0
+        for src, cat in source_cats:
+            res = await ReleaseService.get_grouped_releases(
+                db=db,
+                page=1,
+                limit=limit_per_source,
+                category=cat,
+                source=src,
+                resolution=resolution,
+                year=year,
+                network=network,
+                recent=recent,
+                hours=hours,
+                local=local
+            )
+            if res["items"]:
+                rows.append({
+                    "source": src,
+                    "category": cat,
+                    "total": res["total"],
+                    "items": res["items"]
+                })
+                total_items += res["total"]
+
+        return {"rows": rows, "total": total_items}
+
 release_service = ReleaseService()

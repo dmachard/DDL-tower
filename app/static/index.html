@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DDL Tower">
-    <link rel="stylesheet" href="static/style.css?v=1.0.5">
+    <link rel="stylesheet" href="static/style.css?v=1.1.4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
@@ -40,9 +40,69 @@
     <div class="bg-glow spot-2"></div>
 
     <div class="app-shell">
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <div class="logo">
+                    <img src="static/favicon.svg" alt="DDL Tower Logo" class="logo-icon">
+                    <h1>DDL<span>tower</span></h1>
+                </div>
+            </div>
+
+            <nav class="view-nav">
+                <div class="sidebar-section-label">Découvrir</div>
+                <button type="button" class="sidebar-cat-btn" data-cat="movie">
+                    <i class="fas fa-film"></i>
+                    <span data-i18n="filter_movies">Films</span>
+                </button>
+                <button type="button" class="sidebar-cat-btn" data-cat="series">
+                    <i class="fas fa-tv"></i>
+                    <span data-i18n="filter_series">Séries</span>
+                </button>
+
+                <div class="sidebar-section-label">Gérer</div>
+                <button class="nav-item" data-view="downloads">
+                    <i class="fas fa-cloud-download-alt"></i>
+                    <span data-i18n="nav_downloads">Downloads</span>
+                    <span class="nav-count" id="count-downloads">0</span>
+                </button>
+                <button class="nav-item" data-view="quick-scan">
+                    <i class="fas fa-bolt"></i>
+                    <span data-i18n="nav_quick_scan">Scanner</span>
+                </button>
+                <button class="nav-item" data-view="sources">
+                    <i class="fas fa-satellite-dish"></i>
+                    <span data-i18n="nav_sources">Sources</span>
+                </button>
+                <button class="nav-item" data-view="errors">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span data-i18n="nav_errors">Errors</span>
+                    <span class="nav-count" id="count-errors">0</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div id="live-toggle" class="live-status">
+                    <div class="live-indicator"></div>
+                    <span class="live-label">LIVE</span>
+                </div>
+                <div class="language-switcher">
+                    <div class="custom-select" id="lang-custom-select">
+                        <div class="select-trigger">
+                            <span id="current-lang">FR</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="select-options">
+                            <div class="option" data-value="fr">FR</div>
+                            <div class="option" data-value="en">EN</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
         <main class="main-content">
             <header class="content-header">
-                <div class="logo">
+                <div class="logo mobile-only-logo">
                     <img src="static/favicon.svg" alt="DDL Tower Logo" class="logo-icon">
                     <h1>DDL<span>tower</span></h1>
                 </div>
@@ -50,16 +110,10 @@
                     <!-- Global Search Bar in Header -->
                     <div class="search-wrapper global-search">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="target-search" placeholder="Chercher..." data-i18n="search_placeholder">
+                        <input type="text" id="target-search" placeholder="Chercher un film, une série..." data-i18n="search_placeholder">
                     </div>
                 </div>
                 <div class="header-actions">
-                    <!-- Live toggle moved to header -->
-                    <div id="live-toggle" class="live-status">
-                        <div class="live-indicator"></div>
-                        <span class="live-label" style="display: none;">LIVE</span>
-                    </div>
-
                     <!-- Mobile navigation custom select -->
                     <div class="mobile-nav-switcher">
                         <div class="custom-select" id="mobile-nav-custom-select">
@@ -103,50 +157,8 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="language-switcher">
-                        <div class="custom-select" id="lang-custom-select">
-                            <div class="select-trigger">
-                                <span id="current-lang">FR</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </div>
-                            <div class="select-options">
-                                <div class="option" data-value="fr">FR</div>
-                                <div class="option" data-value="en">EN</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </header>
-
-            <nav class="view-nav">
-                <button class="nav-item active" data-view="releases">
-                    <i class="fas fa-compass"></i>
-                    <span data-i18n="nav_releases">Explorer</span>
-                    <span class="nav-count" id="count-releases">0</span>
-                </button>
-
-                <button class="nav-item" data-view="downloads">
-                    <i class="fas fa-cloud-download-alt"></i>
-                    <span data-i18n="nav_downloads">Downloads</span>
-                    <span class="nav-count" id="count-downloads">0</span>
-                </button>
-
-                <button class="nav-item" data-view="quick-scan">
-                    <i class="fas fa-bolt"></i>
-                    <span data-i18n="nav_quick_scan">Scanner</span>
-                </button>
-
-                <button class="nav-item" data-view="sources">
-                    <i class="fas fa-satellite-dish"></i>
-                    <span data-i18n="nav_sources">Sources</span>
-                </button>
-                <button class="nav-item" data-view="errors">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <span data-i18n="nav_errors">Errors</span>
-                    <span class="nav-count" id="count-errors">0</span>
-                </button>
-            </nav>
 
             <!-- Releases View -->
             <div id="releases-view" class="view-section">
@@ -360,6 +372,47 @@
         </div>
     </template>
 
+    <!-- Modal Release Detail (Netflix Style) -->
+    <div id="release-detail-modal" class="modal-overlay">
+        <div class="modal-content modal-content-xl">
+            <span class="modal-close detail-modal-close" id="close-detail-modal">&times;</span>
+            <div class="detail-hero" id="detail-hero">
+                <div class="detail-hero-bg" id="detail-hero-bg"></div>
+                <div class="detail-hero-content">
+                    <div class="detail-poster" id="detail-poster"></div>
+                    <div class="detail-meta">
+                        <div class="detail-badges">
+                            <span class="group-category" id="detail-category"></span>
+                            <span class="detail-year" id="detail-year"></span>
+                            <div class="group-rating" id="detail-rating"></div>
+                        </div>
+                        <h2 class="detail-title" id="detail-title">...</h2>
+                        <p class="detail-plot" id="detail-plot"></p>
+                        <div class="detail-footer-meta">
+                            <span class="detail-updated" id="detail-updated"></span>
+                            <div class="detail-hero-actions" id="detail-hero-actions"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="detail-links-bar">
+                <div class="detail-tabs">
+                    <button type="button" class="detail-tab active" id="detail-tab-new">
+                        <i class="fas fa-star"></i>
+                        <span data-i18n="tab_new_links">Nouveautés</span>
+                        <span class="detail-tab-count" id="detail-new-count">0</span>
+                    </button>
+                    <button type="button" class="detail-tab" id="detail-tab-all">
+                        <i class="fas fa-layer-group"></i>
+                        <span data-i18n="tab_all_links">Tous les liens</span>
+                        <span class="detail-tab-count" id="detail-all-count">0</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body detail-links-body" id="detail-links-body"></div>
+        </div>
+    </div>
+
     <!-- Modal Identification -->
     <div id="identify-modal" class="modal-overlay">
         <div class="modal-content">
@@ -403,7 +456,7 @@
     </div>
 
 
-    <script type="module" src="static/app.js?v=10"></script>
+    <script type="module" src="static/app.js?v=13"></script>
 </body>
 
 </html>

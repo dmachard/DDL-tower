@@ -45,7 +45,30 @@ export const initNavigation = () => {
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
+            if (item.getAttribute('data-view') === 'releases' && state.releases.category) {
+                state.releases.category = '';
+                document.querySelectorAll('.sidebar-cat-btn').forEach(b => b.classList.remove('active'));
+                import('./filters.js').then(({ updateTagsUI }) => updateTagsUI('filter-tags-releases', state.releases));
+                if (state.currentView === 'releases') fetchData('releases');
+            }
             handleViewChange(item.getAttribute('data-view'));
+        });
+    });
+
+    const catBtns = document.querySelectorAll('.sidebar-cat-btn');
+    catBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cat = btn.getAttribute('data-cat');
+            const nextCat = state.releases.category === cat ? '' : cat;
+            state.releases.category = nextCat;
+            state.releases.page = 1;
+            catBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-cat') === nextCat));
+            import('./filters.js').then(({ updateTagsUI }) => updateTagsUI('filter-tags-releases', state.releases));
+            if (state.currentView !== 'releases') {
+                handleViewChange('releases');
+            } else {
+                fetchData('releases');
+            }
         });
     });
 

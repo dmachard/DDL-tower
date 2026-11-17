@@ -212,3 +212,5 @@ webtop_data/
 
 # ignore error dumps
 app/static/error_dumps/
+
+.github/context-mode/sessions/*

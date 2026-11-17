@@ -261,321 +261,550 @@ export const createReleaseCard = (rel) => {
     return card;
 };
 
-// ─── Releases ─────────────────────────────────────────────────────────────────
+// ─── Helpers for Netflix UI ───────────────────────────────────────────────────
+
+const resolvePosterUrl = (posterPath) => {
+    if (!posterPath) return null;
+    let p = posterPath;
+    if (p.startsWith('static/posters/')) p = p.replace('static/posters/', 'posters/');
+    if (!p.startsWith('posters/')) p = `posters/${p}`;
+    if (!p.startsWith('/')) p = '/' + p;
+    return p;
+};
+
+const getGroupTitle = (group) => (
+    state.language === 'fr'
+        ? (group.title_fr || group.official_title || group.title)
+        : (group.official_title || group.title)
+);
+
+const collectGroupIds = (group) => {
+    const ids = [];
+    Object.values(group.resolutions || {}).forEach(relList => {
+        relList.forEach(rel => rel.sub_releases.forEach(sub => sub.parts.forEach(p => ids.push(p.id))));
+    });
+    return ids;
+};
+
+const countSubReleases = (group, onlyNew = false) => {
+    let count = 0;
+    Object.values(group.resolutions || {}).forEach(relList => {
+        relList.forEach(rel => {
+            rel.sub_releases.forEach(sub => {
+                if (!onlyNew || sub.is_new) count++;
+            });
+        });
+    });
+    return count;
+};
+
+const renderResolutionList = (targetEl, group, newOnly) => {
+    targetEl.innerHTML = '';
+    const resolutions = group.resolutions || {};
+    const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
+    const sortedRes = Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0));
+
+    let renderedCount = 0;
+
+    sortedRes.forEach(res => {
+        const filteredCards = [];
+        resolutions[res].forEach(rel => {
+            if (!newOnly) {
+                filteredCards.push(rel);
+            } else {
+                const newSubs = rel.sub_releases.filter(s => s.is_new);
+                if (newSubs.length > 0) {
+                    filteredCards.push({ ...rel, sub_releases: newSubs });
+                }
+            }
+        });
+
+        if (filteredCards.length === 0) return;
+        renderedCount += filteredCards.length;
+
+        const resRow = document.createElement('div');
+        resRow.className = 'quality-row';
+        resRow.innerHTML = `<div class="quality-label">${res}</div>`;
+
+        const seasonGroups = {};
+        filteredCards.forEach(rel => {
+            const s = rel.season || 'Other';
+            if (!seasonGroups[s]) seasonGroups[s] = [];
+            seasonGroups[s].push(rel);
+        });
+
+        const sortedSeasons = Object.keys(seasonGroups).sort((a, b) => {
+            if (a === 'Other') return 1;
+            if (b === 'Other') return -1;
+            return parseInt(a) - parseInt(b);
+        });
+
+        const seasonsContainer = document.createElement('div');
+        seasonsContainer.className = 'seasons-container';
+        resRow.appendChild(seasonsContainer);
+
+        sortedSeasons.forEach(s => {
+            const seasonDiv = document.createElement('div');
+            seasonDiv.className = 'season-group';
+
+            if (group.category === 'series' && s !== 'Other') {
+                const sHeader = document.createElement('div');
+                sHeader.className = 'season-header';
+                sHeader.textContent = `Season ${s.toString().padStart(2, '0')}`;
+                seasonDiv.appendChild(sHeader);
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'quality-grid';
+            seasonDiv.appendChild(grid);
+            seasonGroups[s].forEach(rel => {
+                const card = createReleaseCard(rel);
+                card.classList.add('expanded');
+                grid.appendChild(card);
+            });
+            seasonsContainer.appendChild(seasonDiv);
+        });
+
+        targetEl.appendChild(resRow);
+    });
+
+    if (renderedCount === 0) {
+        targetEl.innerHTML = `<div class="detail-empty-links">${TRANSLATIONS[state.language].no_new_links}</div>`;
+    }
+};
+
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+
+let detailModalBound = false;
+
+const bindDetailModalClose = () => {
+    if (detailModalBound) return;
+    detailModalBound = true;
+    const modal = document.getElementById('release-detail-modal');
+    const closeBtn = document.getElementById('close-detail-modal');
+    if (!modal) return;
+    const close = () => modal.classList.remove('active');
+    closeBtn?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) close();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('active')) close();
+    });
+};
+
+export const openReleaseModal = (group) => {
+    bindDetailModalClose();
+    const modal = document.getElementById('release-detail-modal');
+    if (!modal) return;
+
+    const titleText = getGroupTitle(group);
+    const posterUrl = resolvePosterUrl(group.poster_path);
+
+    const heroBg = document.getElementById('detail-hero-bg');
+    const posterEl = document.getElementById('detail-poster');
+    if (posterUrl) {
+        heroBg.style.backgroundImage = `url(${posterUrl})`;
+        posterEl.style.backgroundImage = `url(${posterUrl})`;
+        posterEl.classList.add('has-poster');
+    } else {
+        heroBg.style.backgroundImage = '';
+        posterEl.style.backgroundImage = '';
+        posterEl.classList.remove('has-poster');
+    }
+
+    const titleEl = document.getElementById('detail-title');
+    titleEl.innerHTML = group.imdb_id
+        ? `<a href="${getImdbUrl(group.imdb_id)}" target="_blank" class="imdb-link">${titleText} <i class="fas fa-external-link-alt" style="font-size: 0.7em; opacity: 0.6;"></i></a>`
+        : titleText;
+
+    const catEl = document.getElementById('detail-category');
+    if (group.category) {
+        catEl.textContent = group.category === 'movie'
+            ? TRANSLATIONS[state.language].filter_movies
+            : TRANSLATIONS[state.language].filter_series;
+        catEl.className = `group-category cat-${group.category}`;
+    } else {
+        catEl.className = 'group-category hidden';
+    }
+
+    document.getElementById('detail-year').textContent = group.year ? `(${group.year})` : '';
+
+    const ratingEl = document.getElementById('detail-rating');
+    if (group.rating) {
+        ratingEl.innerHTML = renderRatingDots(group.rating);
+        ratingEl.classList.remove('hidden');
+    } else {
+        ratingEl.classList.add('hidden');
+    }
+
+    const plotEl = document.getElementById('detail-plot');
+    const plot = state.language === 'fr' ? (group.plot_fr || group.plot_en) : (group.plot_en || group.plot_fr);
+    plotEl.textContent = (plot && plot !== 'N/A') ? plot : '';
+
+    document.getElementById('detail-updated').textContent = `${TRANSLATIONS[state.language].msg_latest_update}: ${formatDate(group.last_updated)}`;
+
+    // Group-level action buttons
+    const actionsEl = document.getElementById('detail-hero-actions');
+    actionsEl.innerHTML = '';
+
+    const btnIdentify = document.createElement('button');
+    btnIdentify.type = 'button';
+    btnIdentify.className = 'btn-action-round';
+    btnIdentify.title = TRANSLATIONS[state.language].modal_identify_title;
+    btnIdentify.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i>';
+    btnIdentify.onclick = () => {
+        import('./modals.js').then(({ openIdentifyModal }) =>
+            openIdentifyModal(collectGroupIds(group), group.official_title || group.title || '')
+        );
+    };
+    actionsEl.appendChild(btnIdentify);
+
+    const btnCheckAll = document.createElement('button');
+    btnCheckAll.type = 'button';
+    btnCheckAll.className = 'btn-action-round';
+    btnCheckAll.title = 'Vérifier tous les liens';
+    btnCheckAll.innerHTML = '<i class="fas fa-heartbeat"></i>';
+    btnCheckAll.onclick = async () => {
+        const icon = btnCheckAll.querySelector('i');
+        const originalClass = icon.className;
+        icon.className = 'fas fa-spinner fa-spin';
+        btnCheckAll.disabled = true;
+
+        const linksBody = document.getElementById('detail-links-body');
+        const allUrls = [];
+        const urlMappings = [];
+        linksBody.querySelectorAll('.rel-provider-row').forEach(pRow => {
+            const checkBtn = pRow.querySelector('.rel-p-check');
+            if (checkBtn) {
+                const urls = checkBtn.getAttribute('data-urls').split('\n');
+                urls.forEach(u => { if (!allUrls.includes(u)) allUrls.push(u); });
+                urlMappings.push({ pRow, urls, checkBtn });
+            }
+        });
+
+        try {
+            const res = await import('./api.js').then(m => m.checkUrls(allUrls));
+            if (res.ok) {
+                const data = await res.json();
+                urlMappings.forEach(mapping => {
+                    let isDead = false;
+                    let hasError = false;
+                    mapping.urls.forEach(url => {
+                        const s = data[url] ? data[url].status : 'unknown';
+                        if (s === 'dead') isDead = true;
+                        if (s === 'error' || s === 'unknown') hasError = true;
+                    });
+                    const pIcon = mapping.checkBtn.querySelector('i');
+                    if (isDead) {
+                        pIcon.className = 'fas fa-heart-broken';
+                        mapping.checkBtn.style.color = 'var(--accent-red)';
+                        mapping.pRow.style.opacity = '0.5';
+                        mapping.pRow.style.borderLeft = '3px solid var(--accent-red)';
+                        mapping.pRow.classList.add('is-dead');
+                    } else if (hasError) {
+                        pIcon.className = 'fas fa-exclamation-triangle';
+                        mapping.checkBtn.style.color = 'var(--warning)';
+                        mapping.pRow.classList.remove('is-dead');
+                        mapping.pRow.style.opacity = '';
+                        mapping.pRow.style.borderLeft = '';
+                    } else {
+                        pIcon.className = 'fas fa-check';
+                        mapping.checkBtn.style.color = '';
+                        mapping.checkBtn.classList.add('success');
+                        setTimeout(() => { mapping.checkBtn.classList.remove('success'); pIcon.className = 'fas fa-heartbeat'; }, 2000);
+                        mapping.pRow.classList.remove('is-dead');
+                        mapping.pRow.style.opacity = '';
+                        mapping.pRow.style.borderLeft = '';
+                    }
+                });
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            icon.className = originalClass;
+            btnCheckAll.disabled = false;
+        }
+    };
+    actionsEl.appendChild(btnCheckAll);
+
+    const btnCopyMd = document.createElement('button');
+    btnCopyMd.type = 'button';
+    btnCopyMd.className = 'btn-action-round';
+    btnCopyMd.title = TRANSLATIONS[state.language].copy_all_markdown || 'Copier le résumé Markdown';
+    btnCopyMd.innerHTML = '<i class="fab fa-markdown"></i>';
+    btnCopyMd.onclick = async () => {
+        let md = `# ${titleText} ${group.year ? `(${group.year})` : ''}\n\n`;
+        const resolutions = group.resolutions || {};
+        const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
+        Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0)).forEach(res => {
+            md += `## ${res}\n\n`;
+            resolutions[res].forEach(rel => {
+                rel.sub_releases.forEach(sub => {
+                    md += `* **${sub.raw_title || sub.title || sub.filename}**\n`;
+                    sub.parts.forEach(p => { md += `  * [${p.hoster || 'Link'}](${p.url})\n`; });
+                });
+            });
+            md += `\n`;
+        });
+        try {
+            await navigator.clipboard.writeText(md.trim());
+            const icon = btnCopyMd.querySelector('i');
+            const orig = icon.className;
+            icon.className = 'fas fa-check';
+            btnCopyMd.classList.add('success');
+            setTimeout(() => { icon.className = orig; btnCopyMd.classList.remove('success'); }, 1000);
+        } catch (err) { console.error(err); }
+    };
+    actionsEl.appendChild(btnCopyMd);
+
+    const btnDelete = document.createElement('button');
+    btnDelete.type = 'button';
+    btnDelete.className = 'btn-action-round btn-danger';
+    btnDelete.title = TRANSLATIONS[state.language].btn_delete;
+    btnDelete.innerHTML = '<i class="fas fa-trash"></i>';
+    btnDelete.onclick = async () => {
+        const title = TRANSLATIONS[state.language].btn_delete;
+        const msg = TRANSLATIONS[state.language].confirm_delete_release;
+        if (await showConfirm(title, msg)) {
+            const res = await deleteReleases(collectGroupIds(group));
+            if (res.ok) {
+                modal.classList.remove('active');
+                fetchData('releases');
+            }
+        }
+    };
+    actionsEl.appendChild(btnDelete);
+
+    // Tabs: Nouveautés vs Tous les liens
+    const newCount = countSubReleases(group, true);
+    const allCount = countSubReleases(group, false);
+    document.getElementById('detail-new-count').textContent = newCount;
+    document.getElementById('detail-all-count').textContent = allCount;
+
+    const tabNew = document.getElementById('detail-tab-new');
+    const tabAll = document.getElementById('detail-tab-all');
+    const linksBody = document.getElementById('detail-links-body');
+
+    const setMode = (newOnly) => {
+        tabNew.classList.toggle('active', newOnly);
+        tabAll.classList.toggle('active', !newOnly);
+        renderResolutionList(linksBody, group, newOnly);
+    };
+
+    tabNew.onclick = () => setMode(true);
+    tabAll.onclick = () => setMode(false);
+
+    // Default to New links if any exist, otherwise All links
+    setMode(newCount > 0);
+    modal.classList.add('active');
+};
+
+// ─── Poster Card ──────────────────────────────────────────────────────────────
+
+const createPosterCard = (group, showCatBadge = true) => {
+    const card = document.createElement('div');
+    const posterUrl = resolvePosterUrl(group.poster_path);
+    const newCount = countSubReleases(group, true);
+    const allCount = countSubReleases(group, false);
+    const titleText = getGroupTitle(group);
+    const catClass = group.category ? `cat-${group.category}` : '';
+
+    card.className = `poster-card ${catClass} ${posterUrl ? 'has-poster' : 'no-poster'} ${newCount > 0 ? 'has-new' : ''}`;
+
+    const catLabel = group.category === 'movie'
+        ? TRANSLATIONS[state.language].filter_movies
+        : (group.category === 'series' ? TRANSLATIONS[state.language].filter_series : '');
+    const catIcon = group.category === 'movie' ? 'fa-film' : (group.category === 'series' ? 'fa-tv' : '');
+
+    const addedDate = group.last_updated ? formatDate(group.last_updated) : '';
+    const countBadgeHtml = newCount > 0
+        ? `<span class="poster-badge-new" title="${newCount} ${TRANSLATIONS[state.language].tab_new_links || 'nouveautés'}">+${newCount}</span>`
+        : (allCount > 0 ? `<span class="poster-badge-count" title="${allCount} ${TRANSLATIONS[state.language].tab_all_links || 'liens'}">${allCount}</span>` : '<span></span>');
+
+    card.innerHTML = `
+        ${posterUrl ? `<img class="poster-img" src="${posterUrl}" loading="lazy" alt="">` : ''}
+        <div class="poster-top-badges">
+            ${countBadgeHtml}
+            ${(showCatBadge && catLabel) ? `<span class="poster-badge-cat cat-${group.category}"><i class="fas ${catIcon}"></i> ${catLabel}</span>` : ''}
+        </div>
+        ${!posterUrl ? `
+            <div class="poster-typo-body">
+                <div class="poster-typo-title">${titleText}</div>
+                <div class="poster-typo-meta">
+                    <span>${group.year || ''}</span>
+                    ${addedDate ? `<span class="poster-added-date">${addedDate}</span>` : ''}
+                </div>
+            </div>
+        ` : `
+            <div class="poster-overlay">
+                <div class="poster-title">${titleText}</div>
+                <div class="poster-sub">
+                    <span>${group.year || ''}</span>
+                    ${addedDate ? `<span class="poster-added-date">${addedDate}</span>` : ''}
+                </div>
+            </div>
+        `}
+    `;
+
+    card.onclick = () => openReleaseModal(group);
+    return card;
+};
+
+// ─── Releases (Netflix Source Rows + Grid Fallback) ───────────────────────────
+
+const createCarousel = (items, showCatBadge = false) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+
+    const track = document.createElement('div');
+    track.className = 'carousel-track';
+    items.forEach(group => track.appendChild(createPosterCard(group, showCatBadge)));
+
+    const btnLeft = document.createElement('button');
+    btnLeft.type = 'button';
+    btnLeft.className = 'carousel-arrow carousel-arrow-left';
+    btnLeft.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    btnLeft.onclick = () => track.scrollBy({ left: -Math.max(track.clientWidth * 0.8, 300), behavior: 'smooth' });
+
+    const btnRight = document.createElement('button');
+    btnRight.type = 'button';
+    btnRight.className = 'carousel-arrow carousel-arrow-right';
+    btnRight.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    btnRight.onclick = () => track.scrollBy({ left: Math.max(track.clientWidth * 0.8, 300), behavior: 'smooth' });
+
+    wrapper.appendChild(btnLeft);
+    wrapper.appendChild(track);
+    wrapper.appendChild(btnRight);
+    return wrapper;
+};
+
+const renderSourceRows = (container, rows) => {
+    // Group rows by source -> subgroups (movie, series, other)
+    const bySource = new Map();
+    rows.forEach((row) => {
+        if (!bySource.has(row.source)) {
+            bySource.set(row.source, { source: row.source, total: 0, subgroups: [] });
+        }
+        const group = bySource.get(row.source);
+        group.total += row.total || 0;
+        group.subgroups.push(row);
+    });
+
+    const catOrder = { movie: 0, series: 1 };
+
+    bySource.forEach((srcGroup) => {
+        const section = document.createElement('section');
+        section.className = 'source-section';
+
+        const header = document.createElement('div');
+        header.className = 'source-row-header';
+        header.innerHTML = `
+            <div class="source-row-title">
+                <i class="fas fa-server"></i>
+                <span>${srcGroup.source}</span>
+                <span class="source-row-count">${srcGroup.total}</span>
+            </div>
+        `;
+
+        section.appendChild(header);
+
+        srcGroup.subgroups.sort((a, b) => (catOrder[a.category] ?? 2) - (catOrder[b.category] ?? 2));
+
+        srcGroup.subgroups.forEach((sub) => {
+            const subDiv = document.createElement('div');
+            subDiv.className = `source-subgroup ${sub.category ? `cat-${sub.category}` : ''}`;
+
+            const catLabel = sub.category === 'movie'
+                ? TRANSLATIONS[state.language].filter_movies
+                : (sub.category === 'series' ? TRANSLATIONS[state.language].filter_series : '');
+            const catIcon = sub.category === 'movie' ? 'fa-film' : (sub.category === 'series' ? 'fa-tv' : 'fa-folder');
+
+            if (catLabel) {
+                const subHeader = document.createElement('div');
+                subHeader.className = 'source-sub-header';
+                subHeader.innerHTML = `
+                    <div class="source-sub-title">
+                        <i class="fas ${catIcon} source-row-icon"></i>
+                        <span>${catLabel}</span>
+                        <span class="source-row-count">${sub.total}</span>
+                    </div>
+                `;
+                subDiv.appendChild(subHeader);
+            }
+
+            subDiv.appendChild(createCarousel(sub.items));
+            section.appendChild(subDiv);
+        });
+
+        container.appendChild(section);
+    });
+};
 
 export const renderReleases = (groups) => {
     const container = document.getElementById('releases-container');
-    const template = document.getElementById('release-group-template');
-    if (!container || !template) return;
+    const paginationEl = document.getElementById('releases-pagination');
+    if (!container) return;
 
     container.innerHTML = '';
+
+    const isCarouselMode = !state.releases.query && !state.releases.source;
+    if (isCarouselMode) {
+        const rows = state.releases.rows || [];
+        if (rows.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-film"></i></div>
+                    <div class="empty-state-text">${TRANSLATIONS[state.language].msg_no_results}</div>
+                    <div class="empty-state-subtext">${TRANSLATIONS[state.language].empty_state_subtext}</div>
+                </div>`;
+        } else {
+            renderSourceRows(container, rows);
+        }
+        if (paginationEl) paginationEl.innerHTML = '';
+        return;
+    }
+
+    // Grid mode (search or single source)
+    if (state.releases.source) {
+        const banner = document.createElement('div');
+        banner.className = 'source-filter-banner';
+        banner.innerHTML = `
+            <button type="button" class="btn-back-sources">
+                <i class="fas fa-arrow-left"></i>
+                <span>${TRANSLATIONS[state.language].btn_back_all_sources || 'Toutes les sources'}</span>
+            </button>
+            <div class="source-banner-title">
+                <i class="fas fa-server"></i> ${state.releases.source}
+            </div>
+        `;
+        banner.querySelector('.btn-back-sources').onclick = () => {
+            state.releases.source = '';
+            state.releases.page = 1;
+            const labelEl = document.getElementById('current-source-label');
+            if (labelEl) labelEl.textContent = TRANSLATIONS[state.language].filter_all_sources;
+            fetchData('releases');
+        };
+        container.appendChild(banner);
+    }
+
     if (!groups || groups.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon"><i class="fas fa-film"></i></div>
-                <div class="empty-state-text">${TRANSLATIONS[state.language].msg_no_results}</div>
-                <div class="empty-state-subtext">${TRANSLATIONS[state.language].empty_state_subtext}</div>
-            </div>`;
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.innerHTML = `
+            <div class="empty-state-icon"><i class="fas fa-film"></i></div>
+            <div class="empty-state-text">${TRANSLATIONS[state.language].msg_no_results}</div>
+            <div class="empty-state-subtext">${TRANSLATIONS[state.language].empty_state_subtext}</div>
+        `;
+        container.appendChild(empty);
         renderPagination('releases');
         return;
     }
 
-    groups.forEach((group, index) => {
-        const clone = template.content.cloneNode(true);
-        const row = clone.querySelector('.release-group-row');
-        row.style.animationDelay = `${index * 0.05}s`;
-        if (group.category) row.classList.add(`cat-${group.category}`);
-
-        const titleEl = clone.querySelector('.group-title');
-        const titleText = state.language === 'fr'
-            ? (group.title_fr || group.official_title || group.title)
-            : (group.official_title || group.title);
-        titleEl.innerHTML = group.imdb_id
-            ? `<a href="${getImdbUrl(group.imdb_id)}" target="_blank" class="imdb-link">${titleText}</a>`
-            : titleText;
-
-        const catTag = clone.querySelector('.group-category');
-        if (group.category) {
-            catTag.textContent = group.category === 'movie'
-                ? TRANSLATIONS[state.language].filter_movies
-                : TRANSLATIONS[state.language].filter_series;
-            catTag.classList.add(`cat-${group.category}`);
-        } else {
-            catTag.classList.add('hidden');
-        }
-
-        clone.querySelector('.group-year').textContent = group.year ? `(${group.year})` : '';
-
-        const posterEl = clone.querySelector('.group-poster');
-        const actionsEl = clone.querySelector('.group-actions');
-
-        const btnIdentify = document.createElement('div');
-        btnIdentify.className = 'btn-action-round';
-        btnIdentify.title = TRANSLATIONS[state.language].modal_identify_title;
-        btnIdentify.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i>';
-        btnIdentify.onclick = (e) => {
-            e.stopPropagation();
-            const allLinks = [];
-            Object.values(group.resolutions || {}).forEach(relList => {
-                relList.forEach(rel => rel.sub_releases.forEach(sub => sub.parts.forEach(p => allLinks.push(p.id))));
-            });
-            import('./modals.js').then(({ openIdentifyModal }) => openIdentifyModal(allLinks, group.official_title || group.title || ''));
-        };
-        actionsEl.appendChild(btnIdentify);
-
-        const btnCheckAll = document.createElement('div');
-        btnCheckAll.className = 'btn-action-round';
-        btnCheckAll.title = "Vérifier tous les liens";
-        btnCheckAll.innerHTML = '<i class="fas fa-heartbeat"></i>';
-        btnCheckAll.onclick = async (e) => {
-            e.stopPropagation();
-            const icon = btnCheckAll.querySelector('i');
-            const originalClass = icon.className;
-            icon.className = 'fas fa-spinner fa-spin';
-            btnCheckAll.style.pointerEvents = 'none';
-            
-            const allUrls = [];
-            const providerRows = row.querySelectorAll('.rel-provider-row');
-            const urlMappings = [];
-            
-            providerRows.forEach(pRow => {
-                const checkBtn = pRow.querySelector('.rel-p-check');
-                if (checkBtn) {
-                    const urls = checkBtn.getAttribute('data-urls').split('\n');
-                    urls.forEach(u => {
-                        if (!allUrls.includes(u)) allUrls.push(u);
-                    });
-                    urlMappings.push({ pRow, urls, checkBtn });
-                }
-            });
-            
-            try {
-                const res = await import('./api.js').then(m => m.checkUrls(allUrls));
-                if (res.ok) {
-                    const data = await res.json();
-                    
-                    urlMappings.forEach(mapping => {
-                        let isDead = false;
-                        let hasError = false;
-                        mapping.urls.forEach(url => {
-                            const s = data[url] ? data[url].status : 'unknown';
-                            if (s === 'dead') isDead = true;
-                            if (s === 'error' || s === 'unknown') hasError = true;
-                        });
-                        
-                        const pIcon = mapping.checkBtn.querySelector('i');
-                        if (isDead) {
-                            pIcon.className = 'fas fa-heart-broken';
-                            mapping.checkBtn.style.color = 'var(--accent-red)';
-                            mapping.pRow.style.opacity = '0.5';
-                            mapping.pRow.style.borderLeft = '3px solid var(--accent-red)';
-                            mapping.pRow.classList.add('is-dead');
-                        } else if (hasError) {
-                            pIcon.className = 'fas fa-exclamation-triangle';
-                            mapping.checkBtn.style.color = 'var(--warning)';
-                            mapping.pRow.classList.remove('is-dead');
-                            mapping.pRow.style.opacity = '';
-                            mapping.pRow.style.borderLeft = '';
-                        } else {
-                            pIcon.className = 'fas fa-check';
-                            mapping.checkBtn.style.color = '';
-                            mapping.checkBtn.classList.add('success');
-                            setTimeout(() => { mapping.checkBtn.classList.remove('success'); pIcon.className = 'fas fa-heartbeat'; }, 2000);
-                            mapping.pRow.classList.remove('is-dead');
-                            mapping.pRow.style.opacity = '';
-                            mapping.pRow.style.borderLeft = '';
-                        }
-                    });
-                    
-                    const cards = row.querySelectorAll('.release-card');
-                    cards.forEach(card => {
-                        const pRows = card.querySelectorAll('.rel-provider-row');
-                        const deadRows = card.querySelectorAll('.rel-provider-row.is-dead');
-                        if (pRows.length > 0 && pRows.length === deadRows.length) {
-                            card.style.border = '2px solid var(--accent-red)';
-                            card.style.opacity = '0.6';
-                        } else {
-                            card.style.border = '';
-                            card.style.opacity = '';
-                        }
-                    });
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                icon.className = originalClass;
-                btnCheckAll.style.pointerEvents = 'auto';
-            }
-        };
-        actionsEl.appendChild(btnCheckAll);
-
-        const btnCopyMarkdown = document.createElement('div');
-        btnCopyMarkdown.className = 'btn-action-round';
-        btnCopyMarkdown.title = TRANSLATIONS[state.language].copy_all_markdown || "Copier le résumé Markdown";
-        btnCopyMarkdown.innerHTML = '<i class="fab fa-markdown"></i>';
-        btnCopyMarkdown.onclick = async (e) => {
-            e.stopPropagation();
-            let md = `# ${titleText} ${group.year ? `(${group.year})` : ''}\n\n`;
-            
-            const resolutions = group.resolutions || {};
-            const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
-            const sortedRes = Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0));
-
-            sortedRes.forEach(res => {
-                md += `## ${res}\n\n`;
-                
-                const seasonGroups = {};
-                resolutions[res].forEach(rel => {
-                    const s = rel.season || 'Other';
-                    if (!seasonGroups[s]) seasonGroups[s] = [];
-                    seasonGroups[s].push(rel);
-                });
-
-                const sortedSeasons = Object.keys(seasonGroups).sort((a, b) => {
-                    if (a === 'Other') return 1;
-                    if (b === 'Other') return -1;
-                    return parseInt(a) - parseInt(b);
-                });
-
-                sortedSeasons.forEach(s => {
-                    if (group.category === 'series' && s !== 'Other') {
-                        md += `### Season ${s.toString().padStart(2, '0')}\n\n`;
-                    }
-                    
-                    seasonGroups[s].forEach(rel => {
-                        rel.sub_releases.forEach(sub => {
-                            const name = sub.raw_title || sub.title || sub.filename;
-                            md += `* **${name}**\n`;
-                            sub.parts.forEach(p => {
-                                md += `  * [${p.hoster || 'Link'}](${p.url})\n`;
-                            });
-                        });
-                    });
-                    md += `\n`;
-                });
-            });
-
-            try {
-                await navigator.clipboard.writeText(md.trim());
-                const icon = btnCopyMarkdown.querySelector('i');
-                const originalClass = icon.className;
-                icon.className = 'fas fa-check';
-                btnCopyMarkdown.classList.add('success');
-                setTimeout(() => { icon.className = originalClass; btnCopyMarkdown.classList.remove('success'); }, 1000);
-            } catch (err) {
-                console.error('Failed to copy Markdown summary:', err);
-            }
-        };
-        actionsEl.appendChild(btnCopyMarkdown);
-        
-        const btnDelete = document.createElement('div');
-        btnDelete.className = 'btn-action-round btn-danger';
-        btnDelete.title = TRANSLATIONS[state.language].btn_delete;
-        btnDelete.innerHTML = '<i class="fas fa-trash"></i>';
-        btnDelete.onclick = async (e) => {
-            e.stopPropagation();
-            const allLinks = [];
-            Object.values(group.resolutions || {}).forEach(relList => {
-                relList.forEach(rel => rel.sub_releases.forEach(sub => sub.parts.forEach(p => allLinks.push(p.id))));
-            });
-            
-            const title = TRANSLATIONS[state.language].btn_delete;
-            const msg = TRANSLATIONS[state.language].confirm_delete_release;
-            
-            if (await showConfirm(title, msg)) {
-                try {
-                    const res = await deleteReleases(allLinks);
-                    if (res.ok) {
-                        fetchData('releases');
-                    }
-                } catch (err) {
-                    console.error('Failed to delete release:', err);
-                }
-            }
-        };
-        actionsEl.appendChild(btnDelete);
-
-
-        if (group.poster_path) {
-            let pPath = group.poster_path;
-            if (pPath.startsWith('static/posters/')) pPath = pPath.replace('static/posters/', 'posters/');
-            if (!pPath.startsWith('posters/')) pPath = `posters/${pPath}`;
-            if (!pPath.startsWith('/')) pPath = '/' + pPath;
-            posterEl.style.backgroundImage = `url(${pPath})`;
-            posterEl.classList.add('has-poster');
-        }
-
-        const plotEl = clone.querySelector('.group-plot');
-        const plot = state.language === 'fr' ? (group.plot_fr || group.plot_en) : (group.plot_en || group.plot_fr);
-        if (plot && plot !== 'N/A') plotEl.textContent = plot;
-
-        const ratingEl = clone.querySelector('.group-rating');
-        if (group.rating) ratingEl.innerHTML = renderRatingDots(group.rating);
-        else ratingEl.classList.add('hidden');
-
-        clone.querySelector('.group-last-updated').textContent = `${TRANSLATIONS[state.language].msg_latest_update}: ${formatDate(group.last_updated)}`;
-
-        const mobileToggle = document.createElement('button');
-        mobileToggle.className = 'mobile-toggle-releases';
-        mobileToggle.innerHTML = `<span>${TRANSLATIONS[state.language].btn_show_versions}</span> <i class="fas fa-chevron-down"></i>`;
-        mobileToggle.onclick = () => {
-            const isExpanded = row.classList.toggle('expanded-group');
-            mobileToggle.querySelector('span').textContent = isExpanded
-                ? TRANSLATIONS[state.language].btn_hide_versions
-                : TRANSLATIONS[state.language].btn_show_versions;
-        };
-        clone.querySelector('.col-main').appendChild(mobileToggle);
-
-        const releasesCol = clone.querySelector('.col-releases');
-        const resolutions = group.resolutions || {};
-        const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
-        const sortedRes = Object.keys(resolutions).sort((a, b) => (resOrder[b] || 0) - (resOrder[a] || 0));
-
-        sortedRes.forEach(res => {
-            const resRow = document.createElement('div');
-            resRow.className = 'quality-row';
-            resRow.innerHTML = `<div class="quality-label">${res}</div>`;
-
-            const seasonGroups = {};
-            resolutions[res].forEach(rel => {
-                const s = rel.season || 'Other';
-                if (!seasonGroups[s]) seasonGroups[s] = [];
-                seasonGroups[s].push(rel);
-            });
-
-            const sortedSeasons = Object.keys(seasonGroups).sort((a, b) => {
-                if (a === 'Other') return 1;
-                if (b === 'Other') return -1;
-                return parseInt(a) - parseInt(b);
-            });
-
-            const seasonsContainer = document.createElement('div');
-            seasonsContainer.className = 'seasons-container';
-            resRow.appendChild(seasonsContainer);
-
-            sortedSeasons.forEach(s => {
-                const seasonDiv = document.createElement('div');
-                seasonDiv.className = 'season-group';
-
-                if (group.category === 'series' && s !== 'Other') {
-                    const sHeader = document.createElement('div');
-                    sHeader.className = 'season-header';
-                    sHeader.textContent = `Season ${s.toString().padStart(2, '0')}`;
-                    seasonDiv.appendChild(sHeader);
-                }
-
-                const grid = document.createElement('div');
-                grid.className = 'quality-grid';
-                seasonDiv.appendChild(grid);
-                seasonGroups[s].forEach(rel => grid.appendChild(createReleaseCard(rel)));
-                seasonsContainer.appendChild(seasonDiv);
-            });
-
-            releasesCol.appendChild(resRow);
-        });
-
-        container.appendChild(clone);
-    });
+    const grid = document.createElement('div');
+    grid.className = 'poster-grid';
+    groups.forEach(group => grid.appendChild(createPosterCard(group)));
+    container.appendChild(grid);
 
     renderPagination('releases');
 };

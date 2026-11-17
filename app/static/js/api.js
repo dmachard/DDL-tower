@@ -10,12 +10,19 @@ export const fetchData = async (view) => {
     if (!viewState) return;
 
     try {
-        const url = new URL(`/api/${view}`, window.location.origin);
-        url.searchParams.append('page', viewState.page);
-        url.searchParams.append('limit', viewState.limit);
-        if (viewState.query) url.searchParams.append('q', viewState.query);
+        const isSourceRowsMode = view === 'releases' && !viewState.query && !viewState.source;
+        const url = new URL(isSourceRowsMode ? '/api/releases/by-source' : `/api/${view}`, window.location.origin);
+
+        if (isSourceRowsMode) {
+            url.searchParams.append('limit_per_source', '25');
+        } else {
+            url.searchParams.append('page', viewState.page);
+            url.searchParams.append('limit', viewState.limit);
+            if (viewState.query) url.searchParams.append('q', viewState.query);
+            if (view === 'releases' && viewState.source) url.searchParams.append('source', viewState.source);
+        }
+
         if (viewState.category) url.searchParams.append('category', viewState.category);
-        if (view === 'releases' && viewState.source) url.searchParams.append('source', viewState.source);
         if (view === 'releases' && viewState.resolution) url.searchParams.append('resolution', viewState.resolution);
         if (view === 'releases' && viewState.year) url.searchParams.append('year', viewState.year);
         if (view === 'releases' && viewState.network) url.searchParams.append('network', viewState.network);
@@ -26,17 +33,25 @@ export const fetchData = async (view) => {
         const res = await fetch(url);
         const data = await res.json();
 
-        viewState.items = data.items;
-        viewState.total = data.total;
-        viewState.pages = data.pages;
+        if (isSourceRowsMode) {
+            viewState.rows = data.rows || [];
+            viewState.items = [];
+            viewState.total = data.total || 0;
+            viewState.pages = 0;
+        } else {
+            viewState.items = data.items || [];
+            if (view === 'releases') viewState.rows = [];
+            viewState.total = data.total || 0;
+            viewState.pages = data.pages || 0;
+        }
 
         const countEl = document.getElementById(`count-${view}`);
-        if (countEl) countEl.textContent = data.total;
+        if (countEl) countEl.textContent = viewState.total;
         const mobCountEl = document.getElementById(`mobile-count-${view}`);
-        if (mobCountEl) mobCountEl.textContent = data.total;
+        if (mobCountEl) mobCountEl.textContent = viewState.total;
 
         if (state.currentView === view) {
-            if (view === 'releases') renderReleases(data.items);
+            if (view === 'releases') renderReleases(viewState.items);
             else if (view === 'errors') {
                 renderErrors(data.items);
                 renderPagination('errors');

@@ -17,6 +17,7 @@
 @import url('css/downloads.css');
 @import url('css/sources.css');
 @import url('css/quick-scan.css');
+@import url('css/theme-clean.css');
 
 /* --- Collection of Mobile Utility Overrides --- */
 @media (max-width: 600px) {

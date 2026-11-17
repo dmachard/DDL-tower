@@ -1,13 +1,9 @@
 export const CONFIG = {
     views: {
-        releases: { limit: 20, recent: true, hours: 12 }
+        releases: { limit: 20, recent: false, hours: null }
     },
     filters: {
         releases: [
-            { type: 'recent', value: 'true', i18n: 'filter_recent', icon: 'fas fa-star tag-star' },
-            { type: 'hours', value: '12', label: '12h' },
-            { type: 'hours', value: '24', label: '24h' },
-            { type: 'hours', value: '48', label: '48h' },
             { type: 'category', value: 'movie', i18n: 'filter_movies', icon: 'fas fa-film' },
             { type: 'category', value: 'series', i18n: 'filter_series', icon: 'fas fa-tv' },
             { type: 'local', value: 'true', i18n: 'filter_local', icon: 'fas fa-map-marker-alt' },
@@ -22,7 +18,7 @@ export const state = {
     currentView: 'releases',
     language: 'fr',
     autoRefresh: false,
-    releases: { items: [], page: 1, limit: 20, total: 0, pages: 0, query: '', category: '', source: '', resolution: '', year: '', network: '', recent: true, hours: 12, local: '' },
+    releases: { items: [], rows: [], page: 1, limit: 20, total: 0, pages: 0, query: '', category: '', source: '', resolution: '', year: '', network: '', recent: false, hours: null, local: '' },
     downloads: { items: [], active: {}, query: '' },
     errors: { items: [], page: 1, limit: 20, total: 0, pages: 0 },
     sources: [],
