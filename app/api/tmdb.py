@@ -116,6 +116,8 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
                 link.year = existing_meta.year
         
         await db.commit()
+        from app.services.release_service import release_service
+        release_service.invalidate_cache()
         return {"status": "success", "imdb_id": existing_meta.imdb_id}
     except Exception as e:
         print(f"[API] Identification error: {e}")

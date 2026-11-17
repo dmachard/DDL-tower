@@ -31,16 +31,13 @@ class ReleaseService:
 
     @staticmethod
     async def get_threshold(db: AsyncSession, recent: bool, hours: int = None):
-        """Unified threshold calculation for novelty window."""
+        """Unified threshold calculation for novelty window (today since 00:00 local time)."""
         if not recent:
             return None
         if hours:
             return datetime.now(timezone.utc) - timedelta(hours=hours)
-        
-        last_scan = await ReleaseService.get_latest_scan_time(db)
-        if not last_scan:
-            return None
-        return last_scan - timedelta(minutes=settings.SCAN_INTERVAL_MINUTES * settings.SCAN_NOVELTY_MULTIPLIER)
+
+        return datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
     @staticmethod
     def _format_group_releases(releases, threshold):
@@ -330,6 +327,13 @@ class ReleaseService:
         )
         src_result = await db.execute(src_stmt)
         sources = [row[0] for row in src_result.all() if row[0]]
+        if settings.SCRAPER_SOURCES:
+            active_sources = {
+                s.get("name") for s in settings.SCRAPER_SOURCES
+                if s.get("name") and s.get("enabled", True)
+            }
+            active_sources.update({"Quick-Scan", "Demo-Source"})
+            sources = [s for s in sources if s in active_sources]
         cats = [category] if category else ["movie", "series"]
         source_cats = [(src, cat) for src in sources for cat in cats]
 

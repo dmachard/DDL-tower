@@ -1,4 +1,5 @@
 import time
+from unittest.mock import patch
 import pytest
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -12,6 +13,11 @@ from app.services.release_service import ReleaseService
 @pytest.mark.asyncio
 async def test_by_source_lightweight_and_detail():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    p = patch("app.services.release_service.settings")
+    mock_settings = p.start()
+    mock_settings.SCRAPER_SOURCES = [{"name": "SrcA", "enabled": True}]
+    mock_settings.SCAN_INTERVAL_MINUTES = 60
+    mock_settings.SCAN_NOVELTY_MULTIPLIER = 2
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -84,12 +90,18 @@ async def test_by_source_lightweight_and_detail():
             refetched = await ReleaseService.get_releases_by_source(async_db, recent=False)
             assert refetched is not res
     finally:
+        p.stop()
         await engine.dispose()
 
 
 @pytest.mark.asyncio
 async def test_by_source_performance_large_dataset():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    p = patch("app.services.release_service.settings")
+    mock_settings = p.start()
+    mock_settings.SCRAPER_SOURCES = [{"name": f"Src{i}", "enabled": True} for i in range(6)]
+    mock_settings.SCAN_INTERVAL_MINUTES = 60
+    mock_settings.SCAN_NOVELTY_MULTIPLIER = 2
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -159,4 +171,5 @@ async def test_by_source_performance_large_dataset():
 
             print(f"\n[PERF 20k rows] all={t_all*1000:.1f}ms movie={t_mov*1000:.1f}ms series={t_ser*1000:.1f}ms detail={t_det*1000:.1f}ms")
     finally:
+        p.stop()
         await engine.dispose()
