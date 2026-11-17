@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import DownloadLink, MediaMetadata, ScrapedURL
@@ -323,42 +323,15 @@ class ReleaseService:
         threshold = await ReleaseService.get_threshold(db, recent, hours)
         novelty_threshold = threshold or await ReleaseService.get_threshold(db, True, hours)
 
-        src_stmt = select(
-            DownloadLink.source_name,
-            DownloadLink.category,
-            func.max(DownloadLink.last_checked).label("latest")
-        ).where(
+        src_stmt = select(DownloadLink.source_name).distinct().where(
             DownloadLink.status == "alive",
             DownloadLink.source_name != None,
             DownloadLink.source_name != ""
         )
-
-        if category:
-            src_stmt = src_stmt.where(DownloadLink.category == category)
-        if resolution:
-            if resolution == "2160p":
-                src_stmt = src_stmt.where(
-                    DownloadLink.resolution.ilike("2160p") |
-                    DownloadLink.resolution.ilike("4K") |
-                    DownloadLink.resolution.ilike("4Klight") |
-                    DownloadLink.resolution.ilike("4KLIGHT")
-                )
-            else:
-                src_stmt = src_stmt.where(DownloadLink.resolution == resolution)
-        if network:
-            src_stmt = src_stmt.where(DownloadLink.network == network)
-        if recent and threshold:
-            src_stmt = src_stmt.where(DownloadLink.last_checked >= threshold)
-        if year:
-            src_stmt = src_stmt.outerjoin(MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id)
-            src_stmt = src_stmt.where(or_(DownloadLink.year == year, MediaMetadata.year == year))
-
-        src_stmt = src_stmt.group_by(
-            DownloadLink.source_name,
-            DownloadLink.category
-        ).order_by(func.max(DownloadLink.last_checked).desc())
         src_result = await db.execute(src_stmt)
-        source_cats = [(row[0], row[1]) for row in src_result.all() if row[0]]
+        sources = [row[0] for row in src_result.all() if row[0]]
+        cats = [category] if category else ["movie", "series"]
+        source_cats = [(src, cat) for src in sources for cat in cats]
 
         rows = []
         total_items = 0
@@ -429,27 +402,52 @@ class ReleaseService:
                     if grouped_map[k]["rep"].imdb_id and not grouped_map[k]["rep"].imdb_id.startswith("local")
                 ]
                 meta_by_imdb = {}
-                links_by_imdb = {}
+                counts_by_imdb = {}
                 if imdb_ids:
                     meta_res = await db.execute(select(MediaMetadata).where(MediaMetadata.imdb_id.in_(imdb_ids)))
                     for m in meta_res.scalars().all():
                         meta_by_imdb[m.imdb_id] = m
 
-                    all_imdb_res = await db.execute(
-                        select(DownloadLink)
-                        .where(DownloadLink.imdb_id.in_(imdb_ids), DownloadLink.status == "alive")
-                        .order_by(DownloadLink.last_checked.desc())
-                    )
-                    for al in all_imdb_res.scalars().all():
-                        links_by_imdb.setdefault(al.imdb_id, []).append(al)
+                    if novelty_threshold:
+                        cnt_stmt = select(
+                            DownloadLink.imdb_id,
+                            func.count(DownloadLink.id),
+                            func.sum(case((DownloadLink.last_checked >= novelty_threshold, 1), else_=0))
+                        ).where(
+                            DownloadLink.imdb_id.in_(imdb_ids),
+                            DownloadLink.status == "alive"
+                        ).group_by(DownloadLink.imdb_id)
+                    else:
+                        cnt_stmt = select(
+                            DownloadLink.imdb_id,
+                            func.count(DownloadLink.id),
+                            0
+                        ).where(
+                            DownloadLink.imdb_id.in_(imdb_ids),
+                            DownloadLink.status == "alive"
+                        ).group_by(DownloadLink.imdb_id)
+
+                    for cid, c_all, c_new in (await db.execute(cnt_stmt)).all():
+                        counts_by_imdb[cid] = (int(c_all or 0), int(c_new or 0))
 
                 items = []
                 for k in ordered_keys:
                     rep = grouped_map[k]["rep"]
+                    local_links = grouped_map[k]["links"]
                     m = meta_by_imdb.get(rep.imdb_id)
-                    rel_list = links_by_imdb.get(rep.imdb_id) or grouped_map[k]["links"]
-                    resolutions_map, card_count = ReleaseService._format_group_releases(rel_list, novelty_threshold)
-                    group_latest = rel_list[0].last_checked if rel_list else rep.last_checked
+                    if rep.imdb_id in counts_by_imdb:
+                        all_cnt, new_cnt = counts_by_imdb[rep.imdb_id]
+                    else:
+                        all_cnt = len(local_links)
+                        new_cnt = 0
+                        if novelty_threshold:
+                            for l in local_links:
+                                if l.last_checked:
+                                    lc = l.last_checked.replace(tzinfo=timezone.utc) if l.last_checked.tzinfo is None else l.last_checked
+                                    if lc >= novelty_threshold:
+                                        new_cnt += 1
+
+                    group_latest = local_links[0].last_checked if local_links else rep.last_checked
                     items.append({
                         "title": rep.title,
                         "official_title": m.official_title if m else None,
@@ -462,18 +460,59 @@ class ReleaseService:
                         "rating": m.rating if m else None,
                         "imdb_id": rep.imdb_id,
                         "last_updated": group_latest.isoformat() if hasattr(group_latest, "isoformat") else group_latest,
-                        "resolutions": resolutions_map,
-                        "count": card_count
+                        "resolutions": None,
+                        "new_count": new_cnt,
+                        "all_count": all_cnt,
+                        "count": all_cnt
                     })
 
                 if items:
                     rows.append({"source": src, "category": cat, "total": len(items), "items": items})
                     total_items += len(items)
 
+        rows.sort(
+            key=lambda r: (r["items"][0].get("last_updated") or "") if r.get("items") else "",
+            reverse=True
+        )
         payload = {"rows": rows, "total": total_items}
         if len(_BY_SOURCE_CACHE) > 32:
             _BY_SOURCE_CACHE.clear()
         _BY_SOURCE_CACHE[cache_key] = (time.monotonic(), payload)
         return payload
+
+    @staticmethod
+    async def get_release_detail(
+        db: AsyncSession,
+        imdb_id: str = None,
+        title: str = None,
+        year: int = None,
+        category: str = None,
+        hours: int = None
+    ):
+        """Returns formatted resolutions/links for a single release on demand."""
+        novelty_threshold = await ReleaseService.get_threshold(db, True, hours)
+        if imdb_id and not imdb_id.startswith("local"):
+            stmt = select(DownloadLink).where(
+                DownloadLink.imdb_id == imdb_id,
+                DownloadLink.status == "alive"
+            )
+        else:
+            stmt = select(DownloadLink).where(
+                func.lower(DownloadLink.title) == (title or "").lower(),
+                DownloadLink.status == "alive"
+            )
+            if year is not None:
+                stmt = stmt.where(DownloadLink.year == year)
+            else:
+                stmt = stmt.where(DownloadLink.year == None)
+            if category:
+                stmt = stmt.where(DownloadLink.category == category)
+            else:
+                stmt = stmt.where(DownloadLink.category == None)
+
+        stmt = stmt.order_by(DownloadLink.last_checked.desc())
+        releases = (await db.execute(stmt)).scalars().all()
+        resolutions_map, card_count = ReleaseService._format_group_releases(releases, novelty_threshold)
+        return {"resolutions": resolutions_map, "count": card_count}
 
 release_service = ReleaseService()

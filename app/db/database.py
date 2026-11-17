@@ -119,6 +119,7 @@ async def init_db():
             # Performance indexes for large download_links tables
             for idx_sql in (
                 "CREATE INDEX IF NOT EXISTS ix_dl_status_source_cat_checked ON download_links (status, source_name, category, last_checked)",
+                "CREATE INDEX IF NOT EXISTS ix_dl_status_cat_checked ON download_links (status, category, last_checked)",
                 "CREATE INDEX IF NOT EXISTS ix_dl_imdb_status ON download_links (imdb_id, status)",
                 "CREATE INDEX IF NOT EXISTS ix_dl_status_checked ON download_links (status, last_checked)",
                 "CREATE INDEX IF NOT EXISTS ix_dl_title_status ON download_links (title, status)",

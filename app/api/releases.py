@@ -111,6 +111,18 @@ async def get_releases_by_source(
         db, limit_per_source, category, resolution, year, network, recent, hours, local
     )
 
+@router.get("/releases/detail")
+async def get_release_detail(
+    db: AsyncSession = Depends(get_db),
+    imdb_id: str = Query(None),
+    title: str = Query(None),
+    year: int = Query(None),
+    category: str = Query(None),
+    hours: int = Query(None)
+):
+    """Returns formatted links/resolutions for a single release on demand."""
+    return await release_service.get_release_detail(db, imdb_id, title, year, category, hours)
+
 class DeleteRequest(BaseModel):
     ids: List[int]
 

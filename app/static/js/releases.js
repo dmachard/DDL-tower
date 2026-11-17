@@ -287,8 +287,11 @@ const collectGroupIds = (group) => {
 };
 
 const countSubReleases = (group, onlyNew = false) => {
+    if (!group.resolutions) {
+        return onlyNew ? (group.new_count || 0) : (group.all_count ?? group.count ?? 0);
+    }
     let count = 0;
-    Object.values(group.resolutions || {}).forEach(relList => {
+    Object.values(group.resolutions).forEach(relList => {
         relList.forEach(rel => {
             rel.sub_releases.forEach(sub => {
                 if (!onlyNew || sub.is_new) count++;
@@ -576,28 +579,55 @@ export const openReleaseModal = (group) => {
     };
     actionsEl.appendChild(btnDelete);
 
-    // Tabs: Nouveautés vs Tous les liens
-    const newCount = countSubReleases(group, true);
-    const allCount = countSubReleases(group, false);
-    document.getElementById('detail-new-count').textContent = newCount;
-    document.getElementById('detail-all-count').textContent = allCount;
-
     const tabNew = document.getElementById('detail-tab-new');
     const tabAll = document.getElementById('detail-tab-all');
     const linksBody = document.getElementById('detail-links-body');
 
-    const setMode = (newOnly) => {
-        tabNew.classList.toggle('active', newOnly);
-        tabAll.classList.toggle('active', !newOnly);
-        renderResolutionList(linksBody, group, newOnly);
+    const initTabs = () => {
+        const newCount = countSubReleases(group, true);
+        const allCount = countSubReleases(group, false);
+        document.getElementById('detail-new-count').textContent = newCount;
+        document.getElementById('detail-all-count').textContent = allCount;
+
+        const setMode = (newOnly) => {
+            tabNew.classList.toggle('active', newOnly);
+            tabAll.classList.toggle('active', !newOnly);
+            renderResolutionList(linksBody, group, newOnly);
+        };
+
+        tabNew.onclick = () => setMode(true);
+        tabAll.onclick = () => setMode(false);
+        setMode(newCount > 0);
     };
 
-    tabNew.onclick = () => setMode(true);
-    tabAll.onclick = () => setMode(false);
-
-    // Default to New links if any exist, otherwise All links
-    setMode(newCount > 0);
     modal.classList.add('active');
+
+    if (!group.resolutions) {
+        document.getElementById('detail-new-count').textContent = group.new_count || 0;
+        document.getElementById('detail-all-count').textContent = group.all_count ?? group.count ?? 0;
+        linksBody.innerHTML = '<div class="detail-empty-links"><i class="fas fa-spinner fa-spin"></i></div>';
+
+        const url = new URL('/api/releases/detail', window.location.origin);
+        if (group.imdb_id && !group.imdb_id.startsWith('local')) {
+            url.searchParams.append('imdb_id', group.imdb_id);
+        } else {
+            if (group.title) url.searchParams.append('title', group.title);
+            if (group.year) url.searchParams.append('year', String(group.year));
+            if (group.category) url.searchParams.append('category', group.category);
+        }
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                group.resolutions = data.resolutions || {};
+                initTabs();
+            })
+            .catch(err => {
+                console.error('Failed to load release detail:', err);
+                linksBody.innerHTML = `<div class="detail-empty-links">${TRANSLATIONS[state.language].msg_no_results}</div>`;
+            });
+    } else {
+        initTabs();
+    }
 };
 
 // ─── Poster Card ──────────────────────────────────────────────────────────────
