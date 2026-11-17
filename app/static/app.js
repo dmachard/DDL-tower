@@ -134,15 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Filter Tags ───────────────────────────────────────────────────────────
     document.getElementById('filter-tags-releases')?.addEventListener('click', (e) => handleTagClick(e, 'releases'));
 
-    // ── Live Refresh Toggle ───────────────────────────────────────────────────
-    const liveToggle = document.getElementById('live-toggle');
-    if (liveToggle) {
-        liveToggle.addEventListener('click', () => {
-            state.autoRefresh = !state.autoRefresh;
-            liveToggle.classList.toggle('active', state.autoRefresh);
-        });
-    }
-
     // ── Show All Toggle ───────────────────────────────────────────────────────
     const showAllToggle = document.getElementById('show-all-toggle');
     if (showAllToggle) {
@@ -206,17 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Polling Intervals ─────────────────────────────────────────────────────
-    setInterval(() => {
-        if (state.autoRefresh && document.visibilityState === 'visible') {
-            if (state.currentView === 'releases') fetchData(state.currentView);
-            else if (state.currentView === 'downloads') fetchDownloads();
-        }
-    }, 30000);
-
-    setInterval(() => {
-        if (state.autoRefresh && document.visibilityState === 'visible') fetchStats();
-    }, 60000);
-
     setInterval(() => {
         const hasActive = state.downloads.active && Object.keys(state.downloads.active).length > 0;
         if (hasActive && state.currentView === 'downloads' && document.visibilityState === 'visible') fetchDownloads();

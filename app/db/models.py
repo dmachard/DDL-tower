@@ -40,6 +40,7 @@ class DownloadLink(Base):
 
     __table_args__ = (
         Index("ix_dl_status_source_cat_checked", "status", "source_name", "category", "last_checked"),
+        Index("ix_dl_source_checked", "source_name", "last_checked"),
         Index("ix_dl_status_cat_checked", "status", "category", "last_checked"),
         Index("ix_dl_imdb_status", "imdb_id", "status"),
         Index("ix_dl_status_checked", "status", "last_checked"),

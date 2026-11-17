@@ -1,7 +1,8 @@
+import time
 from typing import Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
@@ -10,59 +11,58 @@ from app.core.config import settings
 from app.core.utils import parse_size, format_size
 
 router = APIRouter()
+_STATS_CACHE = {}
+_STATS_TTL = 30.0
 
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):
     """
     Returns global statistics using optimized SQL aggregation.
     """
-    # Unique Movies (Unique titles)
-    movie_unique_stmt = select(func.count(func.distinct(DownloadLink.title))).where(DownloadLink.category == "movie")
-    movie_unique_res = await db.execute(movie_unique_stmt)
-    unique_movies = movie_unique_res.scalar() or 0
-    
-    # Total Movie Links
-    movie_links_stmt = select(func.count(DownloadLink.id)).where(DownloadLink.category == "movie")
-    movie_links_res = await db.execute(movie_links_stmt)
-    links_movies = movie_links_res.scalar() or 0
-    
-    # Unique Series (Unique titles)
-    series_unique_stmt = select(func.count(func.distinct(DownloadLink.title))).where(DownloadLink.category == "series")
-    series_unique_res = await db.execute(series_unique_stmt)
-    unique_series = series_unique_res.scalar() or 0
-    
-    # Total Series Links
-    series_links_stmt = select(func.count(DownloadLink.id)).where(DownloadLink.category == "series")
-    series_links_res = await db.execute(series_links_stmt)
-    links_series = series_links_res.scalar() or 0
-    
-    # Total links
-    total_links_stmt = select(func.count(DownloadLink.id))
-    total_links_res = await db.execute(total_links_stmt)
-    total_links = total_links_res.scalar() or 0
-    
-    # Stats by source
-    stmt = select(DownloadLink.source_name, DownloadLink.size)
-    result = await db.execute(stmt)
-    rows = result.all()
-    
+    now = time.monotonic()
+    cached = _STATS_CACHE.get("stats")
+    if cached and (now - cached[0]) < _STATS_TTL:
+        return cached[1]
+
+    # Single aggregate pass for link counts
+    agg_stmt = select(
+        func.count(DownloadLink.id),
+        func.sum(case((DownloadLink.category == "movie", 1), else_=0)),
+        func.sum(case((DownloadLink.category == "series", 1), else_=0)),
+        func.sum(case((DownloadLink.status == "dead", 1), else_=0)),
+    )
+    total_links, links_movies, links_series, dead_links = (await db.execute(agg_stmt)).one()
+    total_links = int(total_links or 0)
+    links_movies = int(links_movies or 0)
+    links_series = int(links_series or 0)
+    dead_links = int(dead_links or 0)
+
+    # Unique Movies & Series (Unique titles)
+    unique_movies = (await db.execute(
+        select(func.count(func.distinct(DownloadLink.title))).where(DownloadLink.category == "movie")
+    )).scalar() or 0
+    unique_series = (await db.execute(
+        select(func.count(func.distinct(DownloadLink.title))).where(DownloadLink.category == "series")
+    )).scalar() or 0
+
+    # Size by source aggregated in SQL (avoids loading 185k+ rows into Python)
+    size_rows = (await db.execute(
+        select(
+            DownloadLink.source_name,
+            func.sum(func.coalesce(DownloadLink.size_bytes, 0))
+        ).group_by(DownloadLink.source_name)
+    )).all()
+
     size_by_source = {}
     total_size_bytes = 0
-    
-    for source, size_str in rows:
+    for source, bytes_sum in size_rows:
         source_name = source or "Unknown"
-        bytes_val = parse_size(size_str)
+        bytes_val = int(bytes_sum or 0)
         size_by_source[source_name] = size_by_source.get(source_name, 0) + bytes_val
         total_size_bytes += bytes_val
-        
-    # Format sizes back to string
+
     fmt_size_by_source = {src: format_size(val) for src, val in size_by_source.items()}
-    
-    # Dead links
-    dead_links_stmt = select(func.count(DownloadLink.id)).where(DownloadLink.status == "dead")
-    dead_links_res = await db.execute(dead_links_stmt)
-    dead_links = dead_links_res.scalar() or 0
-    
+
     stats = {
         "unique_movies": unique_movies,
         "unique_series": unique_series,
@@ -77,6 +77,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         "size_by_source": fmt_size_by_source,
         "size_by_source_raw": size_by_source
     }
+    _STATS_CACHE["stats"] = (time.monotonic(), stats)
     return stats
 
 def get_source_entry_url(source_name: str) -> Optional[str]:
@@ -100,6 +101,11 @@ async def get_sources_dashboard(db: AsyncSession = Depends(get_db)):
     """
     Returns a detailed dashboard of all sources, their health and last additions.
     """
+    now = time.monotonic()
+    cached = _STATS_CACHE.get("dashboard")
+    if cached and (now - cached[0]) < _STATS_TTL:
+        return cached[1]
+
     configured_sources = {s["name"]: s.get("entry_url") for s in settings.SCRAPER_SOURCES}
     
     source_stats_stmt = select(
@@ -146,7 +152,9 @@ async def get_sources_dashboard(db: AsyncSession = Depends(get_db)):
             } if last_link else None
         })
         
-    return {"sources": sources_dashboard}
+    payload = {"sources": sources_dashboard}
+    _STATS_CACHE["dashboard"] = (time.monotonic(), payload)
+    return payload
 
 @router.get("/sources")
 async def get_sources(db: AsyncSession = Depends(get_db)):
@@ -253,7 +261,10 @@ async def get_errors(page: int = 1, limit: int = 20, db: AsyncSession = Depends(
     """
     Returns the paginated list of scraping errors.
     """
-    await check_sources_novelty(db)
+    now = time.monotonic()
+    if (now - _STATS_CACHE.get("novelty_ts", 0)) >= 60.0:
+        await check_sources_novelty(db)
+        _STATS_CACHE["novelty_ts"] = now
     # Count total errors in database
     count_stmt = select(func.count(ScrapedURL.url)).where(ScrapedURL.status.like("failed%"))
     count_res = await db.execute(count_stmt)

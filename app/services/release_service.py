@@ -330,7 +330,7 @@ class ReleaseService:
         if settings.SCRAPER_SOURCES:
             active_sources = {
                 s.get("name") for s in settings.SCRAPER_SOURCES
-                if s.get("name") and s.get("enabled", True)
+                if s.get("name") and s.get("enabled", s.get("enable", True))
             }
             active_sources.update({"Quick-Scan", "Demo-Source"})
             sources = [s for s in sources if s in active_sources]

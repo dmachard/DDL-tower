@@ -66,13 +66,6 @@ export const loadFilters = (view) => {
                 html += `<div class="filter-tag" data-type="year" data-value="${yr}">${yr}</div>`;
             });
         }
-
-        if (state.networks.length > 0) {
-            html += '<div class="filter-separator"></div>';
-            state.networks.forEach(net => {
-                html += `<div class="filter-tag" data-type="network" data-value="${net}">${net}</div>`;
-            });
-        }
     }
 
     container.innerHTML = html;

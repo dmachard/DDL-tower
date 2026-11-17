@@ -950,6 +950,11 @@ body:has(.modal-overlay.active) {
         margin: 0 -14px 14px !important;
         padding: 4px 14px 10px !important;
     }
+    .view-toolbar,
+    .filter-group,
+    .filter-tags {
+        justify-content: flex-start !important;
+    }
 
     .hero-banner {
         height: 220px;
