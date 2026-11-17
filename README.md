@@ -50,3 +50,9 @@ Running tests
 ```bash
 docker compose exec -T ddltower python3 -m pytest -p no:cacheprovider -v app/tests/test*
 ```
+
+Seed demo source (`Demo-Source`, idempotent, pass `--force` to recreate):
+
+```bash
+docker compose exec -T ddltower python3 - < scripts/init_demo_source.py
+```

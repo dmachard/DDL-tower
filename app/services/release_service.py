@@ -336,6 +336,8 @@ class ReleaseService:
         rows = []
         total_items = 0
 
+        from app.api.stats import get_source_entry_url
+
         if year is not None or local is not None:
             for src, cat in source_cats:
                 res = await ReleaseService.get_grouped_releases(
@@ -345,7 +347,7 @@ class ReleaseService:
                 )
                 if res["items"]:
                     row_total = len(res["items"])
-                    rows.append({"source": src, "category": cat, "total": row_total, "items": res["items"]})
+                    rows.append({"source": src, "source_url": get_source_entry_url(src), "category": cat, "total": row_total, "items": res["items"]})
                     total_items += row_total
         else:
             for src, cat in source_cats:
@@ -467,7 +469,7 @@ class ReleaseService:
                     })
 
                 if items:
-                    rows.append({"source": src, "category": cat, "total": len(items), "items": items})
+                    rows.append({"source": src, "source_url": get_source_entry_url(src), "category": cat, "total": len(items), "items": items})
                     total_items += len(items)
 
         rows.sort(

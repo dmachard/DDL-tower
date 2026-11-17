@@ -782,12 +782,16 @@ const renderSourceRows = (container, rows) => {
             : (row.category === 'series' ? TRANSLATIONS[state.language].filter_series : '');
         const catIcon = row.category === 'movie' ? 'fa-film' : (row.category === 'series' ? 'fa-tv' : 'fa-server');
 
+        const sourceHtml = row.source_url
+            ? `<a href="${row.source_url}" target="_blank" rel="noopener noreferrer" class="source-row-link">${row.source} <i class="fas fa-external-link-alt"></i></a>`
+            : `<span>${row.source}</span>`;
+
         const header = document.createElement('div');
         header.className = 'source-row-header';
         header.innerHTML = `
             <div class="source-row-title">
                 <i class="fas ${catIcon} source-row-icon"></i>
-                <span>${row.source}</span>
+                ${sourceHtml}
                 ${catLabel ? `<span class="source-row-sep">·</span><span class="source-row-cat-text">${catLabel}</span>` : ''}
             </div>
         `;
