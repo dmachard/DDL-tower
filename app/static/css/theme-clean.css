@@ -457,46 +457,38 @@ body {
 /* ── Source Sections, Carousels & Posters ─────────────────────────────────── */
 
 .source-section {
-    padding-bottom: 20px;
+    padding-bottom: 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     margin-bottom: 22px;
-    gap: 12px;
+    gap: 10px;
 }
 
 .source-row-title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
+    letter-spacing: -0.2px;
     color: #fafafa;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.source-row-title i {
-    color: #71717a;
-    font-size: 13px;
-}
-
-.source-row-count {
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.07);
+.source-row-icon {
+    font-size: 14px;
     color: #a1a1aa;
-    font-size: 11px;
-    padding: 1px 7px;
 }
 
-.source-subgroup {
-    border-left: 2px solid rgba(255, 255, 255, 0.07);
-    padding-left: 12px;
+.source-section.cat-movie .source-row-icon { color: var(--color-movie); }
+.source-section.cat-series .source-row-icon { color: var(--color-series); }
+
+.source-row-sep {
+    color: #52525b;
+    font-weight: 400;
 }
 
-.source-subgroup.cat-movie {
-    border-left-color: rgba(56, 189, 248, 0.45);
-}
-
-.source-subgroup.cat-series {
-    border-left-color: rgba(167, 139, 250, 0.45);
-}
-
-.source-sub-title {
-    font-size: 12px;
+.source-row-cat-text {
+    font-size: 14px;
+    font-weight: 500;
     color: #a1a1aa;
 }
 
@@ -520,6 +512,15 @@ body {
     background: rgba(17, 17, 19, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #fafafa;
+}
+
+.carousel-loader {
+    flex: 0 0 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #71717a;
+    font-size: 18px;
 }
 
 .poster-card {

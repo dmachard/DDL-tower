@@ -10,7 +10,7 @@ export const fetchData = async (view) => {
     if (!viewState) return;
 
     try {
-        const isSourceRowsMode = view === 'releases' && !viewState.query && !viewState.source;
+        const isSourceRowsMode = view === 'releases' && !viewState.query;
         const url = new URL(isSourceRowsMode ? '/api/releases/by-source' : `/api/${view}`, window.location.origin);
 
         if (isSourceRowsMode) {
@@ -19,7 +19,6 @@ export const fetchData = async (view) => {
             url.searchParams.append('page', viewState.page);
             url.searchParams.append('limit', viewState.limit);
             if (viewState.query) url.searchParams.append('q', viewState.query);
-            if (view === 'releases' && viewState.source) url.searchParams.append('source', viewState.source);
         }
 
         if (viewState.category) url.searchParams.append('category', viewState.category);

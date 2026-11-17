@@ -653,13 +653,65 @@ const createPosterCard = (group, showCatBadge = true) => {
 
 // ─── Releases (Netflix Source Rows + Grid Fallback) ───────────────────────────
 
-const createCarousel = (items, showCatBadge = false) => {
+const createCarousel = (items, source, category, showCatBadge = false) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'carousel-wrapper';
 
     const track = document.createElement('div');
     track.className = 'carousel-track';
     items.forEach(group => track.appendChild(createPosterCard(group, showCatBadge)));
+
+    let page = 1;
+    let loading = false;
+    let hasMore = items.length >= 25;
+
+    const loadMore = async () => {
+        if (loading || !hasMore || !source) return;
+        loading = true;
+        const loader = document.createElement('div');
+        loader.className = 'carousel-loader';
+        loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        track.appendChild(loader);
+
+        try {
+            const url = new URL('/api/releases', window.location.origin);
+            url.searchParams.append('page', String(page + 1));
+            url.searchParams.append('limit', '25');
+            url.searchParams.append('source', source);
+            if (category) url.searchParams.append('category', category);
+            if (state.releases.resolution) url.searchParams.append('resolution', state.releases.resolution);
+            if (state.releases.year) url.searchParams.append('year', state.releases.year);
+            if (state.releases.network) url.searchParams.append('network', state.releases.network);
+            if (state.releases.local) url.searchParams.append('local', state.releases.local);
+            if (state.releases.recent) url.searchParams.append('recent', 'true');
+            if (state.releases.hours) url.searchParams.append('hours', state.releases.hours);
+
+            const res = await fetch(url);
+            const data = await res.json();
+            loader.remove();
+
+            const nextItems = data.items || [];
+            if (nextItems.length > 0) {
+                page += 1;
+                nextItems.forEach(group => track.appendChild(createPosterCard(group, showCatBadge)));
+                hasMore = page < (data.pages || 0);
+            } else {
+                hasMore = false;
+            }
+        } catch (err) {
+            console.error('Carousel loadMore error:', err);
+            loader.remove();
+            hasMore = false;
+        } finally {
+            loading = false;
+        }
+    };
+
+    track.addEventListener('scroll', () => {
+        if (hasMore && !loading && track.scrollLeft + track.clientWidth >= track.scrollWidth - 400) {
+            loadMore();
+        }
+    }, { passive: true });
 
     const btnLeft = document.createElement('button');
     btnLeft.type = 'button';
@@ -671,7 +723,12 @@ const createCarousel = (items, showCatBadge = false) => {
     btnRight.type = 'button';
     btnRight.className = 'carousel-arrow carousel-arrow-right';
     btnRight.innerHTML = '<i class="fas fa-chevron-right"></i>';
-    btnRight.onclick = () => track.scrollBy({ left: Math.max(track.clientWidth * 0.8, 300), behavior: 'smooth' });
+    btnRight.onclick = () => {
+        track.scrollBy({ left: Math.max(track.clientWidth * 0.8, 300), behavior: 'smooth' });
+        if (hasMore && !loading && track.scrollLeft + track.clientWidth >= track.scrollWidth - 600) {
+            loadMore();
+        }
+    };
 
     wrapper.appendChild(btnLeft);
     wrapper.appendChild(track);
@@ -680,63 +737,33 @@ const createCarousel = (items, showCatBadge = false) => {
 };
 
 const renderSourceRows = (container, rows) => {
-    // Group rows by source -> subgroups (movie, series, other)
-    const bySource = new Map();
-    rows.forEach((row) => {
-        if (!bySource.has(row.source)) {
-            bySource.set(row.source, { source: row.source, total: 0, subgroups: [] });
-        }
-        const group = bySource.get(row.source);
-        group.total += row.total || 0;
-        group.subgroups.push(row);
+    const catOrder = { movie: 0, series: 1 };
+    const sortedRows = [...rows].sort((a, b) => {
+        if (a.source === b.source) return (catOrder[a.category] ?? 2) - (catOrder[b.category] ?? 2);
+        return 0;
     });
 
-    const catOrder = { movie: 0, series: 1 };
-
-    bySource.forEach((srcGroup) => {
+    sortedRows.forEach((row) => {
         const section = document.createElement('section');
-        section.className = 'source-section';
+        section.className = `source-section ${row.category ? `cat-${row.category}` : ''}`;
+
+        const catLabel = row.category === 'movie'
+            ? TRANSLATIONS[state.language].filter_movies
+            : (row.category === 'series' ? TRANSLATIONS[state.language].filter_series : '');
+        const catIcon = row.category === 'movie' ? 'fa-film' : (row.category === 'series' ? 'fa-tv' : 'fa-server');
 
         const header = document.createElement('div');
         header.className = 'source-row-header';
         header.innerHTML = `
             <div class="source-row-title">
-                <i class="fas fa-server"></i>
-                <span>${srcGroup.source}</span>
-                <span class="source-row-count">${srcGroup.total}</span>
+                <i class="fas ${catIcon} source-row-icon"></i>
+                <span>${row.source}</span>
+                ${catLabel ? `<span class="source-row-sep">·</span><span class="source-row-cat-text">${catLabel}</span>` : ''}
             </div>
         `;
 
         section.appendChild(header);
-
-        srcGroup.subgroups.sort((a, b) => (catOrder[a.category] ?? 2) - (catOrder[b.category] ?? 2));
-
-        srcGroup.subgroups.forEach((sub) => {
-            const subDiv = document.createElement('div');
-            subDiv.className = `source-subgroup ${sub.category ? `cat-${sub.category}` : ''}`;
-
-            const catLabel = sub.category === 'movie'
-                ? TRANSLATIONS[state.language].filter_movies
-                : (sub.category === 'series' ? TRANSLATIONS[state.language].filter_series : '');
-            const catIcon = sub.category === 'movie' ? 'fa-film' : (sub.category === 'series' ? 'fa-tv' : 'fa-folder');
-
-            if (catLabel) {
-                const subHeader = document.createElement('div');
-                subHeader.className = 'source-sub-header';
-                subHeader.innerHTML = `
-                    <div class="source-sub-title">
-                        <i class="fas ${catIcon} source-row-icon"></i>
-                        <span>${catLabel}</span>
-                        <span class="source-row-count">${sub.total}</span>
-                    </div>
-                `;
-                subDiv.appendChild(subHeader);
-            }
-
-            subDiv.appendChild(createCarousel(sub.items));
-            section.appendChild(subDiv);
-        });
-
+        section.appendChild(createCarousel(row.items, row.source, row.category));
         container.appendChild(section);
     });
 };
@@ -748,7 +775,7 @@ export const renderReleases = (groups) => {
 
     container.innerHTML = '';
 
-    const isCarouselMode = !state.releases.query && !state.releases.source;
+    const isCarouselMode = !state.releases.query;
     if (isCarouselMode) {
         const rows = state.releases.rows || [];
         if (rows.length === 0) {
@@ -765,29 +792,7 @@ export const renderReleases = (groups) => {
         return;
     }
 
-    // Grid mode (search or single source)
-    if (state.releases.source) {
-        const banner = document.createElement('div');
-        banner.className = 'source-filter-banner';
-        banner.innerHTML = `
-            <button type="button" class="btn-back-sources">
-                <i class="fas fa-arrow-left"></i>
-                <span>${TRANSLATIONS[state.language].btn_back_all_sources || 'Toutes les sources'}</span>
-            </button>
-            <div class="source-banner-title">
-                <i class="fas fa-server"></i> ${state.releases.source}
-            </div>
-        `;
-        banner.querySelector('.btn-back-sources').onclick = () => {
-            state.releases.source = '';
-            state.releases.page = 1;
-            const labelEl = document.getElementById('current-source-label');
-            if (labelEl) labelEl.textContent = TRANSLATIONS[state.language].filter_all_sources;
-            fetchData('releases');
-        };
-        container.appendChild(banner);
-    }
-
+    // Grid mode (search)
     if (!groups || groups.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'empty-state';
