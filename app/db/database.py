@@ -116,4 +116,15 @@ async def init_db():
                     print("[DB] Migration: Adding 'html_path' column to 'scraped_urls' table")
                     sync_conn.connection.execute("ALTER TABLE scraped_urls ADD COLUMN html_path TEXT")
 
+            # Performance indexes for large download_links tables
+            for idx_sql in (
+                "CREATE INDEX IF NOT EXISTS ix_dl_status_source_cat_checked ON download_links (status, source_name, category, last_checked)",
+                "CREATE INDEX IF NOT EXISTS ix_dl_imdb_status ON download_links (imdb_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_dl_status_checked ON download_links (status, last_checked)",
+                "CREATE INDEX IF NOT EXISTS ix_dl_title_status ON download_links (title, status)",
+                "CREATE INDEX IF NOT EXISTS ix_dl_lower_title_status ON download_links (lower(title), status)",
+            ):
+                sync_conn.connection.execute(idx_sql)
+            sync_conn.connection.commit()
+
         await conn.run_sync(migrate)

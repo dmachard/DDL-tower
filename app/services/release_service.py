@@ -1,5 +1,6 @@
 import re
 import math
+import time
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from sqlalchemy.future import select
@@ -10,7 +11,14 @@ from app.db.models import DownloadLink, MediaMetadata, ScrapedURL
 from app.core.config import settings
 from app.core.utils import format_size
 
+_BY_SOURCE_CACHE = {}
+_BY_SOURCE_TTL = 30.0
+
+
 class ReleaseService:
+    @staticmethod
+    def invalidate_cache():
+        _BY_SOURCE_CACHE.clear()
     @staticmethod
     async def get_latest_scan_time(db: AsyncSession):
         """Retrieve the most recent scan timestamp from ScrapedURL table."""
@@ -48,7 +56,8 @@ class ReleaseService:
         recent: bool = False,
         hours: int = None,
         show_all: bool = True,
-        local: bool = None
+        local: bool = None,
+        include_total: bool = True
     ):
         """Returns grouped download links (releases) for movies and series."""
         threshold = await ReleaseService.get_threshold(db, recent, hours)
@@ -140,9 +149,11 @@ class ReleaseService:
         )
         
         # Get total count
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total_result = await db.execute(count_stmt)
-        total = total_result.scalar() or 0
+        total = 0
+        if include_total:
+            count_stmt = select(func.count()).select_from(stmt.subquery())
+            total_result = await db.execute(count_stmt)
+            total = total_result.scalar() or 0
         
         # Paginate
         stmt = stmt.order_by(func.max(DownloadLink.last_checked).desc())
@@ -296,6 +307,12 @@ class ReleaseService:
         local: bool = None
     ):
         """Returns grouped releases organized by source for horizontal carousel rows."""
+        cache_key = (limit_per_source, category, resolution, year, network, recent, hours, local)
+        now = time.monotonic()
+        cached = _BY_SOURCE_CACHE.get(cache_key)
+        if cached and (now - cached[0]) < _BY_SOURCE_TTL:
+            return cached[1]
+
         threshold = await ReleaseService.get_threshold(db, recent, hours)
 
         src_stmt = select(
@@ -349,17 +366,23 @@ class ReleaseService:
                 network=network,
                 recent=recent,
                 hours=hours,
-                local=local
+                local=local,
+                include_total=False
             )
             if res["items"]:
+                row_total = len(res["items"])
                 rows.append({
                     "source": src,
                     "category": cat,
-                    "total": res["total"],
+                    "total": row_total,
                     "items": res["items"]
                 })
-                total_items += res["total"]
+                total_items += row_total
 
-        return {"rows": rows, "total": total_items}
+        payload = {"rows": rows, "total": total_items}
+        if len(_BY_SOURCE_CACHE) > 32:
+            _BY_SOURCE_CACHE.clear()
+        _BY_SOURCE_CACHE[cache_key] = (time.monotonic(), payload)
+        return payload
 
 release_service = ReleaseService()

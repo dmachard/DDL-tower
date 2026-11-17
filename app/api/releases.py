@@ -125,5 +125,6 @@ async def delete_releases(req: DeleteRequest, db: AsyncSession = Depends(get_db)
     stmt = delete(DownloadLink).where(DownloadLink.id.in_(req.ids))
     result = await db.execute(stmt)
     await db.commit()
+    release_service.invalidate_cache()
     
     return {"ok": True, "deleted": result.rowcount}

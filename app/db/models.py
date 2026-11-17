@@ -1,5 +1,5 @@
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, Boolean, ForeignKey, Index
 from datetime import datetime, timezone
 from app.db.database import Base
 
@@ -37,6 +37,13 @@ class DownloadLink(Base):
     # Reference to centralized metadata
     imdb_id = Column(String, ForeignKey("media_metadata.imdb_id"), nullable=True)
     metadata_rel = relationship("MediaMetadata", back_populates="links")
+
+    __table_args__ = (
+        Index("ix_dl_status_source_cat_checked", "status", "source_name", "category", "last_checked"),
+        Index("ix_dl_imdb_status", "imdb_id", "status"),
+        Index("ix_dl_status_checked", "status", "last_checked"),
+        Index("ix_dl_title_status", "title", "status"),
+    )
 
 class MediaMetadata(Base):
     __tablename__ = "media_metadata"
