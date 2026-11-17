@@ -54,7 +54,7 @@ export const createReleaseCard = (rel) => {
             return `
             <div class="rel-provider-row ${sub.is_new ? 'is-new' : ''} ${rowExtraClass}" style="${rowStyle}" title="${sub.raw_title || sub.title || sub.filename}">
                 <span class="rel-p-name">${p.name} ${hasError ? '<i class="fas fa-exclamation-circle" style="color: var(--warning); font-size: 11px; margin-left: 4px;" title="Hoster check error"></i>' : ''}</span>
-                <span class="rel-p-count">${p.partsCount}F</span>
+                ${p.partsCount > 1 ? `<span class="rel-p-count">${p.partsCount}F</span>` : ''}
                 <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
                 <div class="rel-p-actions">
                     <button class="rel-p-identify" data-ids="${p.ids.join(',')}" data-title="${sub.title || sub.filename}" title="${TRANSLATIONS[state.language].modal_identify_title}">

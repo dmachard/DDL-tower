@@ -195,6 +195,6 @@ export const setLanguage = (lang) => {
     });
 
     // Re-render current view
-    if (state.currentView === 'releases') renderReleases(state.releases.items);
+    if (state.currentView === 'releases' && (state.releases.rows.length || state.releases.items.length)) renderReleases(state.releases.items);
     else if (state.currentView === 'sources') { fetchStats(); fetchSourcesDashboard(); }
 };

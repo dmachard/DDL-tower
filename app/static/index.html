@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DDL Tower">
-    <link rel="stylesheet" href="static/style.css?v=1.1.6">
+    <link rel="stylesheet" href="static/style.css?v=1.2.2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
@@ -31,7 +31,8 @@
                 <div id="splash-progress-bar" class="splash-progress-bar"></div>
             </div>
             <p class="splash-status" id="splash-status">...</p>
-            <button id="splash-retry-btn" class="btn btn-secondary hidden" style="margin-top: 10px; padding: 6px 14px; font-size: 12px; cursor: pointer;">Recharger</button>
+            <button id="splash-retry-btn" class="btn btn-secondary hidden"
+                style="margin-top: 10px; padding: 6px 14px; font-size: 12px; cursor: pointer;">Recharger</button>
         </div>
     </div>
 
@@ -110,7 +111,8 @@
                     <!-- Global Search Bar in Header -->
                     <div class="search-wrapper global-search">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="target-search" placeholder="Chercher un film, une série..." data-i18n="search_placeholder">
+                        <input type="text" id="target-search" placeholder="Chercher un film, une série..."
+                            data-i18n="search_placeholder">
                     </div>
                 </div>
                 <div class="header-actions">
@@ -123,33 +125,33 @@
                             <div class="select-options">
                                 <div class="option active" data-value="releases">
                                     <span class="option-label-wrapper">
-                                        <i class="fas fa-compass"></i> 
+                                        <i class="fas fa-compass"></i>
                                         <span data-i18n="nav_releases">Explorer</span>
                                     </span>
                                     <span class="nav-count" id="mobile-count-releases">0</span>
                                 </div>
                                 <div class="option" data-value="downloads">
                                     <span class="option-label-wrapper">
-                                        <i class="fas fa-cloud-download-alt"></i> 
+                                        <i class="fas fa-cloud-download-alt"></i>
                                         <span data-i18n="nav_downloads">Downloads</span>
                                     </span>
                                     <span class="nav-count" id="mobile-count-downloads">0</span>
                                 </div>
                                 <div class="option" data-value="quick-scan">
                                     <span class="option-label-wrapper">
-                                        <i class="fas fa-bolt"></i> 
+                                        <i class="fas fa-bolt"></i>
                                         <span data-i18n="nav_quick_scan">Scanner</span>
                                     </span>
                                 </div>
                                 <div class="option" data-value="sources">
                                     <span class="option-label-wrapper">
-                                        <i class="fas fa-satellite-dish"></i> 
+                                        <i class="fas fa-satellite-dish"></i>
                                         <span data-i18n="nav_sources">Sources</span>
                                     </span>
                                 </div>
                                 <div class="option" data-value="errors">
                                     <span class="option-label-wrapper">
-                                        <i class="fas fa-exclamation-circle"></i> 
+                                        <i class="fas fa-exclamation-circle"></i>
                                         <span data-i18n="nav_errors">Errors</span>
                                     </span>
                                     <span class="nav-count" id="mobile-count-errors">0</span>
@@ -186,7 +188,8 @@
                 <div class="view-header">
                     <h2 data-i18n="nav_downloads">Downloads</h2>
                     <div class="header-actions">
-                        <button id="clear-downloads-btn" class="btn btn-secondary" style="color: var(--accent-red); border-color: var(--accent-red);">
+                        <button id="clear-downloads-btn" class="btn btn-secondary"
+                            style="color: var(--accent-red); border-color: var(--accent-red);">
                             <i class="fas fa-trash-alt"></i> <span data-i18n="btn_clear_downloads">Effacer</span>
                         </button>
                     </div>
@@ -201,13 +204,15 @@
                 <div class="view-header">
                     <h2 data-i18n="nav_errors">Errors</h2>
                     <div class="header-actions">
-                        <button id="clear-errors-btn" class="btn btn-secondary" style="color: var(--accent-red); border-color: var(--accent-red);">
+                        <button id="clear-errors-btn" class="btn btn-secondary"
+                            style="color: var(--accent-red); border-color: var(--accent-red);">
                             <i class="fas fa-trash-alt"></i> <span data-i18n="btn_clear">Clear</span>
                         </button>
                     </div>
                 </div>
                 <div class="list-container">
-                    <div id="errors-container" class="scrollable-content" style="max-height: calc(100vh - 240px); overflow-y: auto; padding: 10px;">
+                    <div id="errors-container" class="scrollable-content"
+                        style="max-height: calc(100vh - 240px); overflow-y: auto; padding: 10px;">
                         <!-- Errors populated by JS -->
                     </div>
                     <div id="errors-pagination" class="pagination-bottom pagination-container"></div>
@@ -256,12 +261,15 @@
                                 <input type="text" id="direct-scan-input" placeholder="https://...">
                                 <div id="scan-indicator" class="scan-indicator hidden"></div>
                             </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
-                                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer;">
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+                                <label
+                                    style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer;">
                                     <input type="checkbox" id="direct-scan-force">
                                     <span data-i18n="force_rescan">Force rescan</span>
                                 </label>
-                                <button id="btn-direct-scan" class="btn btn-primary" style="padding: 6px 16px; font-size: 13px; border-radius: 8px;">
+                                <button id="btn-direct-scan" class="btn btn-primary"
+                                    style="padding: 6px 16px; font-size: 13px; border-radius: 8px;">
                                     <i class="fas fa-search"></i> <span data-i18n="btn_scan">Scan</span>
                                 </button>
                             </div>
@@ -278,8 +286,10 @@
                         <h2 data-i18n="quick_scan_title">Quick Extract</h2>
                         <div class="card">
                             <textarea id="quick-scan-textarea"></textarea>
-                            <div class="quick-scan-actions" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                                <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; margin-right: auto;">
+                            <div class="quick-scan-actions"
+                                style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <label
+                                    style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; margin-right: auto;">
                                     <input type="checkbox" id="quick-scan-force">
                                     <span data-i18n="force_rescan">Force rescan</span>
                                 </label>
@@ -456,7 +466,7 @@
     </div>
 
 
-    <script type="module" src="static/app.js?v=17"></script>
+    <script type="module" src="static/app.js?v=19"></script>
 </body>
 
 </html>

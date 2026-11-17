@@ -638,9 +638,19 @@ body {
 
 /* ── Modals & Detail View ─────────────────────────────────────────────────── */
 
+body:has(.modal-overlay.active) {
+    overflow: hidden !important;
+}
+
 .modal-overlay {
     background: rgba(0, 0, 0, 0.72) !important;
     backdrop-filter: blur(8px) !important;
+    overscroll-behavior: contain;
+}
+
+.detail-links-body,
+.modal-body {
+    overscroll-behavior: contain;
 }
 
 .modal-content,
@@ -683,6 +693,8 @@ body {
     border-radius: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 8px !important;
 }
 
@@ -692,21 +704,24 @@ body {
     border-left: 2px solid #fafafa !important;
     border-radius: 0 !important;
     padding: 0 0 0 8px !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
     color: #fafafa !important;
-    min-width: 56px;
+    width: auto !important;
+    min-width: 0 !important;
+    align-self: flex-start !important;
 }
 
 .detail-links-body .seasons-container {
-    gap: 8px !important;
+    gap: 10px !important;
+    width: 100% !important;
 }
 
 .detail-links-body .season-header {
     font-size: 11px !important;
     font-weight: 600 !important;
     color: #71717a !important;
-    margin: 4px 0 4px !important;
+    margin: 2px 0 6px !important;
     padding: 0 !important;
 }
 
@@ -725,11 +740,15 @@ body {
     max-width: none !important;
     background: transparent !important;
     border: none !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-radius: 0 !important;
-    padding: 10px 14px !important;
+    padding: 6px 12px !important;
     box-shadow: none !important;
-    gap: 6px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 10px !important;
 }
 
 .detail-links-body .release-card:last-child {
@@ -737,26 +756,37 @@ body {
 }
 
 .detail-links-body .release-card.is-new {
-    background: rgba(255, 255, 255, 0.025) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
     box-shadow: none !important;
 }
 
 .detail-links-body .rel-meta-top {
-    gap: 6px !important;
-    margin-bottom: 2px !important;
+    display: none !important;
 }
 
 .detail-links-body .rel-tags {
+    display: inline-flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
     gap: 6px !important;
     margin: 0 !important;
 }
 
 .detail-links-body .rel-tag {
-    background: rgba(255, 255, 255, 0.06) !important;
+    background: transparent !important;
     border: none !important;
-    color: #a1a1aa !important;
+    color: #71717a !important;
     font-size: 11px !important;
-    padding: 2px 7px !important;
+    font-weight: 500 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+}
+
+.detail-links-body .rel-tag-se {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #fafafa !important;
+    font-weight: 700 !important;
+    padding: 2px 6px !important;
     border-radius: 4px !important;
 }
 
@@ -767,15 +797,17 @@ body {
 .detail-links-body .rel-providers {
     display: flex !important;
     flex-direction: column !important;
-    gap: 4px !important;
-    margin-top: 4px !important;
+    flex: 1 1 280px !important;
+    gap: 2px !important;
+    margin-top: 0 !important;
 }
 
 .detail-links-body .rel-provider-row {
     display: flex !important;
     align-items: center !important;
+    justify-content: flex-end !important;
     gap: 10px !important;
-    padding: 4px 0 !important;
+    padding: 2px 0 !important;
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
@@ -783,10 +815,17 @@ body {
 }
 
 .detail-links-body .rel-p-name {
-    min-width: 90px;
-    font-size: 13px;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0;
+    font-size: 11px;
     font-weight: 600;
-    color: #fafafa;
+    text-transform: lowercase;
+    color: #a1a1aa;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-left: auto;
 }
 
 .detail-links-body .rel-p-count,
@@ -794,14 +833,14 @@ body {
     white-space: nowrap;
     flex-shrink: 0;
     font-size: 12px;
-    color: #a1a1aa;
+    color: #71717a;
 }
 
 .detail-links-body .rel-p-actions {
-    margin-left: auto !important;
+    margin-left: 4px !important;
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
+    gap: 2px !important;
     flex-shrink: 0;
 }
 

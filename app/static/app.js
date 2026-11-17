@@ -41,14 +41,14 @@ const splash = {
             this.retryBtn.addEventListener('click', () => window.location.reload(true));
         }
 
-        // Safety fallback: auto-dismiss splash after 6s even if an API call hangs
+        // Safety fallback: auto-dismiss splash after 12s even if an API call hangs
         clearTimeout(this.safetyTimer);
         this.safetyTimer = setTimeout(() => {
             if (this.el && !this.el.classList.contains('hidden')) {
                 console.warn('[PWA] Splash timeout reached, auto-dismissing.');
                 this.hide();
             }
-        }, 6000);
+        }, 12000);
     },
     step(key) {
         this.done++;

@@ -90,7 +90,15 @@ async def service_worker():
         }
     )
 
-app.mount("/posters", StaticFiles(directory=settings.POSTER_DIR), name="posters")
+class CachedStaticFiles(StaticFiles):
+    """StaticFiles with long-lived Cache-Control for immutable poster assets."""
+    async def get_response(self, path, scope):
+        resp = await super().get_response(path, scope)
+        if resp.status_code == 200:
+            resp.headers.setdefault("Cache-Control", "public, max-age=2592000")
+        return resp
+
+app.mount("/posters", CachedStaticFiles(directory=settings.POSTER_DIR), name="posters")
 app.mount("/static/error_dumps", StaticFiles(directory="data/error_dumps"), name="error_dumps")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
