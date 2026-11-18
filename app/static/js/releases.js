@@ -443,8 +443,8 @@ export const openReleaseModal = (group, currentSource = '') => {
     const heroBg = document.getElementById('detail-hero-bg');
     const posterEl = document.getElementById('detail-poster');
     if (posterUrl) {
-        heroBg.style.backgroundImage = `url(${posterUrl})`;
-        posterEl.style.backgroundImage = `url(${posterUrl})`;
+        heroBg.style.backgroundImage = `url("${posterUrl}")`;
+        posterEl.style.backgroundImage = `url("${posterUrl}")`;
         posterEl.classList.add('has-poster');
     } else {
         heroBg.style.backgroundImage = '';
@@ -512,12 +512,22 @@ export const openReleaseModal = (group, currentSource = '') => {
 
         const linksBody = document.getElementById('detail-links-body');
         const allUrls = [];
+        Object.values(group.resolutions || {}).forEach(relList => {
+            relList.forEach(rel => {
+                (rel.sub_releases || []).forEach(sub => {
+                    (sub.parts || []).forEach(p => {
+                        if (p.url && !allUrls.includes(p.url)) allUrls.push(p.url);
+                    });
+                });
+            });
+        });
+
         const urlMappings = [];
         linksBody.querySelectorAll('.rel-provider-row').forEach(pRow => {
             const checkBtn = pRow.querySelector('.rel-p-check');
             if (checkBtn) {
                 const urls = checkBtn.getAttribute('data-urls').split('\n');
-                urls.forEach(u => { if (!allUrls.includes(u)) allUrls.push(u); });
+                urls.forEach(u => { if (u && !allUrls.includes(u)) allUrls.push(u); });
                 urlMappings.push({ pRow, urls, checkBtn });
             }
         });
@@ -526,6 +536,20 @@ export const openReleaseModal = (group, currentSource = '') => {
             const res = await import('./api.js').then(m => m.checkUrls(allUrls));
             if (res.ok) {
                 const data = await res.json();
+                const nowIso = new Date().toISOString();
+                Object.values(group.resolutions || {}).forEach(relList => {
+                    relList.forEach(rel => {
+                        (rel.sub_releases || []).forEach(sub => {
+                            (sub.parts || []).forEach(p => {
+                                const info = data[p.url];
+                                if (info && (info.status === 'alive' || info.status === 'dead')) {
+                                    p.status = info.status;
+                                    p.last_checked = nowIso;
+                                }
+                            });
+                        });
+                    });
+                });
                 urlMappings.forEach(mapping => {
                     let isDead = false;
                     let hasError = false;

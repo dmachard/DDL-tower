@@ -1,3 +1,4 @@
+import re
 import httpx
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,6 +19,7 @@ class IdentificationRequest(BaseModel):
     year: Optional[int] = None
     category: str = "movie"
     lang: Optional[str] = None
+    poster_url: Optional[str] = None
     link_ids: List[int]
 
 @router.get("/tmdb/search")
@@ -79,7 +81,8 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
             raise HTTPException(status_code=404, detail="Could not find metadata for provided info")
             
         # 2. Update MediaMetadata or create if new
-        imdb_id = res_data.get("imdb_id") or f"local_{res_data.get('official_title', 'unknown').replace(' ', '_').lower()}"
+        raw_local = re.sub(r'[^a-zA-Z0-9\s]', '', res_data.get('official_title') or 'unknown').lower().strip()
+        imdb_id = res_data.get("imdb_id") or f"local_{raw_local.replace(' ', '_')}"[:40]
         
         stmt = select(MediaMetadata).where(MediaMetadata.imdb_id == imdb_id)
         existing_meta = (await db.execute(stmt)).scalar()
@@ -97,7 +100,7 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
         if res_data.get("plot_fr"): existing_meta.plot_fr = res_data.get("plot_fr")
         if res_data.get("rating"): existing_meta.rating = res_data.get("rating")
             
-        p_url = res_data.get("poster_url")
+        p_url = res_data.get("poster_url") or req.poster_url
         if p_url:
              existing_meta.poster_path = await tmdb_service.download_poster(existing_meta.imdb_id, p_url)
 

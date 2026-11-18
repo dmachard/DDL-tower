@@ -56,7 +56,7 @@ const renderIdentifyResults = (results) => {
     }
 
     identifyResults.innerHTML = results.map(res => `
-        <div class="result-item" data-tmdb-id="${res.id}" data-title="${res.title}" data-year="${res.year}">
+        <div class="result-item" data-tmdb-id="${res.id}" data-title="${res.title}" data-year="${res.year}" data-poster="${res.poster_path || ''}">
             <img src="${res.poster_path || 'static/img/no-poster.svg'}" class="result-poster">
             <div class="result-info">
                 <div class="result-title">${res.title}</div>
@@ -70,6 +70,8 @@ const renderIdentifyResults = (results) => {
             const tmdb_id = item.getAttribute('data-tmdb-id');
             const title = item.getAttribute('data-title');
             const year = item.getAttribute('data-year');
+            const rawPoster = item.getAttribute('data-poster') || '';
+            const poster_url = rawPoster ? rawPoster.replace('/w200/', '/w500/') : null;
 
             const titleConfirm = state.language === 'fr' ? 'Confirmation' : 'Confirmation';
             const confirmMsg = state.language === 'fr'
@@ -90,6 +92,7 @@ const renderIdentifyResults = (results) => {
                             year: parseInt(year) || null,
                             category: selectedCat,
                             lang: state.language,
+                            poster_url,
                             link_ids: identifyTargetLinks
                         })
                     });
