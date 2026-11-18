@@ -621,3 +621,79 @@ async def check_links(request: CheckLinksRequest, db: AsyncSession = Depends(get
         release_service.invalidate_cache()
 
     return result
+
+
+class SourceCheckRequest(BaseModel):
+    source: str
+    category: str | None = None
+    limit: int = 50
+
+
+async def _check_source_links_bg(source: str, urls: List[str]):
+    from sqlalchemy import func, update
+    from app.core.hoster import Hoster
+    from app.db.models import DownloadLink
+    from app.services.release_service import release_service
+
+    try:
+        results = await Hoster().check_links(urls)
+        dead_urls = [u for u, r in results.items() if r.get("status") == "dead"]
+        alive_urls = [u for u, r in results.items() if r.get("status") == "alive"]
+        other_urls = [u for u in urls if u not in dead_urls and u not in alive_urls]
+        now = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            if dead_urls:
+                await db.execute(
+                    update(DownloadLink)
+                    .where(DownloadLink.url.in_(dead_urls))
+                    .values(
+                        status="dead",
+                        created_at=func.coalesce(DownloadLink.created_at, DownloadLink.last_checked),
+                        last_checked=now,
+                    )
+                )
+            if alive_urls:
+                await db.execute(
+                    update(DownloadLink)
+                    .where(DownloadLink.url.in_(alive_urls))
+                    .values(
+                        created_at=func.coalesce(DownloadLink.created_at, DownloadLink.last_checked),
+                        last_checked=now,
+                    )
+                )
+            if other_urls:
+                await db.execute(
+                    update(DownloadLink)
+                    .where(DownloadLink.url.in_(other_urls))
+                    .values(
+                        created_at=func.coalesce(DownloadLink.created_at, DownloadLink.last_checked),
+                        last_checked=now,
+                    )
+                )
+            await db.commit()
+        release_service.invalidate_cache()
+        print(f"[SOURCE-CHECK] {source}: {len(alive_urls)} alive, {len(dead_urls)} dead, {len(other_urls)} error/unknown")
+    except Exception as e:
+        print(f"[SOURCE-CHECK] Error checking {source}: {e}")
+
+
+@router.post("/sources/check-links")
+async def check_source_links(request: SourceCheckRequest, db: AsyncSession = Depends(get_db)):
+    """Queues a background check for the oldest alive links of a source."""
+    from app.db.models import DownloadLink
+
+    cap = max(1, min(request.limit, 200))
+    stmt = (
+        select(DownloadLink.url)
+        .where(DownloadLink.source_name == request.source, DownloadLink.status == "alive")
+    )
+    if request.category:
+        stmt = stmt.where(DownloadLink.category == request.category)
+    stmt = stmt.order_by(DownloadLink.last_checked.asc()).limit(cap)
+
+    urls = [u for u in (await db.execute(stmt)).scalars().all() if u]
+    if not urls:
+        return {"status": "empty", "queued": 0}
+
+    asyncio.create_task(_check_source_links_bg(request.source, urls))
+    return {"status": "started", "queued": len(urls)}

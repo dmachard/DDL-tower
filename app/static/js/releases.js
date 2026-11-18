@@ -547,14 +547,14 @@ export const openReleaseModal = (group, currentSource = '') => {
             relList.forEach(rel => {
                 (rel.sub_releases || []).forEach(sub => {
                     (sub.parts || []).forEach(p => {
-                        if (p.url && !allUrls.includes(p.url)) allUrls.push(p.url);
+                        if (p.url && p.status !== 'dead' && !allUrls.includes(p.url)) allUrls.push(p.url);
                     });
                 });
             });
         });
 
         const urlMappings = [];
-        linksBody.querySelectorAll('.rel-provider-row').forEach(pRow => {
+        linksBody.querySelectorAll('.rel-provider-row:not(.is-dead)').forEach(pRow => {
             const checkBtn = pRow.querySelector('.rel-p-check');
             if (checkBtn) {
                 const urls = checkBtn.getAttribute('data-urls').split('\n');
@@ -562,6 +562,12 @@ export const openReleaseModal = (group, currentSource = '') => {
                 urlMappings.push({ pRow, urls, checkBtn });
             }
         });
+
+        if (allUrls.length === 0) {
+            icon.className = originalClass;
+            btnCheckAll.disabled = false;
+            return;
+        }
 
         try {
             const res = await import('./api.js').then(m => m.checkUrls(allUrls));
@@ -920,9 +926,40 @@ const renderSourceRows = (container, rows) => {
                     <span class="source-row-stat ${newCount > 0 ? 'stat-new' : 'stat-muted'}">${newCount} new</span>
                     <span class="source-row-stat stat-up">${upCount} up</span>
                     <span class="source-row-stat ${downCount > 0 ? 'stat-down' : 'stat-muted'}">${downCount} down</span>
+                    <button type="button" class="source-row-check-btn" title="Vérifier les 50 plus anciens liens"><i class="fas fa-heartbeat"></i></button>
                 </div>
             </div>
         `;
+        const srcCheckBtn = header.querySelector('.source-row-check-btn');
+        if (srcCheckBtn) {
+            srcCheckBtn.onclick = async () => {
+                const icon = srcCheckBtn.querySelector('i');
+                icon.className = 'fas fa-spinner fa-spin';
+                srcCheckBtn.disabled = true;
+                try {
+                    const res = await fetch('/api/sources/check-links', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source: row.source, category: row.category || null, limit: 50 }),
+                    });
+                    if (res.ok) {
+                        icon.className = 'fas fa-check';
+                        srcCheckBtn.classList.add('success');
+                        setTimeout(() => {
+                            icon.className = 'fas fa-heartbeat';
+                            srcCheckBtn.classList.remove('success');
+                        }, 2500);
+                    } else {
+                        icon.className = 'fas fa-heartbeat';
+                    }
+                } catch (err) {
+                    console.error(err);
+                    icon.className = 'fas fa-heartbeat';
+                } finally {
+                    srcCheckBtn.disabled = false;
+                }
+            };
+        }
 
         section.appendChild(header);
         section.appendChild(createCarousel(row.items, row.source, row.category));

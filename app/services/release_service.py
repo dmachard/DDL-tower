@@ -40,13 +40,17 @@ class ReleaseService:
         return datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
     @staticmethod
+    def _release_sig(filename: Optional[str]) -> str:
+        sig = filename or ""
+        sig = re.sub(r'[._ ](?:part|pt|vol|volume)[._ ]?\d+', '', sig, flags=re.I)
+        sig = re.sub(r'[._ ](?:rar|zip|7z|html|mkv|mp4|avi)$', '', sig, flags=re.I)
+        return re.sub(r'[._\s-]+', '.', sig).lower()
+
+    @staticmethod
     def _format_group_releases(releases, threshold):
         release_cards = {}
         for r in releases:
-            sig = r.filename or ""
-            sig = re.sub(r'[._ ](?:part|pt|vol|volume)[._ ]?\d+', '', sig, flags=re.I)
-            sig = re.sub(r'[._ ](?:rar|zip|7z|html|mkv|mp4|avi)$', '', sig, flags=re.I)
-            sig = re.sub(r'[._\s-]+', '.', sig).lower()
+            sig = ReleaseService._release_sig(r.filename)
 
             card_key = (r.season, r.episode, r.resolution, r.language, r.source_name, r.quality, r.codec, r.network, r.v_quality)
             sub_key = sig
@@ -477,29 +481,28 @@ class ReleaseService:
                     for m in meta_res.scalars().all():
                         meta_by_imdb[m.imdb_id] = m
 
-                    if novelty_threshold:
-                        cnt_stmt = select(
-                            DownloadLink.imdb_id,
-                            func.count(DownloadLink.id),
-                            func.sum(case((func.coalesce(DownloadLink.created_at, DownloadLink.last_checked) >= novelty_threshold, 1), else_=0))
-                        ).where(
-                            DownloadLink.imdb_id.in_(imdb_ids),
-                            DownloadLink.source_name == src,
-                            DownloadLink.status == "alive"
-                        ).group_by(DownloadLink.imdb_id)
-                    else:
-                        cnt_stmt = select(
-                            DownloadLink.imdb_id,
-                            func.count(DownloadLink.id),
-                            0
-                        ).where(
-                            DownloadLink.imdb_id.in_(imdb_ids),
-                            DownloadLink.source_name == src,
-                            DownloadLink.status == "alive"
-                        ).group_by(DownloadLink.imdb_id)
-
-                    for cid, c_all, c_new in (await db.execute(cnt_stmt)).all():
-                        counts_by_imdb[cid] = (int(c_all or 0), int(c_new or 0))
+                    cnt_stmt = select(
+                        DownloadLink.imdb_id,
+                        DownloadLink.filename,
+                        DownloadLink.created_at,
+                        DownloadLink.last_checked,
+                    ).where(
+                        DownloadLink.imdb_id.in_(imdb_ids),
+                        DownloadLink.source_name == src,
+                        DownloadLink.status == "alive"
+                    )
+                    rels_by_imdb = {}
+                    for cid, fname, c_at, l_chk in (await db.execute(cnt_stmt)).all():
+                        sig = ReleaseService._release_sig(fname)
+                        sigs = rels_by_imdb.setdefault(cid, {})
+                        is_n = False
+                        added_dt = c_at or l_chk
+                        if novelty_threshold and added_dt:
+                            lc = added_dt.replace(tzinfo=timezone.utc) if added_dt.tzinfo is None else added_dt
+                            is_n = lc >= novelty_threshold
+                        sigs[sig] = sigs.get(sig, False) or is_n
+                    for cid, sigs in rels_by_imdb.items():
+                        counts_by_imdb[cid] = (len(sigs), sum(1 for v in sigs.values() if v))
 
                 items = []
                 for k in ordered_keys:
@@ -509,15 +512,17 @@ class ReleaseService:
                     if rep.imdb_id in counts_by_imdb:
                         all_cnt, new_cnt = counts_by_imdb[rep.imdb_id]
                     else:
-                        all_cnt = len(local_links)
-                        new_cnt = 0
-                        if novelty_threshold:
-                            for l in local_links:
-                                l_added = l.created_at or l.last_checked
-                                if l_added:
-                                    lc = l_added.replace(tzinfo=timezone.utc) if l_added.tzinfo is None else l_added
-                                    if lc >= novelty_threshold:
-                                        new_cnt += 1
+                        local_sigs = {}
+                        for l in local_links:
+                            sig = ReleaseService._release_sig(l.filename)
+                            is_n = False
+                            l_added = l.created_at or l.last_checked
+                            if novelty_threshold and l_added:
+                                lc = l_added.replace(tzinfo=timezone.utc) if l_added.tzinfo is None else l_added
+                                is_n = lc >= novelty_threshold
+                            local_sigs[sig] = local_sigs.get(sig, False) or is_n
+                        all_cnt = len(local_sigs)
+                        new_cnt = sum(1 for v in local_sigs.values() if v)
 
                     group_latest = (local_links[0].created_at or local_links[0].last_checked) if local_links else (rep.created_at or rep.last_checked)
                     items.append({
