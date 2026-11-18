@@ -7,6 +7,24 @@ import { showConfirm } from './modals.js';
 
 // ─── Release Card ─────────────────────────────────────────────────────────────
 
+const syncGroupCheckResults = (group, data) => {
+    if (!group || !group.resolutions) return;
+    const nowIso = new Date().toISOString();
+    Object.values(group.resolutions).forEach(relList => {
+        relList.forEach(rel => {
+            (rel.sub_releases || []).forEach(sub => {
+                (sub.parts || []).forEach(p => {
+                    const info = data[p.url];
+                    if (info && (info.status === 'alive' || info.status === 'dead')) {
+                        p.status = info.status;
+                        p.last_checked = nowIso;
+                    }
+                });
+            });
+        });
+    });
+};
+
 const applyProviderCheckResult = (pRow, checkBtn, isDead, hasError, restoreIconClass = 'fa-heartbeat') => {
     const icon = checkBtn.querySelector('i');
     if (isDead) {
@@ -209,6 +227,10 @@ export const createReleaseCard = (rel) => {
                     }
                     const pRow = btn.closest('.rel-provider-row');
                     applyProviderCheckResult(pRow, btn, isDead, hasError, originalClass);
+                    if (activeDetailContext?.group) {
+                        syncGroupCheckResults(activeDetailContext.group, data);
+                        activeDetailContext.refreshTabs?.();
+                    }
                     
                     const cardElement = btn.closest('.release-card');
                     if (cardElement) {
@@ -542,20 +564,7 @@ export const openReleaseModal = (group, currentSource = '') => {
             const res = await import('./api.js').then(m => m.checkUrls(allUrls));
             if (res.ok) {
                 const data = await res.json();
-                const nowIso = new Date().toISOString();
-                Object.values(group.resolutions || {}).forEach(relList => {
-                    relList.forEach(rel => {
-                        (rel.sub_releases || []).forEach(sub => {
-                            (sub.parts || []).forEach(p => {
-                                const info = data[p.url];
-                                if (info && (info.status === 'alive' || info.status === 'dead')) {
-                                    p.status = info.status;
-                                    p.last_checked = nowIso;
-                                }
-                            });
-                        });
-                    });
-                });
+                syncGroupCheckResults(group, data);
                 urlMappings.forEach(mapping => {
                     let isDead = false;
                     let hasError = false;
@@ -566,6 +575,7 @@ export const openReleaseModal = (group, currentSource = '') => {
                     });
                     applyProviderCheckResult(mapping.pRow, mapping.checkBtn, isDead, hasError, 'fas fa-heartbeat');
                 });
+                activeDetailContext?.refreshTabs?.();
             }
         } catch (err) {
             console.error(err);
@@ -675,20 +685,32 @@ export const openReleaseModal = (group, currentSource = '') => {
     const linksBody = document.getElementById('detail-links-body');
 
     const initTabs = () => {
-        const newCount = countSubReleases(group, 'new');
-        const allCount = countSubReleases(group, 'all');
-        const deadCount = countSubReleases(group, 'dead');
-        document.getElementById('detail-new-count').textContent = newCount;
-        document.getElementById('detail-all-count').textContent = allCount;
-        document.getElementById('detail-dead-count').textContent = deadCount;
+        const updateCounts = () => {
+            const newCount = countSubReleases(group, 'new');
+            const allCount = countSubReleases(group, 'all');
+            const deadCount = countSubReleases(group, 'dead');
+            document.getElementById('detail-new-count').textContent = newCount;
+            document.getElementById('detail-all-count').textContent = allCount;
+            document.getElementById('detail-dead-count').textContent = deadCount;
+            return { newCount, allCount, deadCount };
+        };
 
         const setMode = (mode) => {
+            if (activeDetailContext) activeDetailContext.mode = mode;
             tabNew.classList.toggle('active', mode === 'new');
             tabAll.classList.toggle('active', mode === 'all');
             tabDead?.classList.toggle('active', mode === 'dead');
             renderResolutionList(linksBody, group, mode);
         };
 
+        if (activeDetailContext) {
+            activeDetailContext.refreshTabs = () => {
+                updateCounts();
+                setMode(activeDetailContext.mode || 'all');
+            };
+        }
+
+        const { newCount, allCount } = updateCounts();
         tabNew.onclick = () => setMode('new');
         tabAll.onclick = () => setMode('all');
         if (tabDead) tabDead.onclick = () => setMode('dead');

@@ -77,11 +77,20 @@ async def test_by_source_lightweight_and_detail():
             assert len(movies_only["rows"]) == 1
             assert movies_only["rows"][0]["category"] == "movie"
 
-            # 3. Detail endpoint loads full resolutions + is_new flags on demand
+            # 3. Detail endpoint loads full resolutions + is_new flags + dead links on demand
+            async_db.add(DownloadLink(
+                url="https://1f.test/m_dead", hoster="1fichier", status="dead",
+                filename="Test.Movie.2025.480p.mkv", size="800 MB", size_bytes=800000000,
+                created_at=old_time, last_checked=now, source_name="SrcA", title="Test Movie",
+                category="movie", year=2025, resolution="480p", imdb_id="tt0000001"
+            ))
+            await async_db.commit()
+
             detail = await ReleaseService.get_release_detail(async_db, imdb_id="tt0000001")
-            assert set(detail["resolutions"].keys()) == {"1080p", "720p"}
+            assert set(detail["resolutions"].keys()) == {"1080p", "720p", "480p"}
             assert detail["resolutions"]["1080p"][0]["sub_releases"][0]["is_new"] is True
             assert detail["resolutions"]["720p"][0]["sub_releases"][0]["is_new"] is False
+            assert detail["resolutions"]["480p"][0]["sub_releases"][0]["parts"][0]["status"] == "dead"
 
             # 4. Cache hit + invalidation
             cached = await ReleaseService.get_releases_by_source(async_db, recent=False)
