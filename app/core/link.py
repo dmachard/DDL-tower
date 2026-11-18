@@ -44,11 +44,48 @@ async def _reverify_old_links_bg(urls: List[str]):
                     .values(last_checked=now)
                 )
             await db.commit()
-        if dead_urls:
-            release_service.invalidate_cache()
-            print(f"[LINK] Marked {len(dead_urls)} old link(s) as dead.")
+        release_service.invalidate_cache()
+        print(f"[LINK] Rechecked old link(s): {len(alive_urls)} alive, {len(dead_urls)} dead.")
     except Exception as e:
         print(f"[LINK] Background old-link recheck error: {e}")
+
+
+async def schedule_old_links_recheck(session: AsyncSession, added_links: List[DownloadLink]):
+    """Schedules a capped background check for older alive links of the same title/imdb_id."""
+    if not added_links:
+        return
+    try:
+        imdb_ids = {l.imdb_id for l in added_links if l.imdb_id and not str(l.imdb_id).startswith("local")}
+        titles = {l.title.lower() for l in added_links if l.title}
+        if not imdb_ids and not titles:
+            return
+
+        conds = []
+        if imdb_ids:
+            conds.append(DownloadLink.imdb_id.in_(imdb_ids))
+        if titles:
+            conds.append(func.lower(DownloadLink.title).in_(titles))
+
+        cutoff = datetime.now(timezone.utc) - _RECHECK_MIN_AGE
+        new_urls = {l.url for l in added_links if l.url}
+        stmt = (
+            select(DownloadLink.url)
+            .where(
+                or_(*conds),
+                DownloadLink.status == "alive",
+                DownloadLink.last_checked < cutoff,
+                ~DownloadLink.url.in_(new_urls) if new_urls else True,
+            )
+            .order_by(DownloadLink.last_checked.asc())
+            .limit(_RECHECK_MAX_PER_BATCH)
+        )
+        res = await session.execute(stmt)
+        old_urls = [u for u in res.scalars().all() if isinstance(u, str)]
+        if old_urls:
+            print(f"[LINK] Scheduling background recheck for {len(old_urls)} old link(s)...")
+            asyncio.create_task(_reverify_old_links_bg(old_urls))
+    except Exception as e:
+        print(f"[LINK] Schedule old-link recheck error: {e}")
 
 class LinkManager:
     def __init__(self):
@@ -255,41 +292,5 @@ class LinkManager:
         
         # Final flush for this batch
         await session.flush()
-        await self._schedule_old_links_recheck(session, added_links)
+        await schedule_old_links_recheck(session, added_links)
         return added_links
-
-    async def _schedule_old_links_recheck(self, session: AsyncSession, added_links: List[DownloadLink]):
-        """Schedules a capped background check for older alive links of the same title/imdb_id."""
-        if not added_links:
-            return
-        try:
-            imdb_ids = {l.imdb_id for l in added_links if l.imdb_id and not str(l.imdb_id).startswith("local")}
-            titles = {l.title.lower() for l in added_links if l.title}
-            if not imdb_ids and not titles:
-                return
-
-            conds = []
-            if imdb_ids:
-                conds.append(DownloadLink.imdb_id.in_(imdb_ids))
-            if titles:
-                conds.append(func.lower(DownloadLink.title).in_(titles))
-
-            cutoff = datetime.now(timezone.utc) - _RECHECK_MIN_AGE
-            new_urls = {l.url for l in added_links if l.url}
-            stmt = (
-                select(DownloadLink.url)
-                .where(
-                    or_(*conds),
-                    DownloadLink.status == "alive",
-                    DownloadLink.last_checked < cutoff,
-                    ~DownloadLink.url.in_(new_urls) if new_urls else True,
-                )
-                .order_by(DownloadLink.last_checked.asc())
-                .limit(_RECHECK_MAX_PER_BATCH)
-            )
-            res = await session.execute(stmt)
-            old_urls = [u for u in res.scalars().all() if isinstance(u, str)]
-            if old_urls:
-                asyncio.create_task(_reverify_old_links_bg(old_urls))
-        except Exception:
-            pass

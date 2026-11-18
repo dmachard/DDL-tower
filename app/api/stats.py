@@ -465,6 +465,8 @@ async def rescan_error(url: str, background_tasks: BackgroundTasks, db: AsyncSes
         # Enrichment
         if added:
             await enrichment_service.enrich_links(db, links=added)
+            from app.core.link import schedule_old_links_recheck
+            await schedule_old_links_recheck(db, added)
         
         # Clean up files on disk
         if scraped_entry.screenshot_path:

@@ -182,6 +182,10 @@ async def run_scraper(scraper):
                                 from app.api.downloads import run_download_task
                                 # We run it in the background as a task to not block the scraper
                                 asyncio.create_task(run_download_task(links, is_auto=True))
+
+                        if link_ids:
+                            from app.core.link import schedule_old_links_recheck
+                            await schedule_old_links_recheck(db, links_to_enrich)
     except Exception as e:
         if isinstance(e, RuntimeError) and ("closed" in str(e).lower() or "finalized" in str(e).lower() or "no running" in str(e).lower()):
             return

@@ -342,6 +342,39 @@ class ReleaseService:
         total_items = 0
 
         from app.api.stats import get_source_entry_url
+        from sqlalchemy import case
+
+        row_stats = {}
+        if sources:
+            cols = [
+                DownloadLink.source_name,
+                DownloadLink.category,
+                func.sum(case((DownloadLink.status == "alive", 1), else_=0)).label("alive_links"),
+                func.sum(case((DownloadLink.status == "dead", 1), else_=0)).label("dead_links"),
+                func.count(func.distinct(case((DownloadLink.status == "alive", func.coalesce(DownloadLink.imdb_id, func.lower(DownloadLink.title)))))).label("total_items"),
+            ]
+            if novelty_threshold:
+                cols.append(
+                    func.count(func.distinct(case((
+                        and_(DownloadLink.status == "alive", DownloadLink.last_checked >= novelty_threshold),
+                        func.coalesce(DownloadLink.imdb_id, func.lower(DownloadLink.title)),
+                    )))).label("new_items")
+                )
+            stats_stmt = (
+                select(*cols)
+                .where(DownloadLink.source_name.in_(sources))
+                .group_by(DownloadLink.source_name, DownloadLink.category)
+            )
+            stats_res = await db.execute(stats_stmt)
+            for row_stat in stats_res.all():
+                s_name, s_cat, alive_cnt, dead_cnt, item_cnt = row_stat[:5]
+                new_cnt = row_stat[5] if novelty_threshold else 0
+                row_stats[(s_name, s_cat)] = {
+                    "alive_links": int(alive_cnt or 0),
+                    "dead_links": int(dead_cnt or 0),
+                    "total_items": int(item_cnt or 0),
+                    "new_items": int(new_cnt or 0),
+                }
 
         if year is not None:
             for src, cat in source_cats:
@@ -352,7 +385,18 @@ class ReleaseService:
                 )
                 if res["items"]:
                     row_total = len(res["items"])
-                    rows.append({"source": src, "source_url": get_source_entry_url(src), "category": cat, "total": row_total, "items": res["items"]})
+                    st = row_stats.get((src, cat), {})
+                    rows.append({
+                        "source": src,
+                        "source_url": get_source_entry_url(src),
+                        "category": cat,
+                        "total": row_total,
+                        "total_items": st.get("total_items", row_total),
+                        "new_items": st.get("new_items", 0),
+                        "alive_links": st.get("alive_links", 0),
+                        "dead_links": st.get("dead_links", 0),
+                        "items": res["items"],
+                    })
                     total_items += row_total
         else:
             for src, cat in source_cats:
@@ -488,7 +532,18 @@ class ReleaseService:
                     })
 
                 if items:
-                    rows.append({"source": src, "source_url": get_source_entry_url(src), "category": cat, "total": len(items), "items": items})
+                    st = row_stats.get((src, cat), {})
+                    rows.append({
+                        "source": src,
+                        "source_url": get_source_entry_url(src),
+                        "category": cat,
+                        "total": len(items),
+                        "total_items": st.get("total_items", len(items)),
+                        "new_items": st.get("new_items", 0),
+                        "alive_links": st.get("alive_links", 0),
+                        "dead_links": st.get("dead_links", 0),
+                        "items": items,
+                    })
                     total_items += len(items)
 
         rows.sort(

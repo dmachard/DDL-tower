@@ -383,6 +383,7 @@ const renderResolutionList = (targetEl, group, newOnly) => {
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
 let detailModalBound = false;
+let activeDetailContext = null;
 
 const bindDetailModalClose = () => {
     if (detailModalBound) return;
@@ -390,7 +391,10 @@ const bindDetailModalClose = () => {
     const modal = document.getElementById('release-detail-modal');
     const closeBtn = document.getElementById('close-detail-modal');
     if (!modal) return;
-    const close = () => modal.classList.remove('active');
+    const close = () => {
+        modal.classList.remove('active');
+        activeDetailContext = null;
+    };
     closeBtn?.addEventListener('click', close);
     modal.addEventListener('click', (e) => {
         if (e.target === modal) close();
@@ -398,10 +402,20 @@ const bindDetailModalClose = () => {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal.classList.contains('active')) close();
     });
+    window.addEventListener('release-identified', (e) => {
+        if (!modal.classList.contains('active') || !activeDetailContext) return;
+        const detail = { ...e.detail };
+        if (detail.poster_path) {
+            detail.poster_path = `${detail.poster_path}?t=${Date.now()}`;
+        }
+        Object.assign(activeDetailContext.group, detail);
+        openReleaseModal(activeDetailContext.group, activeDetailContext.currentSource);
+    });
 };
 
 export const openReleaseModal = (group, currentSource = '') => {
     bindDetailModalClose();
+    activeDetailContext = { group, currentSource };
     const modal = document.getElementById('release-detail-modal');
     if (!modal) return;
 
@@ -826,14 +840,16 @@ const renderSourceRows = (container, rows) => {
         const section = document.createElement('section');
         section.className = `source-section ${row.category ? `cat-${row.category}` : ''}`;
 
-        const catLabel = row.category === 'movie'
-            ? TRANSLATIONS[state.language].filter_movies
-            : (row.category === 'series' ? TRANSLATIONS[state.language].filter_series : '');
         const catIcon = row.category === 'movie' ? 'fa-film' : (row.category === 'series' ? 'fa-tv' : 'fa-server');
 
         const sourceHtml = row.source_url
             ? `<a href="${row.source_url}" target="_blank" rel="noopener noreferrer" class="source-row-link">${row.source} <i class="fas fa-external-link-alt"></i></a>`
             : `<span>${row.source}</span>`;
+
+        const itemCount = row.total_items ?? row.total ?? 0;
+        const newCount = row.new_items ?? 0;
+        const upCount = row.alive_links ?? 0;
+        const downCount = row.dead_links ?? 0;
 
         const header = document.createElement('div');
         header.className = 'source-row-header';
@@ -841,7 +857,12 @@ const renderSourceRows = (container, rows) => {
             <div class="source-row-title">
                 <i class="fas ${catIcon} source-row-icon"></i>
                 ${sourceHtml}
-                ${catLabel ? `<span class="source-row-sep">·</span><span class="source-row-cat-text">${catLabel}</span>` : ''}
+                <div class="source-row-stats">
+                    <span class="source-row-stat">${itemCount} ${itemCount > 1 ? 'items' : 'item'}</span>
+                    <span class="source-row-stat ${newCount > 0 ? 'stat-new' : 'stat-muted'}">${newCount} new</span>
+                    <span class="source-row-stat stat-up">${upCount} up</span>
+                    <span class="source-row-stat ${downCount > 0 ? 'stat-down' : 'stat-muted'}">${downCount} down</span>
+                </div>
             </div>
         `;
 

@@ -118,7 +118,18 @@ async def identify_release(req: IdentificationRequest, db: AsyncSession = Depend
         await db.commit()
         from app.services.release_service import release_service
         release_service.invalidate_cache()
-        return {"status": "success", "imdb_id": existing_meta.imdb_id}
+        return {
+            "status": "success",
+            "imdb_id": existing_meta.imdb_id,
+            "official_title": existing_meta.official_title,
+            "title_fr": existing_meta.title_fr,
+            "year": existing_meta.year,
+            "plot_en": existing_meta.plot_en,
+            "plot_fr": existing_meta.plot_fr,
+            "rating": existing_meta.rating,
+            "poster_path": existing_meta.poster_path,
+            "category": "series" if req.category in ["tv", "series"] else "movie",
+        }
     except Exception as e:
         print(f"[API] Identification error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

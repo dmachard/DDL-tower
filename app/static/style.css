@@ -13,7 +13,7 @@
 
 /* View Specific Styles */
 @import url('css/dashboard.css');
-@import url('css/releases.css');
+@import url('css/releases.css?v=3');
 @import url('css/downloads.css');
 @import url('css/sources.css');
 @import url('css/quick-scan.css');

@@ -94,7 +94,9 @@ const renderIdentifyResults = (results) => {
                         })
                     });
                     if (res.ok) {
+                        const data = await res.json();
                         document.getElementById('identify-modal').classList.remove('active');
+                        window.dispatchEvent(new CustomEvent('release-identified', { detail: data }));
                         fetchData('releases');
                     }
                 } catch (err) {

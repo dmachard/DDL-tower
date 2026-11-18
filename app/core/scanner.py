@@ -84,6 +84,8 @@ class DirectScanner:
                         if new_links:
                             await enrichment_service.enrich_links(session, links=new_links)
                             await session.commit()
+                            from app.core.link import schedule_old_links_recheck
+                            await schedule_old_links_recheck(session, new_links)
                         
                         results.append({"url": url, "total": total_found, "new": new_added})
                         
@@ -150,6 +152,8 @@ class DirectScanner:
             if new_links:
                 await enrichment_service.enrich_links(session, links=new_links)
                 await session.commit()
+                from app.core.link import schedule_old_links_recheck
+                await schedule_old_links_recheck(session, new_links)
 
             return {
                 "total_found": total_found,
