@@ -19,13 +19,16 @@ export const createReleaseCard = (rel) => {
             const h = p.hoster || 'Unknown';
             const cleanName = beautifyHoster(h);
             if (!providers[cleanName]) {
-                providers[cleanName] = { name: cleanName, partsCount: 0, totalBytes: 0, urls: [], ids: [], statuses: [] };
+                providers[cleanName] = { name: cleanName, partsCount: 0, totalBytes: 0, urls: [], ids: [], statuses: [], lastChecked: null };
             }
             providers[cleanName].partsCount++;
             providers[cleanName].totalBytes += (p.size_bytes || 0);
             providers[cleanName].urls.push(p.url);
             providers[cleanName].ids.push(p.id);
             if (p.status) providers[cleanName].statuses.push(p.status);
+            if (p.last_checked && (!providers[cleanName].lastChecked || p.last_checked > providers[cleanName].lastChecked)) {
+                providers[cleanName].lastChecked = p.last_checked;
+            }
         });
 
         const providerRows = Object.values(providers).map(p => {
@@ -55,6 +58,7 @@ export const createReleaseCard = (rel) => {
             <div class="rel-provider-row ${sub.is_new ? 'is-new' : ''} ${rowExtraClass}" style="${rowStyle}" title="${sub.raw_title || sub.title || sub.filename}">
                 <span class="rel-p-name">${p.name} ${hasError ? '<i class="fas fa-exclamation-circle" style="color: var(--warning); font-size: 11px; margin-left: 4px;" title="Hoster check error"></i>' : ''}</span>
                 ${p.partsCount > 1 ? `<span class="rel-p-count">${p.partsCount}F</span>` : ''}
+                ${p.lastChecked ? `<span class="rel-p-checked" title="Last checked">${formatDate(p.lastChecked)}</span>` : ''}
                 <span class="rel-p-size">${formatBytes(p.totalBytes)}</span>
                 <div class="rel-p-actions">
                     <button class="rel-p-identify" data-ids="${p.ids.join(',')}" data-title="${sub.title || sub.filename}" title="${TRANSLATIONS[state.language].modal_identify_title}">

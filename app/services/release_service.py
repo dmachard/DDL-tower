@@ -95,7 +95,8 @@ class ReleaseService:
                 sub["parts"].append({
                     "id": r.id, "part": part_num, "size": r.size,
                     "size_bytes": r.size_bytes, "hoster": r.hoster, "url": r.url,
-                    "status": r.status
+                    "status": r.status,
+                    "last_checked": r.last_checked.isoformat() if r.last_checked else None,
                 })
 
         resolutions_map = {}
