@@ -138,6 +138,10 @@ class Settings(BaseSettings):
         return _yaml_config.get("unlockers") or []
 
     @property
+    def HOSTERS(self) -> List[dict]:
+        return _yaml_config.get("hosters") or []
+
+    @property
     def AUTO_DOWNLOAD_MAX_SIZE_BYTES(self) -> Optional[int]:
         if not self.AUTO_DOWNLOAD_LOWER_THAN:
             return None

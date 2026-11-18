@@ -43,6 +43,23 @@ To keep this main README simple, all detailed documentation has been moved to th
 - 📐 **[Architecture](doc/architecture.md)**: Flowcharts of the discovery, tagging, and downloading pipeline.
 - 📡 **[RSS Feeds](doc/rss.md)**: Feed endpoints, query filters, and categories.
 
+### Generic Hosters (`config.yaml`)
+
+HTTP-based hoster checks can be configured declaratively under `hosters:` in `config/config.yaml` (specialized Python services like `1fichier.com`, `turbobit.net`, `dailyuploads.net`, and `youtube.com` remain built-in unless overridden):
+
+```yaml
+hosters:
+  - name: "rapidgator"
+    domains: ["rapidgator.net"]
+    allow_redirects: false
+    dead_if_status: [301, 302, 303, 307, 308, 404]
+    dead_if_text: ["404 File not found", "Page not found"]
+    error_if_text: ["challenges.cloudflare.com", "turnstile"]
+    alive_if_text: ["File size:"]
+    extract-filename_regex: 'Downloading:.*?<a[^>]*>([^<]+)</a>'
+    extract-size_regex: 'File size:.*?<strong>([^<]+)</strong>'
+```
+
 ## For developers
 
 Running tests

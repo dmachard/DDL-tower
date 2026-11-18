@@ -331,7 +331,17 @@ async def test_link_manager_force_rescan_rechecks_known_link():
 
 @pytest.mark.asyncio
 async def test_one_fichier_new_layout_parsing():
-    from app.hosters.one_fichier import OneFichierService
+    from app.core.hoster import GenericHoster
+
+    gh = GenericHoster({
+        "name": "1fichier",
+        "domains": ["1fichier.com"],
+        "use_browser": True,
+        "wait_after_load": 0,
+        "dead_if_text": ["not found", "demande n'existe pas"],
+        "extract-filename_regex": [r'class="tier-name"[^>]*>([^<]+)</span>'],
+        "extract-size_regex": [r'class="tier-feat"[^>]*>([^<]+)</span>'],
+    })
 
     html_sample = """
     <div class="tiers">
@@ -349,37 +359,15 @@ async def test_one_fichier_new_layout_parsing():
     mock_page.goto = AsyncMock()
     mock_page.close = AsyncMock()
 
-    tier_name_mock = AsyncMock()
-    tier_name_mock.count = AsyncMock(return_value=1)
-    tier_name_mock.inner_text = AsyncMock(return_value="Movie.Title.2024.1080p.mkv")
-
-    tier_feat_mock = AsyncMock()
-    tier_feat_mock.count = AsyncMock(return_value=1)
-    tier_feat_mock.inner_text = AsyncMock(return_value="1.50 Go")
-
-    def locator_mock(selector):
-        m = MagicMock()
-        if selector == '.tier-name':
-            m.first = tier_name_mock
-        elif selector == '.tier-feat':
-            m.first = tier_feat_mock
-        else:
-            default_mock = AsyncMock()
-            default_mock.count = AsyncMock(return_value=0)
-            m.first = default_mock
-        return m
-
-    mock_page.locator = MagicMock(side_effect=locator_mock)
-
     mock_browser = AsyncMock()
     mock_browser.new_page.return_value = mock_page
 
     with patch("app.services.browser_manager.browser_manager.get_browser", return_value=mock_browser), \
-         patch("app.hosters.one_fichier.async_playwright") as mock_playwright:
+         patch("playwright.async_api.async_playwright") as mock_playwright:
         mock_p_instance = AsyncMock()
         mock_playwright.return_value.__aenter__.return_value = mock_p_instance
 
-        res = await OneFichierService.check("https://1fichier.com/?testdummy123")
+        res = await gh.check("https://1fichier.com/?testdummy123")
         assert res["status"] == "alive"
         assert res["filename"] == "Movie.Title.2024.1080p.mkv"
         assert res["size"] == 1610612736
