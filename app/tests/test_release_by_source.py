@@ -66,12 +66,14 @@ async def test_by_source_lightweight_and_detail():
             by_cat = {r["category"]: r for r in res["rows"]}
             assert set(by_cat.keys()) == {"movie", "series"}
 
-            movie_item = by_cat["movie"]["items"][0]
+            movie_item = next(i for i in by_cat["movie"]["items"] if i["title"] == "Test Movie")
+            dead_item = next(i for i in by_cat["movie"]["items"] if i["title"] == "Dead Movie")
             assert movie_item["resolutions"] is None
             assert movie_item["all_count"] == 2
             assert movie_item["new_count"] == 1
             assert movie_item["poster_path"] == "tt0000001.jpg"
-            assert by_cat["movie"]["total_items"] == 1
+            assert dead_item["all_count"] == 0
+            assert by_cat["movie"]["total_items"] == 2
             assert by_cat["movie"]["new_items"] == 1
             assert by_cat["movie"]["alive_links"] == 2
             assert by_cat["movie"]["dead_links"] == 1

@@ -629,7 +629,10 @@ class SourceCheckRequest(BaseModel):
     limit: int = 50
 
 
-async def _check_source_links_bg(source: str, urls: List[str]):
+_SOURCE_CHECK_JOBS = {}
+
+
+async def _check_source_links_bg(job_key: str, source: str, urls: List[str]):
     from sqlalchemy import func, update
     from app.core.hoster import Hoster
     from app.db.models import DownloadLink
@@ -675,12 +678,24 @@ async def _check_source_links_bg(source: str, urls: List[str]):
         print(f"[SOURCE-CHECK] {source}: {len(alive_urls)} alive, {len(dead_urls)} dead, {len(other_urls)} error/unknown")
     except Exception as e:
         print(f"[SOURCE-CHECK] Error checking {source}: {e}")
+    finally:
+        _SOURCE_CHECK_JOBS[job_key] = {"running": False}
+
+
+@router.get("/sources/check-links/status")
+async def get_source_check_status(source: str, category: str | None = None):
+    job_key = f"{source}:{category or ''}"
+    return _SOURCE_CHECK_JOBS.get(job_key, {"running": False})
 
 
 @router.post("/sources/check-links")
 async def check_source_links(request: SourceCheckRequest, db: AsyncSession = Depends(get_db)):
     """Queues a background check for the oldest alive links of a source."""
     from app.db.models import DownloadLink
+
+    job_key = f"{request.source}:{request.category or ''}"
+    if _SOURCE_CHECK_JOBS.get(job_key, {}).get("running"):
+        return {"status": "running", "queued": _SOURCE_CHECK_JOBS[job_key].get("queued", 0)}
 
     cap = max(1, min(request.limit, 200))
     stmt = (
@@ -695,5 +710,6 @@ async def check_source_links(request: SourceCheckRequest, db: AsyncSession = Dep
     if not urls:
         return {"status": "empty", "queued": 0}
 
-    asyncio.create_task(_check_source_links_bg(request.source, urls))
+    _SOURCE_CHECK_JOBS[job_key] = {"running": True, "queued": len(urls)}
+    asyncio.create_task(_check_source_links_bg(job_key, request.source, urls))
     return {"status": "started", "queued": len(urls)}

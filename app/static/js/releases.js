@@ -777,7 +777,9 @@ const createPosterCard = (group, showCatBadge = true, sourceName = '') => {
     const addedDate = group.last_updated ? formatDate(group.last_updated) : '';
     const countBadgeHtml = newCount > 0
         ? `<span class="poster-badge-new" title="${newCount} ${TRANSLATIONS[state.language].tab_new_links || 'nouveautés'}">+${newCount}</span>`
-        : (allCount > 0 ? `<span class="poster-badge-count" title="${allCount} ${TRANSLATIONS[state.language].tab_all_links || 'liens'}">${allCount}</span>` : '<span></span>');
+        : (allCount > 0
+            ? `<span class="poster-badge-count" title="${allCount} ${TRANSLATIONS[state.language].tab_all_links || 'liens'}">${allCount}</span>`
+            : `<span class="poster-badge-dead" title="${TRANSLATIONS[state.language].tab_dead_links || 'Liens morts'}"><i class="fas fa-heart-broken"></i></span>`);
 
     card.innerHTML = `
         ${posterUrl ? `<img class="poster-img" src="${posterUrl}" loading="lazy" alt="">` : ''}
@@ -943,21 +945,36 @@ const renderSourceRows = (container, rows) => {
                         body: JSON.stringify({ source: row.source, category: row.category || null, limit: 50 }),
                     });
                     if (res.ok) {
-                        icon.className = 'fas fa-check';
-                        srcCheckBtn.classList.add('success');
-                        setTimeout(() => {
+                        const data = await res.json();
+                        if (data.status === 'empty') {
                             icon.className = 'fas fa-heartbeat';
-                            srcCheckBtn.classList.remove('success');
-                        }, 2500);
-                    } else {
-                        icon.className = 'fas fa-heartbeat';
+                            srcCheckBtn.disabled = false;
+                            return;
+                        }
+                        const statusUrl = `/api/sources/check-links/status?source=${encodeURIComponent(row.source)}${row.category ? `&category=${encodeURIComponent(row.category)}` : ''}`;
+                        const poll = setInterval(async () => {
+                            try {
+                                const sr = await fetch(statusUrl);
+                                if (sr.ok) {
+                                    const sd = await sr.json();
+                                    if (!sd.running) {
+                                        clearInterval(poll);
+                                        fetchData('releases');
+                                    }
+                                }
+                            } catch (_) {
+                                clearInterval(poll);
+                                icon.className = 'fas fa-heartbeat';
+                                srcCheckBtn.disabled = false;
+                            }
+                        }, 3000);
+                        return;
                     }
                 } catch (err) {
                     console.error(err);
-                    icon.className = 'fas fa-heartbeat';
-                } finally {
-                    srcCheckBtn.disabled = false;
                 }
+                icon.className = 'fas fa-heartbeat';
+                srcCheckBtn.disabled = false;
             };
         }
 

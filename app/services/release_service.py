@@ -170,7 +170,7 @@ class ReleaseService:
             func.max(MediaMetadata.title_fr).label("title_fr"),
             func.max(MediaMetadata.year).label("official_year"),
             func.coalesce(DownloadLink.imdb_id, MediaMetadata.imdb_id).label("imdb_id")
-        ).where(DownloadLink.status == "alive")
+        ).where(DownloadLink.status.in_(["alive", "dead"]))
         
         stmt = stmt.outerjoin(MediaMetadata, DownloadLink.imdb_id == MediaMetadata.imdb_id)
         
@@ -328,7 +328,7 @@ class ReleaseService:
         novelty_threshold = threshold or await ReleaseService.get_threshold(db, True, hours)
 
         src_stmt = select(DownloadLink.source_name).distinct().where(
-            DownloadLink.status == "alive",
+            DownloadLink.status.in_(["alive", "dead"]),
             DownloadLink.source_name != None,
             DownloadLink.source_name != ""
         )
@@ -357,7 +357,7 @@ class ReleaseService:
                 DownloadLink.category,
                 func.sum(case((DownloadLink.status == "alive", 1), else_=0)).label("alive_links"),
                 func.sum(case((DownloadLink.status == "dead", 1), else_=0)).label("dead_links"),
-                func.count(func.distinct(case((DownloadLink.status == "alive", func.coalesce(DownloadLink.imdb_id, func.lower(DownloadLink.title)))))).label("total_items"),
+                func.count(func.distinct(case((DownloadLink.status.in_(["alive", "dead"]), func.coalesce(DownloadLink.imdb_id, func.lower(DownloadLink.title)))))).label("total_items"),
             ]
             if novelty_threshold:
                 cols.append(
@@ -411,7 +411,7 @@ class ReleaseService:
             for src, cat in source_cats:
                 # Fast index-ordered scan on newest rows per (source, category)
                 q_stmt = select(DownloadLink).where(
-                    DownloadLink.status == "alive",
+                    DownloadLink.status.in_(["alive", "dead"]),
                     DownloadLink.source_name == src,
                     DownloadLink.category == cat
                 )
@@ -514,6 +514,8 @@ class ReleaseService:
                     else:
                         local_sigs = {}
                         for l in local_links:
+                            if l.status != "alive":
+                                continue
                             sig = ReleaseService._release_sig(l.filename)
                             is_n = False
                             l_added = l.created_at or l.last_checked
