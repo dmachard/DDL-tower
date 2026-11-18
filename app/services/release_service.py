@@ -342,7 +342,7 @@ class ReleaseService:
 
         from app.api.stats import get_source_entry_url
 
-        if year is not None or local is not None:
+        if year is not None:
             for src, cat in source_cats:
                 res = await ReleaseService.get_grouped_releases(
                     db=db, page=1, limit=limit_per_source, category=cat, source=src,
@@ -361,6 +361,18 @@ class ReleaseService:
                     DownloadLink.source_name == src,
                     DownloadLink.category == cat
                 )
+                if local is True:
+                    q_stmt = q_stmt.where(or_(
+                        DownloadLink.imdb_id == None,
+                        DownloadLink.imdb_id == "N/A",
+                        DownloadLink.imdb_id.like("local%")
+                    ))
+                elif local is False:
+                    q_stmt = q_stmt.where(and_(
+                        DownloadLink.imdb_id != None,
+                        DownloadLink.imdb_id != "N/A",
+                        ~DownloadLink.imdb_id.like("local%")
+                    ))
                 if resolution:
                     if resolution == "2160p":
                         q_stmt = q_stmt.where(
@@ -421,6 +433,7 @@ class ReleaseService:
                             func.sum(case((DownloadLink.last_checked >= novelty_threshold, 1), else_=0))
                         ).where(
                             DownloadLink.imdb_id.in_(imdb_ids),
+                            DownloadLink.source_name == src,
                             DownloadLink.status == "alive"
                         ).group_by(DownloadLink.imdb_id)
                     else:
@@ -430,6 +443,7 @@ class ReleaseService:
                             0
                         ).where(
                             DownloadLink.imdb_id.in_(imdb_ids),
+                            DownloadLink.source_name == src,
                             DownloadLink.status == "alive"
                         ).group_by(DownloadLink.imdb_id)
 

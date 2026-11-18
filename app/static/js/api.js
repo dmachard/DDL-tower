@@ -129,7 +129,8 @@ export const fetchSources = async (loadFilters, updateTagsUI) => {
 
 export const fetchYears = async (loadFilters, updateTagsUI) => {
     try {
-        state.years = [2026, 2025, 2024];
+        const currentYear = new Date().getFullYear();
+        state.years = [currentYear, currentYear - 1];
         loadFilters('releases');
         updateTagsUI('filter-tags-releases', state.releases);
     } catch (err) {
@@ -183,6 +184,14 @@ export const deleteReleases = async (ids) => {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids })
+    });
+};
+
+export const updateReleaseSource = async (ids, sourceName) => {
+    return fetch('/api/releases/source', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, source_name: sourceName })
     });
 };
 

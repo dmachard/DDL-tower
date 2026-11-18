@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from app.core.scheduler import run_scrapers
@@ -15,9 +15,10 @@ class ExtractRequest(BaseModel):
     force: bool = False
 
 @router.post("/scan/force")
-async def force_scan(background_tasks: BackgroundTasks):
-    background_tasks.add_task(run_scrapers)
-    return {"message": "Full discovery scan manually triggered."}
+async def force_scan(background_tasks: BackgroundTasks, source: Optional[str] = None):
+    background_tasks.add_task(run_scrapers, source_name=source)
+    msg = f"Scan triggered for source '{source}'." if source else "Full discovery scan manually triggered."
+    return {"message": msg}
 
 @router.post("/scan/direct")
 async def direct_scan(request: ScanRequest, background_tasks: BackgroundTasks):

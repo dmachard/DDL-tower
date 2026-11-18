@@ -1,7 +1,7 @@
 import math
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, delete
+from sqlalchemy import func, or_, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import List
@@ -140,3 +140,23 @@ async def delete_releases(req: DeleteRequest, db: AsyncSession = Depends(get_db)
     release_service.invalidate_cache()
     
     return {"ok": True, "deleted": result.rowcount}
+
+class UpdateSourceRequest(BaseModel):
+    ids: List[int]
+    source_name: str
+
+@router.patch("/releases/source")
+async def update_release_source(req: UpdateSourceRequest, db: AsyncSession = Depends(get_db)):
+    """Moves download links to another source_name."""
+    if not req.ids or not req.source_name.strip():
+        return {"ok": False, "updated": 0}
+
+    stmt = (
+        update(DownloadLink)
+        .where(DownloadLink.id.in_(req.ids))
+        .values(source_name=req.source_name.strip())
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    release_service.invalidate_cache()
+    return {"ok": True, "updated": result.rowcount}

@@ -709,6 +709,24 @@ body:has(.modal-overlay.active) {
     border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.detail-source-select {
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: #0b0b0c;
+    color: #e4e4e7;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+}
+
+.detail-source-select:hover {
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
 .detail-tab {
     border-radius: 6px;
 }

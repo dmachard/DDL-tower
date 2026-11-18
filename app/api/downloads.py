@@ -290,7 +290,7 @@ async def run_download_task(urls: List[str], is_auto: bool = False):
     url_to_meta = {}
     async with AsyncSessionLocal() as session:
         from app.db.models import DownloadLink, MediaMetadata
-        from sqlalchemy import select, func
+        from sqlalchemy import func
 
         # Determine title priority based on default language
         if settings.DEFAULT_LANGUAGE == "fr":

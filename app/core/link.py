@@ -1,13 +1,54 @@
 import asyncio
 import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List
+from sqlalchemy import func, or_, update
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import DownloadLink
 from app.core.hoster import Hoster
 from app.core.utils import format_size
+
+_RECHECK_MIN_AGE = timedelta(hours=24)
+_RECHECK_MAX_PER_BATCH = 20
+
+
+async def _reverify_old_links_bg(urls: List[str]):
+    """Background check of older alive links; marks confirmed dead links."""
+    if not urls:
+        return
+    try:
+        from app.db.database import AsyncSessionLocal
+        from app.services.release_service import release_service
+
+        hoster = Hoster()
+        results = await hoster.check_links(urls)
+        dead_urls = [u for u, r in results.items() if r.get("status") == "dead"]
+        alive_urls = [u for u, r in results.items() if r.get("status") == "alive"]
+        if not dead_urls and not alive_urls:
+            return
+
+        now = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            if dead_urls:
+                await db.execute(
+                    update(DownloadLink)
+                    .where(DownloadLink.url.in_(dead_urls))
+                    .values(status="dead", last_checked=now)
+                )
+            if alive_urls:
+                await db.execute(
+                    update(DownloadLink)
+                    .where(DownloadLink.url.in_(alive_urls))
+                    .values(last_checked=now)
+                )
+            await db.commit()
+        if dead_urls:
+            release_service.invalidate_cache()
+            print(f"[LINK] Marked {len(dead_urls)} old link(s) as dead.")
+    except Exception as e:
+        print(f"[LINK] Background old-link recheck error: {e}")
 
 class LinkManager:
     def __init__(self):
@@ -214,4 +255,41 @@ class LinkManager:
         
         # Final flush for this batch
         await session.flush()
+        await self._schedule_old_links_recheck(session, added_links)
         return added_links
+
+    async def _schedule_old_links_recheck(self, session: AsyncSession, added_links: List[DownloadLink]):
+        """Schedules a capped background check for older alive links of the same title/imdb_id."""
+        if not added_links:
+            return
+        try:
+            imdb_ids = {l.imdb_id for l in added_links if l.imdb_id and not str(l.imdb_id).startswith("local")}
+            titles = {l.title.lower() for l in added_links if l.title}
+            if not imdb_ids and not titles:
+                return
+
+            conds = []
+            if imdb_ids:
+                conds.append(DownloadLink.imdb_id.in_(imdb_ids))
+            if titles:
+                conds.append(func.lower(DownloadLink.title).in_(titles))
+
+            cutoff = datetime.now(timezone.utc) - _RECHECK_MIN_AGE
+            new_urls = {l.url for l in added_links if l.url}
+            stmt = (
+                select(DownloadLink.url)
+                .where(
+                    or_(*conds),
+                    DownloadLink.status == "alive",
+                    DownloadLink.last_checked < cutoff,
+                    ~DownloadLink.url.in_(new_urls) if new_urls else True,
+                )
+                .order_by(DownloadLink.last_checked.asc())
+                .limit(_RECHECK_MAX_PER_BATCH)
+            )
+            res = await session.execute(stmt)
+            old_urls = [u for u in res.scalars().all() if isinstance(u, str)]
+            if old_urls:
+                asyncio.create_task(_reverify_old_links_bg(old_urls))
+        except Exception:
+            pass

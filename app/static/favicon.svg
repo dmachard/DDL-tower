@@ -1,9 +1,5 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Minimalist Black & White Tower -->
-  <rect width="32" height="32" rx="16" fill="black"/>
-  
-  <!-- Stacked blocks forming a tower -->
-  <rect x="10" y="22" width="12" height="4" rx="1" fill="white"/>
-  <rect x="12" y="15" width="8" height="6" rx="1" fill="white"/>
-  <rect x="14" y="6" width="4" height="8" rx="1" fill="white"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="#18181b" stroke="#27272a"/>
+  <path d="M16 7V19M16 19L11 14M16 19L21 14" stroke="#fafafa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M9 22.5V23.5C9 24.3284 9.67157 25 10.5 25H21.5C22.3284 25 23 24.3284 23 23.5V22.5" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

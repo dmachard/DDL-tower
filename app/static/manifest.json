@@ -1,6 +1,6 @@
 {
-  "name": "DLtower",
-  "short_name": "DLtower",
+  "name": "LinkTower",
+  "short_name": "LinkTower",
   "description": "Download manager and scraper dashboard",
   "start_url": "/",
   "scope": "/",

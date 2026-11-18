@@ -2,7 +2,7 @@ import { TRANSLATIONS } from './i18n.js';
 import { state } from './state.js';
 import { formatSeasonEp, formatLangs, formatBytes, beautifyHoster, getImdbUrl, renderRatingDots, formatDate } from './helpers.js';
 import { renderPagination } from './pagination.js';
-import { downloadUrls, deleteReleases, fetchData } from './api.js';
+import { downloadUrls, deleteReleases, fetchData, updateReleaseSource } from './api.js';
 import { showConfirm } from './modals.js';
 
 // ─── Release Card ─────────────────────────────────────────────────────────────
@@ -396,7 +396,7 @@ const bindDetailModalClose = () => {
     });
 };
 
-export const openReleaseModal = (group) => {
+export const openReleaseModal = (group, currentSource = '') => {
     bindDetailModalClose();
     const modal = document.getElementById('release-detail-modal');
     if (!modal) return;
@@ -579,6 +579,51 @@ export const openReleaseModal = (group) => {
     };
     actionsEl.appendChild(btnDelete);
 
+    if (state.sources && state.sources.length > 0) {
+        const srcSelect = document.createElement('select');
+        srcSelect.className = 'detail-source-select';
+        srcSelect.title = 'Changer la source';
+        const detectedSource = currentSource || (() => {
+            for (const list of Object.values(group.resolutions || {})) {
+                if (list.length && list[0].source) return list[0].source;
+            }
+            return '';
+        })();
+
+        const optEmpty = document.createElement('option');
+        optEmpty.value = '';
+        optEmpty.textContent = detectedSource || 'Source...';
+        srcSelect.appendChild(optEmpty);
+
+        state.sources.forEach(src => {
+            const opt = document.createElement('option');
+            opt.value = src;
+            opt.textContent = src;
+            if (src === detectedSource) opt.selected = true;
+            srcSelect.appendChild(opt);
+        });
+
+        srcSelect.onchange = async () => {
+            const newSource = srcSelect.value;
+            if (!newSource || newSource === detectedSource) return;
+            const ids = collectGroupIds(group);
+            if (!ids.length) return;
+            srcSelect.disabled = true;
+            try {
+                const res = await updateReleaseSource(ids, newSource);
+                if (res.ok) {
+                    modal.classList.remove('active');
+                    fetchData('releases');
+                }
+            } catch (err) {
+                console.error('Failed to update source:', err);
+            } finally {
+                srcSelect.disabled = false;
+            }
+        };
+        actionsEl.appendChild(srcSelect);
+    }
+
     const tabNew = document.getElementById('detail-tab-new');
     const tabAll = document.getElementById('detail-tab-all');
     const linksBody = document.getElementById('detail-links-body');
@@ -632,7 +677,7 @@ export const openReleaseModal = (group) => {
 
 // ─── Poster Card ──────────────────────────────────────────────────────────────
 
-const createPosterCard = (group, showCatBadge = true) => {
+const createPosterCard = (group, showCatBadge = true, sourceName = '') => {
     const card = document.createElement('div');
     const posterUrl = resolvePosterUrl(group.poster_path);
     const newCount = countSubReleases(group, true);
@@ -677,7 +722,7 @@ const createPosterCard = (group, showCatBadge = true) => {
         `}
     `;
 
-    card.onclick = () => openReleaseModal(group);
+    card.onclick = () => openReleaseModal(group, sourceName);
     return card;
 };
 
@@ -689,7 +734,7 @@ const createCarousel = (items, source, category, showCatBadge = false) => {
 
     const track = document.createElement('div');
     track.className = 'carousel-track';
-    items.forEach(group => track.appendChild(createPosterCard(group, showCatBadge)));
+    items.forEach(group => track.appendChild(createPosterCard(group, showCatBadge, source)));
 
     let page = 1;
     let loading = false;
@@ -723,7 +768,7 @@ const createCarousel = (items, source, category, showCatBadge = false) => {
             const nextItems = data.items || [];
             if (nextItems.length > 0) {
                 page += 1;
-                nextItems.forEach(group => track.appendChild(createPosterCard(group, showCatBadge)));
+                nextItems.forEach(group => track.appendChild(createPosterCard(group, showCatBadge, source)));
                 hasMore = page < (data.pages || 0);
             } else {
                 hasMore = false;
