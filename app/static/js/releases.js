@@ -156,6 +156,7 @@ export const createReleaseCard = (rel) => {
             <i class="fas fa-chevron-down rel-expand-icon"></i>
         </div>
         <div class="rel-tags">
+            ${rel.source ? `<span class="rel-tag rel-tag-source">${rel.source_url ? `<a href="${rel.source_url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${rel.source}</a>` : rel.source}</span>` : ''}
             ${seasonEp ? `<span class="rel-tag rel-tag-se">${seasonEp}</span>` : ''}
             ${rel.language && rel.language !== 'None' ? `<span class="rel-tag rel-tag-lang">${formatLangs(rel.language)}</span>` : ''}
             ${rel.network ? `<span class="rel-tag rel-tag-network">${rel.network}</span>` : ''}
@@ -779,7 +780,7 @@ const createPosterCard = (group, showCatBadge = true, sourceName = '') => {
         ? `<span class="poster-badge-new" title="${newCount} ${TRANSLATIONS[state.language].tab_new_links || 'nouveautés'}">+${newCount}</span>`
         : (allCount > 0
             ? `<span class="poster-badge-count" title="${allCount} ${TRANSLATIONS[state.language].tab_all_links || 'liens'}">${allCount}</span>`
-            : `<span class="poster-badge-dead" title="${TRANSLATIONS[state.language].tab_dead_links || 'Liens morts'}"><i class="fas fa-heart-broken"></i></span>`);
+            : `<span class="poster-badge-dead" title="${TRANSLATIONS[state.language].tab_dead_links || 'Liens morts'}">0</span>`);
 
     card.innerHTML = `
         ${posterUrl ? `<img class="poster-img" src="${posterUrl}" loading="lazy" alt="">` : ''}
