@@ -71,6 +71,10 @@ async def test_by_source_lightweight_and_detail():
             assert movie_item["all_count"] == 2
             assert movie_item["new_count"] == 1
             assert movie_item["poster_path"] == "tt0000001.jpg"
+            assert by_cat["movie"]["total_items"] == 1
+            assert by_cat["movie"]["new_items"] == 1
+            assert by_cat["movie"]["alive_links"] == 2
+            assert by_cat["movie"]["dead_links"] == 1
 
             # 2. Category filter returns only requested category
             movies_only = await ReleaseService.get_releases_by_source(async_db, category="movie", recent=False)

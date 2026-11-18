@@ -18,6 +18,7 @@ const syncGroupCheckResults = (group, data) => {
                     if (info && (info.status === 'alive' || info.status === 'dead')) {
                         p.status = info.status;
                         p.last_checked = nowIso;
+                        if (activeDetailContext) activeDetailContext.dirty = true;
                     }
                 });
             });
@@ -330,13 +331,11 @@ const collectGroupIds = (group) => {
     return ids;
 };
 
-const isSubDead = (sub) => (sub.parts || []).some(p => p.status === 'dead');
-
-const matchesTabMode = (sub, mode) => {
-    const dead = isSubDead(sub);
-    if (mode === 'dead') return dead;
-    if (mode === 'new' || mode === true) return !dead && !!sub.is_new;
-    return !dead;
+const filterSubParts = (sub, mode) => {
+    const parts = sub.parts || [];
+    if (mode === 'dead') return parts.filter(p => p.status === 'dead');
+    if (mode === 'new' || mode === true) return sub.is_new ? parts.filter(p => p.status !== 'dead') : [];
+    return parts.filter(p => p.status !== 'dead');
 };
 
 const countSubReleases = (group, mode = 'all') => {
@@ -348,7 +347,7 @@ const countSubReleases = (group, mode = 'all') => {
     Object.values(group.resolutions).forEach(relList => {
         relList.forEach(rel => {
             rel.sub_releases.forEach(sub => {
-                if (matchesTabMode(sub, mode)) count++;
+                if (filterSubParts(sub, mode).length > 0) count++;
             });
         });
     });
@@ -366,7 +365,9 @@ const renderResolutionList = (targetEl, group, mode) => {
     sortedRes.forEach(res => {
         const filteredCards = [];
         resolutions[res].forEach(rel => {
-            const matchingSubs = rel.sub_releases.filter(s => matchesTabMode(s, mode));
+            const matchingSubs = rel.sub_releases
+                .map(s => ({ ...s, parts: filterSubParts(s, mode) }))
+                .filter(s => s.parts.length > 0);
             if (matchingSubs.length > 0) {
                 filteredCards.push({ ...rel, sub_releases: matchingSubs });
             }
@@ -438,8 +439,10 @@ const bindDetailModalClose = () => {
     const closeBtn = document.getElementById('close-detail-modal');
     if (!modal) return;
     const close = () => {
+        const shouldRefresh = activeDetailContext?.dirty;
         modal.classList.remove('active');
         activeDetailContext = null;
+        if (shouldRefresh) fetchData('releases');
     };
     closeBtn?.addEventListener('click', close);
     modal.addEventListener('click', (e) => {
