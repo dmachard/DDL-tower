@@ -35,13 +35,20 @@ async def _reverify_old_links_bg(urls: List[str]):
                 await db.execute(
                     update(DownloadLink)
                     .where(DownloadLink.url.in_(dead_urls))
-                    .values(status="dead", last_checked=now)
+                    .values(
+                        status="dead",
+                        created_at=func.coalesce(DownloadLink.created_at, DownloadLink.last_checked),
+                        last_checked=now,
+                    )
                 )
             if alive_urls:
                 await db.execute(
                     update(DownloadLink)
                     .where(DownloadLink.url.in_(alive_urls))
-                    .values(last_checked=now)
+                    .values(
+                        created_at=func.coalesce(DownloadLink.created_at, DownloadLink.last_checked),
+                        last_checked=now,
+                    )
                 )
             await db.commit()
         release_service.invalidate_cache()
@@ -249,6 +256,8 @@ class LinkManager:
                             existing.year = override_year
                             existing.size = format_size(info.get('size', 0))
                             existing.size_bytes = info.get('size', 0)
+                            if existing.created_at is None:
+                                existing.created_at = existing.last_checked or datetime.now(timezone.utc)
                             existing.last_checked = datetime.now(timezone.utc)
                             existing.source_name = source_name
                             existing.source_url = source_url

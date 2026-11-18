@@ -308,22 +308,32 @@ const collectGroupIds = (group) => {
     return ids;
 };
 
-const countSubReleases = (group, onlyNew = false) => {
+const isSubDead = (sub) => (sub.parts || []).some(p => p.status === 'dead');
+
+const matchesTabMode = (sub, mode) => {
+    const dead = isSubDead(sub);
+    if (mode === 'dead') return dead;
+    if (mode === 'new' || mode === true) return !dead && !!sub.is_new;
+    return !dead;
+};
+
+const countSubReleases = (group, mode = 'all') => {
     if (!group.resolutions) {
-        return onlyNew ? (group.new_count || 0) : (group.all_count ?? group.count ?? 0);
+        if (mode === 'dead') return 0;
+        return (mode === 'new' || mode === true) ? (group.new_count || 0) : (group.all_count ?? group.count ?? 0);
     }
     let count = 0;
     Object.values(group.resolutions).forEach(relList => {
         relList.forEach(rel => {
             rel.sub_releases.forEach(sub => {
-                if (!onlyNew || sub.is_new) count++;
+                if (matchesTabMode(sub, mode)) count++;
             });
         });
     });
     return count;
 };
 
-const renderResolutionList = (targetEl, group, newOnly) => {
+const renderResolutionList = (targetEl, group, mode) => {
     targetEl.innerHTML = '';
     const resolutions = group.resolutions || {};
     const resOrder = { '2160p': 5, '4K': 5, '1080p': 4, '720p': 3, '576p': 2, '480p': 1, 'SD': 0, 'HD': -1 };
@@ -334,13 +344,9 @@ const renderResolutionList = (targetEl, group, newOnly) => {
     sortedRes.forEach(res => {
         const filteredCards = [];
         resolutions[res].forEach(rel => {
-            if (!newOnly) {
-                filteredCards.push(rel);
-            } else {
-                const newSubs = rel.sub_releases.filter(s => s.is_new);
-                if (newSubs.length > 0) {
-                    filteredCards.push({ ...rel, sub_releases: newSubs });
-                }
+            const matchingSubs = rel.sub_releases.filter(s => matchesTabMode(s, mode));
+            if (matchingSubs.length > 0) {
+                filteredCards.push({ ...rel, sub_releases: matchingSubs });
             }
         });
 
@@ -665,23 +671,28 @@ export const openReleaseModal = (group, currentSource = '') => {
 
     const tabNew = document.getElementById('detail-tab-new');
     const tabAll = document.getElementById('detail-tab-all');
+    const tabDead = document.getElementById('detail-tab-dead');
     const linksBody = document.getElementById('detail-links-body');
 
     const initTabs = () => {
-        const newCount = countSubReleases(group, true);
-        const allCount = countSubReleases(group, false);
+        const newCount = countSubReleases(group, 'new');
+        const allCount = countSubReleases(group, 'all');
+        const deadCount = countSubReleases(group, 'dead');
         document.getElementById('detail-new-count').textContent = newCount;
         document.getElementById('detail-all-count').textContent = allCount;
+        document.getElementById('detail-dead-count').textContent = deadCount;
 
-        const setMode = (newOnly) => {
-            tabNew.classList.toggle('active', newOnly);
-            tabAll.classList.toggle('active', !newOnly);
-            renderResolutionList(linksBody, group, newOnly);
+        const setMode = (mode) => {
+            tabNew.classList.toggle('active', mode === 'new');
+            tabAll.classList.toggle('active', mode === 'all');
+            tabDead?.classList.toggle('active', mode === 'dead');
+            renderResolutionList(linksBody, group, mode);
         };
 
-        tabNew.onclick = () => setMode(true);
-        tabAll.onclick = () => setMode(false);
-        setMode(newCount > 0);
+        tabNew.onclick = () => setMode('new');
+        tabAll.onclick = () => setMode('all');
+        if (tabDead) tabDead.onclick = () => setMode('dead');
+        setMode(newCount > 0 ? 'new' : (allCount > 0 ? 'all' : 'dead'));
     };
 
     modal.classList.add('active');
@@ -689,6 +700,7 @@ export const openReleaseModal = (group, currentSource = '') => {
     if (!group.resolutions) {
         document.getElementById('detail-new-count').textContent = group.new_count || 0;
         document.getElementById('detail-all-count').textContent = group.all_count ?? group.count ?? 0;
+        document.getElementById('detail-dead-count').textContent = 0;
         linksBody.innerHTML = '<div class="detail-empty-links"><i class="fas fa-spinner fa-spin"></i></div>';
 
         const url = new URL('/api/releases/detail', window.location.origin);

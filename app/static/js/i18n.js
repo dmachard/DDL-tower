@@ -81,6 +81,7 @@ export const TRANSLATIONS = {
         btn_back_all_sources: "All sources",
         tab_new_links: "New links",
         tab_all_links: "All links",
+        tab_dead_links: "Dead links",
         badge_new: "NEW",
         no_new_links: "No new links in this period"
     },
@@ -161,6 +162,7 @@ export const TRANSLATIONS = {
         btn_back_all_sources: "Toutes les sources",
         tab_new_links: "Nouveautés",
         tab_all_links: "Tous les liens",
+        tab_dead_links: "Liens morts",
         badge_new: "NOUVEAU",
         no_new_links: "Aucune nouveauté sur cette période"
     }

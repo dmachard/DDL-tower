@@ -577,12 +577,12 @@ class ReleaseService:
         if imdb_id and not imdb_id.startswith("local"):
             stmt = select(DownloadLink).where(
                 DownloadLink.imdb_id == imdb_id,
-                DownloadLink.status == "alive"
+                DownloadLink.status.in_(["alive", "dead"])
             )
         else:
             stmt = select(DownloadLink).where(
                 func.lower(DownloadLink.title) == (title or "").lower(),
-                DownloadLink.status == "alive"
+                DownloadLink.status.in_(["alive", "dead"])
             )
             if year is not None:
                 stmt = stmt.where(DownloadLink.year == year)

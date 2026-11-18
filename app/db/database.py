@@ -94,6 +94,10 @@ async def init_db():
             if dl_columns and "created_at" not in dl_columns:
                 print("[DB] Migration: Adding 'created_at' column to 'download_links' table")
                 sync_conn.connection.execute("ALTER TABLE download_links ADD COLUMN created_at DATETIME")
+            if dl_columns:
+                sync_conn.connection.execute(
+                    "UPDATE download_links SET created_at = last_checked WHERE created_at IS NULL AND last_checked IS NOT NULL"
+                )
         
             # Add columns to download_history
             inspector.execute("PRAGMA table_info(download_history)")
