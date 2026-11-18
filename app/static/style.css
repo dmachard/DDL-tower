@@ -4,7 +4,7 @@
 */
 
 /* Core & Base */
-@import url('css/base.css');
+@import url('css/base.css?v=2');
 @import url('css/layout.css');
 @import url('css/navigation.css');
 @import url('css/components.css');

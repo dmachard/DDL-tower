@@ -581,11 +581,35 @@ class CheckLinksRequest(BaseModel):
     urls: List[str]
 
 @router.post("/check-links")
-async def check_links(request: CheckLinksRequest):
+async def check_links(request: CheckLinksRequest, db: AsyncSession = Depends(get_db)):
     """
-    Checks if a list of links is alive using the direct Hoster service.
+    Checks if a list of links is alive using the direct Hoster service and persists status/last_checked.
     """
+    from sqlalchemy import update
     from app.core.hoster import Hoster
+    from app.db.models import DownloadLink
+    from app.services.release_service import release_service
+
     hoster = Hoster()
     result = await hoster.check_links(request.urls)
+
+    dead_urls = [u for u, r in result.items() if r.get("status") == "dead"]
+    alive_urls = [u for u, r in result.items() if r.get("status") == "alive"]
+    if dead_urls or alive_urls:
+        now = datetime.now(timezone.utc)
+        if dead_urls:
+            await db.execute(
+                update(DownloadLink)
+                .where(DownloadLink.url.in_(dead_urls))
+                .values(status="dead", last_checked=now)
+            )
+        if alive_urls:
+            await db.execute(
+                update(DownloadLink)
+                .where(DownloadLink.url.in_(alive_urls))
+                .values(status="alive", last_checked=now)
+            )
+        await db.commit()
+        release_service.invalidate_cache()
+
     return result

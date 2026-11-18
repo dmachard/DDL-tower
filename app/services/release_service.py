@@ -53,9 +53,10 @@ class ReleaseService:
 
             if card_key not in release_cards:
                 is_new = False
-                if r.last_checked and threshold:
-                    l_checked = r.last_checked.replace(tzinfo=timezone.utc) if r.last_checked.tzinfo is None else r.last_checked
-                    is_new = l_checked >= threshold
+                added_dt = r.created_at or r.last_checked
+                if added_dt and threshold:
+                    l_added = added_dt.replace(tzinfo=timezone.utc) if added_dt.tzinfo is None else added_dt
+                    is_new = l_added >= threshold
 
                 release_cards[card_key] = {
                     "id": r.id,
@@ -70,9 +71,10 @@ class ReleaseService:
             card = release_cards[card_key]
             if sub_key not in card["sub_releases"]:
                 is_sub_new = False
-                if r.last_checked and threshold:
-                    l_checked = r.last_checked.replace(tzinfo=timezone.utc) if r.last_checked.tzinfo is None else r.last_checked
-                    is_sub_new = l_checked >= threshold
+                added_dt = r.created_at or r.last_checked
+                if added_dt and threshold:
+                    l_added = added_dt.replace(tzinfo=timezone.utc) if added_dt.tzinfo is None else added_dt
+                    is_sub_new = l_added >= threshold
                 if is_sub_new:
                     card["is_new"] = True
 
@@ -155,7 +157,7 @@ class ReleaseService:
             func.max(DownloadLink.title).label("display_title"),
             func.max(DownloadLink.year).label("year"),
             DownloadLink.category,
-            func.max(DownloadLink.last_checked).label("latest"),
+            func.max(func.coalesce(DownloadLink.created_at, DownloadLink.last_checked)).label("latest"),
             func.max(MediaMetadata.poster_path).label("poster_path"),
             func.max(MediaMetadata.plot_en).label("plot_en"),
             func.max(MediaMetadata.plot_fr).label("plot_fr"),
@@ -194,7 +196,7 @@ class ReleaseService:
         if network:
             stmt = stmt.where(DownloadLink.network == network)
         if recent and threshold:
-            stmt = stmt.where(DownloadLink.last_checked >= threshold)
+            stmt = stmt.where(func.coalesce(DownloadLink.created_at, DownloadLink.last_checked) >= threshold)
         if local is not None:
             if local:
                 stmt = stmt.where(or_(
@@ -243,7 +245,7 @@ class ReleaseService:
             total = total_result.scalar() or 0
         
         # Paginate
-        stmt = stmt.order_by(func.max(DownloadLink.last_checked).desc())
+        stmt = stmt.order_by(func.max(func.coalesce(DownloadLink.created_at, DownloadLink.last_checked)).desc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
         
         result = await db.execute(stmt)
@@ -280,12 +282,12 @@ class ReleaseService:
             # as per user request to remove the toggle.
             pass 
 
-            rel_stmt = rel_stmt.order_by(DownloadLink.last_checked.desc())
+            rel_stmt = rel_stmt.order_by(func.coalesce(DownloadLink.created_at, DownloadLink.last_checked).desc())
             rel_result = await db.execute(rel_stmt)
             releases = rel_result.scalars().all()
 
             resolutions_map, card_count = ReleaseService._format_group_releases(releases, novelty_threshold)
-            group_latest = releases[0].last_checked if releases else None
+            group_latest = (releases[0].created_at or releases[0].last_checked) if releases else None
             items.append({
                 "title": g_title, "official_title": g_official, "year": g_off_year or g_year,
                 "category": g_cat, "poster_path": g_poster, "plot_en": g_plot_en, "plot_fr": g_plot_fr,
@@ -356,7 +358,10 @@ class ReleaseService:
             if novelty_threshold:
                 cols.append(
                     func.count(func.distinct(case((
-                        and_(DownloadLink.status == "alive", DownloadLink.last_checked >= novelty_threshold),
+                        and_(
+                            DownloadLink.status == "alive",
+                            func.coalesce(DownloadLink.created_at, DownloadLink.last_checked) >= novelty_threshold,
+                        ),
                         func.coalesce(DownloadLink.imdb_id, func.lower(DownloadLink.title)),
                     )))).label("new_items")
                 )
@@ -430,10 +435,11 @@ class ReleaseService:
                         q_stmt = q_stmt.where(DownloadLink.resolution == resolution)
                 if network:
                     q_stmt = q_stmt.where(DownloadLink.network == network)
+                added_col = func.coalesce(DownloadLink.created_at, DownloadLink.last_checked)
                 if recent and threshold:
-                    q_stmt = q_stmt.where(DownloadLink.last_checked >= threshold)
+                    q_stmt = q_stmt.where(added_col >= threshold)
 
-                q_stmt = q_stmt.order_by(DownloadLink.last_checked.desc()).limit(400)
+                q_stmt = q_stmt.order_by(added_col.desc()).limit(400)
                 link_res = await db.execute(q_stmt)
                 recent_links = link_res.scalars().all()
                 if not recent_links:
@@ -475,7 +481,7 @@ class ReleaseService:
                         cnt_stmt = select(
                             DownloadLink.imdb_id,
                             func.count(DownloadLink.id),
-                            func.sum(case((DownloadLink.last_checked >= novelty_threshold, 1), else_=0))
+                            func.sum(case((func.coalesce(DownloadLink.created_at, DownloadLink.last_checked) >= novelty_threshold, 1), else_=0))
                         ).where(
                             DownloadLink.imdb_id.in_(imdb_ids),
                             DownloadLink.source_name == src,
@@ -507,12 +513,13 @@ class ReleaseService:
                         new_cnt = 0
                         if novelty_threshold:
                             for l in local_links:
-                                if l.last_checked:
-                                    lc = l.last_checked.replace(tzinfo=timezone.utc) if l.last_checked.tzinfo is None else l.last_checked
+                                l_added = l.created_at or l.last_checked
+                                if l_added:
+                                    lc = l_added.replace(tzinfo=timezone.utc) if l_added.tzinfo is None else l_added
                                     if lc >= novelty_threshold:
                                         new_cnt += 1
 
-                    group_latest = local_links[0].last_checked if local_links else rep.last_checked
+                    group_latest = (local_links[0].created_at or local_links[0].last_checked) if local_links else (rep.created_at or rep.last_checked)
                     items.append({
                         "title": rep.title,
                         "official_title": m.official_title if m else None,
@@ -586,7 +593,7 @@ class ReleaseService:
             else:
                 stmt = stmt.where(DownloadLink.category == None)
 
-        stmt = stmt.order_by(DownloadLink.last_checked.desc())
+        stmt = stmt.order_by(func.coalesce(DownloadLink.created_at, DownloadLink.last_checked).desc())
         releases = (await db.execute(stmt)).scalars().all()
         resolutions_map, card_count = ReleaseService._format_group_releases(releases, novelty_threshold)
         return {"resolutions": resolutions_map, "count": card_count}

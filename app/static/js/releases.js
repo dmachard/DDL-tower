@@ -7,6 +7,45 @@ import { showConfirm } from './modals.js';
 
 // ─── Release Card ─────────────────────────────────────────────────────────────
 
+const applyProviderCheckResult = (pRow, checkBtn, isDead, hasError, restoreIconClass = 'fa-heartbeat') => {
+    const icon = checkBtn.querySelector('i');
+    if (isDead) {
+        icon.className = 'fas fa-heart-broken';
+        checkBtn.style.color = 'var(--accent-red)';
+        pRow.style.opacity = '0.5';
+        pRow.style.borderLeft = '3px solid var(--accent-red)';
+        pRow.classList.add('is-dead');
+    } else if (hasError) {
+        icon.className = 'fas fa-exclamation-triangle';
+        checkBtn.style.color = 'var(--warning)';
+        setTimeout(() => { icon.className = restoreIconClass; checkBtn.style.color = ''; }, 3000);
+        pRow.classList.remove('is-dead');
+        pRow.style.opacity = '';
+        pRow.style.borderLeft = '';
+    } else {
+        icon.className = 'fas fa-check';
+        checkBtn.style.color = '';
+        checkBtn.classList.add('success');
+        setTimeout(() => { icon.className = restoreIconClass; checkBtn.classList.remove('success'); }, 2000);
+        pRow.classList.remove('is-dead');
+        pRow.style.opacity = '';
+        pRow.style.borderLeft = '';
+    }
+
+    if (isDead || !hasError) {
+        const nowFormatted = formatDate(new Date().toISOString());
+        let checkedEl = pRow.querySelector('.rel-p-checked');
+        if (!checkedEl) {
+            checkedEl = document.createElement('span');
+            checkedEl.className = 'rel-p-checked';
+            checkedEl.title = 'Last checked';
+            const sizeEl = pRow.querySelector('.rel-p-size');
+            if (sizeEl) pRow.insertBefore(checkedEl, sizeEl);
+        }
+        checkedEl.textContent = nowFormatted;
+    }
+};
+
 export const createReleaseCard = (rel) => {
     const card = document.createElement('div');
     card.className = `release-card ${rel.is_new ? 'is-new' : ''}`;
@@ -169,28 +208,7 @@ export const createReleaseCard = (rel) => {
                         if (s === 'error' || s === 'unknown') hasError = true;
                     }
                     const pRow = btn.closest('.rel-provider-row');
-                    if (isDead) {
-                        icon.className = 'fas fa-heart-broken';
-                        btn.style.color = 'var(--accent-red)';
-                        pRow.style.opacity = '0.5';
-                        pRow.style.borderLeft = '3px solid var(--accent-red)';
-                        pRow.classList.add('is-dead');
-                    } else if (hasError) {
-                        icon.className = 'fas fa-exclamation-triangle';
-                        btn.style.color = 'var(--warning)';
-                        setTimeout(() => { icon.className = originalClass; btn.style.color = ''; }, 3000);
-                        pRow.classList.remove('is-dead');
-                        pRow.style.opacity = '';
-                        pRow.style.borderLeft = '';
-                    } else {
-                        icon.className = 'fas fa-check';
-                        btn.style.color = '';
-                        btn.classList.add('success');
-                        setTimeout(() => { icon.className = originalClass; btn.classList.remove('success'); }, 2000);
-                        pRow.classList.remove('is-dead');
-                        pRow.style.opacity = '';
-                        pRow.style.borderLeft = '';
-                    }
+                    applyProviderCheckResult(pRow, btn, isDead, hasError, originalClass);
                     
                     const cardElement = btn.closest('.release-card');
                     if (cardElement) {
@@ -516,28 +534,7 @@ export const openReleaseModal = (group, currentSource = '') => {
                         if (s === 'dead') isDead = true;
                         if (s === 'error' || s === 'unknown') hasError = true;
                     });
-                    const pIcon = mapping.checkBtn.querySelector('i');
-                    if (isDead) {
-                        pIcon.className = 'fas fa-heart-broken';
-                        mapping.checkBtn.style.color = 'var(--accent-red)';
-                        mapping.pRow.style.opacity = '0.5';
-                        mapping.pRow.style.borderLeft = '3px solid var(--accent-red)';
-                        mapping.pRow.classList.add('is-dead');
-                    } else if (hasError) {
-                        pIcon.className = 'fas fa-exclamation-triangle';
-                        mapping.checkBtn.style.color = 'var(--warning)';
-                        mapping.pRow.classList.remove('is-dead');
-                        mapping.pRow.style.opacity = '';
-                        mapping.pRow.style.borderLeft = '';
-                    } else {
-                        pIcon.className = 'fas fa-check';
-                        mapping.checkBtn.style.color = '';
-                        mapping.checkBtn.classList.add('success');
-                        setTimeout(() => { mapping.checkBtn.classList.remove('success'); pIcon.className = 'fas fa-heartbeat'; }, 2000);
-                        mapping.pRow.classList.remove('is-dead');
-                        mapping.pRow.style.opacity = '';
-                        mapping.pRow.style.borderLeft = '';
-                    }
+                    applyProviderCheckResult(mapping.pRow, mapping.checkBtn, isDead, hasError, 'fas fa-heartbeat');
                 });
             }
         } catch (err) {

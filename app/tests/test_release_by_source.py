@@ -42,7 +42,7 @@ async def test_by_source_lightweight_and_detail():
                 DownloadLink(
                     url="https://1f.test/m2", hoster="1fichier", status="alive",
                     filename="Test.Movie.2025.720p.mkv", size="2.1 GB", size_bytes=2100000000,
-                    last_checked=old_time, source_name="SrcA", title="Test Movie",
+                    created_at=old_time, last_checked=old_time, source_name="SrcA", title="Test Movie",
                     category="movie", year=2025, resolution="720p", imdb_id="tt0000001"
                 ),
                 DownloadLink(
